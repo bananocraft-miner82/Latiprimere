@@ -2,7 +2,7 @@
 
 A cross-platform printing library for .NET: discover printers, read their capabilities, submit jobs and track them to completion, with the same code on Windows, Linux and macOS.
 
-> **Status:** Phase 1, hardening the core and raw printing. The Phase 0 proof of concept is complete. No packages are released yet, and it isn't ready for production use.
+> **Status:** preview. Version 0.1.0-preview is on [NuGet](https://www.nuget.org/packages/Latiprimere) for evaluation. The API may still change before 1.0, so it isn't ready for production use yet.
 
 ## Goals
 
