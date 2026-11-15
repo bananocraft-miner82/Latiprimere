@@ -1,13 +1,1 @@
 #nullable enable
-Latiprimere.PrinterCatalog
-Latiprimere.PrinterCatalog.GetDefaultPrinterAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrinter?>!
-Latiprimere.PrinterCatalog.GetPrinterAsync(string! printerId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrinter!>!
-Latiprimere.PrinterCatalog.GetPrintersAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Latiprimere.PrinterInfo!>!>!
-Latiprimere.PrinterCatalog.PrinterCatalog(System.Collections.Generic.IEnumerable<Latiprimere.IPrintSystem!>! printSystems, Microsoft.Extensions.Logging.ILogger<Latiprimere.PrinterCatalog!>? logger = null) -> void
-Latiprimere.PrintJobExtensions
-Microsoft.Extensions.DependencyInjection.LatiprimereServiceCollectionExtensions
-static Latiprimere.PrintJobExtensions.WatchStatusAsync(this Latiprimere.IPrintJob! job) -> System.Collections.Generic.IAsyncEnumerable<Latiprimere.PrintJobStatus!>!
-static Latiprimere.PrintJobExtensions.WatchStatusAsync(this Latiprimere.IPrintJob! job, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<Latiprimere.PrintJobStatus!>!
-static Latiprimere.PrintJobExtensions.WatchStatusAsync(this Latiprimere.IPrintJob! job, System.TimeSpan pollInterval, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<Latiprimere.PrintJobStatus!>!
-static Microsoft.Extensions.DependencyInjection.LatiprimereServiceCollectionExtensions.AddLatiprimere(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static readonly Latiprimere.PrintJobExtensions.DefaultPollInterval -> System.TimeSpan

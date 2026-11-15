@@ -1,1 +1,242 @@
 #nullable enable
+Latiprimere.ColorMode
+Latiprimere.ColorMode.Color = 2 -> Latiprimere.ColorMode
+Latiprimere.ColorMode.Monochrome = 1 -> Latiprimere.ColorMode
+Latiprimere.ColorMode.PrinterDefault = 0 -> Latiprimere.ColorMode
+Latiprimere.DocumentFormat
+Latiprimere.DocumentFormat.Pdf = 0 -> Latiprimere.DocumentFormat
+Latiprimere.DocumentFormat.Raw = 1 -> Latiprimere.DocumentFormat
+Latiprimere.DuplexMode
+Latiprimere.DuplexMode.LongEdge = 2 -> Latiprimere.DuplexMode
+Latiprimere.DuplexMode.OneSided = 1 -> Latiprimere.DuplexMode
+Latiprimere.DuplexMode.PrinterDefault = 0 -> Latiprimere.DuplexMode
+Latiprimere.DuplexMode.ShortEdge = 3 -> Latiprimere.DuplexMode
+Latiprimere.IPrintJob
+Latiprimere.IPrintJob.CancelAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Latiprimere.IPrintJob.GetStatusAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.PrintJobStatus!>!
+Latiprimere.IPrintJob.Id.get -> string!
+Latiprimere.IPrintJob.PrinterId.get -> string!
+Latiprimere.IPrintSystem
+Latiprimere.IPrintSystem.FindDefaultPrinterAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrinter?>!
+Latiprimere.IPrintSystem.FindPrinterAsync(string! printerId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrinter?>!
+Latiprimere.IPrintSystem.GetPrintersAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Latiprimere.PrinterInfo!>!>!
+Latiprimere.IPrintSystem.IsSupported.get -> bool
+Latiprimere.IPrintSystem.Name.get -> string!
+Latiprimere.IPrinter
+Latiprimere.IPrinter.GetCapabilitiesAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.PrinterCapabilities!>!
+Latiprimere.IPrinter.Info.get -> Latiprimere.PrinterInfo!
+Latiprimere.IPrinter.SubmitAsync(Latiprimere.PrintContent! content, Latiprimere.PrintOptions! options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrintJob!>!
+Latiprimere.IPrinterCatalog
+Latiprimere.IPrinterCatalog.GetDefaultPrinterAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrinter?>!
+Latiprimere.IPrinterCatalog.GetPrinterAsync(string! printerId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrinter!>!
+Latiprimere.IPrinterCatalog.GetPrintersAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Latiprimere.PrinterInfo!>!>!
+Latiprimere.InputTray
+Latiprimere.InputTray.<Clone>$() -> Latiprimere.InputTray!
+Latiprimere.InputTray.Equals(Latiprimere.InputTray? other) -> bool
+Latiprimere.InputTray.Id.get -> string!
+Latiprimere.InputTray.Id.init -> void
+Latiprimere.InputTray.InputTray() -> void
+Latiprimere.InputTray.Name.get -> string!
+Latiprimere.InputTray.Name.init -> void
+Latiprimere.MediaSize
+Latiprimere.MediaSize.<Clone>$() -> Latiprimere.MediaSize!
+Latiprimere.MediaSize.DisplayName.get -> string!
+Latiprimere.MediaSize.DisplayName.init -> void
+Latiprimere.MediaSize.Equals(Latiprimere.MediaSize? other) -> bool
+Latiprimere.MediaSize.HeightMillimetres.get -> double
+Latiprimere.MediaSize.HeightMillimetres.init -> void
+Latiprimere.MediaSize.MediaSize() -> void
+Latiprimere.MediaSize.Name.get -> string!
+Latiprimere.MediaSize.Name.init -> void
+Latiprimere.MediaSize.WidthMillimetres.get -> double
+Latiprimere.MediaSize.WidthMillimetres.init -> void
+Latiprimere.PageOrientation
+Latiprimere.PageOrientation.Landscape = 2 -> Latiprimere.PageOrientation
+Latiprimere.PageOrientation.Portrait = 1 -> Latiprimere.PageOrientation
+Latiprimere.PageOrientation.PrinterDefault = 0 -> Latiprimere.PageOrientation
+Latiprimere.PrintAuthenticationException
+Latiprimere.PrintAuthenticationException.PrintAuthenticationException() -> void
+Latiprimere.PrintAuthenticationException.PrintAuthenticationException(string! message) -> void
+Latiprimere.PrintAuthenticationException.PrintAuthenticationException(string! message, System.Exception! innerException) -> void
+Latiprimere.PrintContent
+Latiprimere.PrintContent.Content.get -> System.IO.Stream!
+Latiprimere.PrintContent.Format.get -> Latiprimere.DocumentFormat
+Latiprimere.PrintException
+Latiprimere.PrintException.NativeErrorCode.get -> int?
+Latiprimere.PrintException.NativeErrorCode.init -> void
+Latiprimere.PrintException.PrintException() -> void
+Latiprimere.PrintException.PrintException(string! message) -> void
+Latiprimere.PrintException.PrintException(string! message, System.Exception! innerException) -> void
+Latiprimere.PrintJobState
+Latiprimere.PrintJobState.Aborted = 6 -> Latiprimere.PrintJobState
+Latiprimere.PrintJobState.Cancelled = 5 -> Latiprimere.PrintJobState
+Latiprimere.PrintJobState.Completed = 7 -> Latiprimere.PrintJobState
+Latiprimere.PrintJobState.Held = 2 -> Latiprimere.PrintJobState
+Latiprimere.PrintJobState.Pending = 1 -> Latiprimere.PrintJobState
+Latiprimere.PrintJobState.Processing = 3 -> Latiprimere.PrintJobState
+Latiprimere.PrintJobState.Stopped = 4 -> Latiprimere.PrintJobState
+Latiprimere.PrintJobState.Unknown = 0 -> Latiprimere.PrintJobState
+Latiprimere.PrintJobStatus
+Latiprimere.PrintJobStatus.<Clone>$() -> Latiprimere.PrintJobStatus!
+Latiprimere.PrintJobStatus.Equals(Latiprimere.PrintJobStatus? other) -> bool
+Latiprimere.PrintJobStatus.IsTerminal.get -> bool
+Latiprimere.PrintJobStatus.JobId.get -> string!
+Latiprimere.PrintJobStatus.JobId.init -> void
+Latiprimere.PrintJobStatus.PagesCompleted.get -> int?
+Latiprimere.PrintJobStatus.PagesCompleted.init -> void
+Latiprimere.PrintJobStatus.PrintJobStatus() -> void
+Latiprimere.PrintJobStatus.State.get -> Latiprimere.PrintJobState
+Latiprimere.PrintJobStatus.State.init -> void
+Latiprimere.PrintJobStatus.StateMessage.get -> string?
+Latiprimere.PrintJobStatus.StateMessage.init -> void
+Latiprimere.PrintJobStatus.Timestamp.get -> System.DateTimeOffset
+Latiprimere.PrintJobStatus.Timestamp.init -> void
+Latiprimere.PrintOptions
+Latiprimere.PrintOptions.<Clone>$() -> Latiprimere.PrintOptions!
+Latiprimere.PrintOptions.Copies.get -> int
+Latiprimere.PrintOptions.Copies.init -> void
+Latiprimere.PrintOptions.Duplex.get -> Latiprimere.DuplexMode
+Latiprimere.PrintOptions.Duplex.init -> void
+Latiprimere.PrintOptions.Equals(Latiprimere.PrintOptions? other) -> bool
+Latiprimere.PrintOptions.JobName.get -> string?
+Latiprimere.PrintOptions.JobName.init -> void
+Latiprimere.PrintOptions.Orientation.get -> Latiprimere.PageOrientation
+Latiprimere.PrintOptions.Orientation.init -> void
+Latiprimere.PrintOptions.OutputFile.get -> string?
+Latiprimere.PrintOptions.OutputFile.init -> void
+Latiprimere.PrintOptions.PrintOptions() -> void
+Latiprimere.PrintSystemUnavailableException
+Latiprimere.PrintSystemUnavailableException.PrintSystemUnavailableException() -> void
+Latiprimere.PrintSystemUnavailableException.PrintSystemUnavailableException(string! message) -> void
+Latiprimere.PrintSystemUnavailableException.PrintSystemUnavailableException(string! message, System.Exception! innerException) -> void
+Latiprimere.PrinterCapabilities
+Latiprimere.PrinterCapabilities.<Clone>$() -> Latiprimere.PrinterCapabilities!
+Latiprimere.PrinterCapabilities.ColorModes.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.ColorMode>!
+Latiprimere.PrinterCapabilities.ColorModes.init -> void
+Latiprimere.PrinterCapabilities.DefaultColorMode.get -> Latiprimere.ColorMode?
+Latiprimere.PrinterCapabilities.DefaultColorMode.init -> void
+Latiprimere.PrinterCapabilities.DefaultDuplexMode.get -> Latiprimere.DuplexMode?
+Latiprimere.PrinterCapabilities.DefaultDuplexMode.init -> void
+Latiprimere.PrinterCapabilities.DefaultMediaSize.get -> Latiprimere.MediaSize?
+Latiprimere.PrinterCapabilities.DefaultMediaSize.init -> void
+Latiprimere.PrinterCapabilities.DuplexModes.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.DuplexMode>!
+Latiprimere.PrinterCapabilities.DuplexModes.init -> void
+Latiprimere.PrinterCapabilities.Equals(Latiprimere.PrinterCapabilities? other) -> bool
+Latiprimere.PrinterCapabilities.InputTrays.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.InputTray!>!
+Latiprimere.PrinterCapabilities.InputTrays.init -> void
+Latiprimere.PrinterCapabilities.MaxCopies.get -> int?
+Latiprimere.PrinterCapabilities.MaxCopies.init -> void
+Latiprimere.PrinterCapabilities.MediaSizes.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.MediaSize!>!
+Latiprimere.PrinterCapabilities.MediaSizes.init -> void
+Latiprimere.PrinterCapabilities.Orientations.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.PageOrientation>!
+Latiprimere.PrinterCapabilities.Orientations.init -> void
+Latiprimere.PrinterCapabilities.PrinterCapabilities() -> void
+Latiprimere.PrinterInfo
+Latiprimere.PrinterInfo.<Clone>$() -> Latiprimere.PrinterInfo!
+Latiprimere.PrinterInfo.Description.get -> string?
+Latiprimere.PrinterInfo.Description.init -> void
+Latiprimere.PrinterInfo.Equals(Latiprimere.PrinterInfo? other) -> bool
+Latiprimere.PrinterInfo.Id.get -> string!
+Latiprimere.PrinterInfo.Id.init -> void
+Latiprimere.PrinterInfo.IsDefault.get -> bool
+Latiprimere.PrinterInfo.IsDefault.init -> void
+Latiprimere.PrinterInfo.Location.get -> string?
+Latiprimere.PrinterInfo.Location.init -> void
+Latiprimere.PrinterInfo.MakeAndModel.get -> string?
+Latiprimere.PrinterInfo.MakeAndModel.init -> void
+Latiprimere.PrinterInfo.Name.get -> string!
+Latiprimere.PrinterInfo.Name.init -> void
+Latiprimere.PrinterInfo.PrinterInfo() -> void
+Latiprimere.PrinterInfo.State.get -> Latiprimere.PrinterState
+Latiprimere.PrinterInfo.State.init -> void
+Latiprimere.PrinterNotFoundException
+Latiprimere.PrinterNotFoundException.PrinterId.get -> string?
+Latiprimere.PrinterNotFoundException.PrinterId.init -> void
+Latiprimere.PrinterNotFoundException.PrinterNotFoundException() -> void
+Latiprimere.PrinterNotFoundException.PrinterNotFoundException(string! message) -> void
+Latiprimere.PrinterNotFoundException.PrinterNotFoundException(string! message, System.Exception! innerException) -> void
+Latiprimere.PrinterState
+Latiprimere.PrinterState.Idle = 1 -> Latiprimere.PrinterState
+Latiprimere.PrinterState.Processing = 2 -> Latiprimere.PrinterState
+Latiprimere.PrinterState.Stopped = 3 -> Latiprimere.PrinterState
+Latiprimere.PrinterState.Unknown = 0 -> Latiprimere.PrinterState
+Latiprimere.Rendering.IPdfRasterizer
+Latiprimere.Rendering.IPdfRasterizer.Open(System.IO.Stream! content) -> Latiprimere.Rendering.IRasterDocument!
+Latiprimere.Rendering.IRasterDocument
+Latiprimere.Rendering.IRasterDocument.GetPageSize(int pageIndex) -> Latiprimere.Rendering.PageSize
+Latiprimere.Rendering.IRasterDocument.PageCount.get -> int
+Latiprimere.Rendering.IRasterDocument.RenderBand(int pageIndex, Latiprimere.Rendering.RasterBand band, System.Span<byte> pixels) -> void
+Latiprimere.Rendering.PageSize
+Latiprimere.Rendering.PageSize.Deconstruct(out double WidthPoints, out double HeightPoints) -> void
+Latiprimere.Rendering.PageSize.Equals(Latiprimere.Rendering.PageSize other) -> bool
+Latiprimere.Rendering.PageSize.HeightPoints.get -> double
+Latiprimere.Rendering.PageSize.HeightPoints.init -> void
+Latiprimere.Rendering.PageSize.IsLandscape.get -> bool
+Latiprimere.Rendering.PageSize.PageSize() -> void
+Latiprimere.Rendering.PageSize.PageSize(double WidthPoints, double HeightPoints) -> void
+Latiprimere.Rendering.PageSize.WidthPoints.get -> double
+Latiprimere.Rendering.PageSize.WidthPoints.init -> void
+Latiprimere.Rendering.RasterBand
+Latiprimere.Rendering.RasterBand.ByteCount.get -> long
+Latiprimere.Rendering.RasterBand.Deconstruct(out int PageWidth, out int PageHeight, out int Top, out int Height, out int Stride) -> void
+Latiprimere.Rendering.RasterBand.Equals(Latiprimere.Rendering.RasterBand other) -> bool
+Latiprimere.Rendering.RasterBand.Height.get -> int
+Latiprimere.Rendering.RasterBand.Height.init -> void
+Latiprimere.Rendering.RasterBand.PageHeight.get -> int
+Latiprimere.Rendering.RasterBand.PageHeight.init -> void
+Latiprimere.Rendering.RasterBand.PageWidth.get -> int
+Latiprimere.Rendering.RasterBand.PageWidth.init -> void
+Latiprimere.Rendering.RasterBand.RasterBand() -> void
+Latiprimere.Rendering.RasterBand.RasterBand(int PageWidth, int PageHeight, int Top, int Height, int Stride) -> void
+Latiprimere.Rendering.RasterBand.Stride.get -> int
+Latiprimere.Rendering.RasterBand.Stride.init -> void
+Latiprimere.Rendering.RasterBand.Top.get -> int
+Latiprimere.Rendering.RasterBand.Top.init -> void
+override Latiprimere.InputTray.Equals(object? obj) -> bool
+override Latiprimere.InputTray.GetHashCode() -> int
+override Latiprimere.InputTray.ToString() -> string!
+override Latiprimere.MediaSize.Equals(object? obj) -> bool
+override Latiprimere.MediaSize.GetHashCode() -> int
+override Latiprimere.MediaSize.ToString() -> string!
+override Latiprimere.PrintJobStatus.Equals(object? obj) -> bool
+override Latiprimere.PrintJobStatus.GetHashCode() -> int
+override Latiprimere.PrintJobStatus.ToString() -> string!
+override Latiprimere.PrintOptions.Equals(object? obj) -> bool
+override Latiprimere.PrintOptions.GetHashCode() -> int
+override Latiprimere.PrintOptions.ToString() -> string!
+override Latiprimere.PrinterCapabilities.Equals(object? obj) -> bool
+override Latiprimere.PrinterCapabilities.GetHashCode() -> int
+override Latiprimere.PrinterCapabilities.ToString() -> string!
+override Latiprimere.PrinterInfo.Equals(object? obj) -> bool
+override Latiprimere.PrinterInfo.GetHashCode() -> int
+override Latiprimere.PrinterInfo.ToString() -> string!
+override Latiprimere.Rendering.PageSize.GetHashCode() -> int
+override Latiprimere.Rendering.RasterBand.GetHashCode() -> int
+static Latiprimere.InputTray.operator !=(Latiprimere.InputTray? left, Latiprimere.InputTray? right) -> bool
+static Latiprimere.InputTray.operator ==(Latiprimere.InputTray? left, Latiprimere.InputTray? right) -> bool
+static Latiprimere.MediaSize.operator !=(Latiprimere.MediaSize? left, Latiprimere.MediaSize? right) -> bool
+static Latiprimere.MediaSize.operator ==(Latiprimere.MediaSize? left, Latiprimere.MediaSize? right) -> bool
+static Latiprimere.PrintContent.FromPdf(System.IO.Stream! content) -> Latiprimere.PrintContent!
+static Latiprimere.PrintContent.FromRaw(System.IO.Stream! content) -> Latiprimere.PrintContent!
+static Latiprimere.PrintJobStatus.operator !=(Latiprimere.PrintJobStatus? left, Latiprimere.PrintJobStatus? right) -> bool
+static Latiprimere.PrintJobStatus.operator ==(Latiprimere.PrintJobStatus? left, Latiprimere.PrintJobStatus? right) -> bool
+static Latiprimere.PrintOptions.operator !=(Latiprimere.PrintOptions? left, Latiprimere.PrintOptions? right) -> bool
+static Latiprimere.PrintOptions.operator ==(Latiprimere.PrintOptions? left, Latiprimere.PrintOptions? right) -> bool
+static Latiprimere.PrinterCapabilities.operator !=(Latiprimere.PrinterCapabilities? left, Latiprimere.PrinterCapabilities? right) -> bool
+static Latiprimere.PrinterCapabilities.operator ==(Latiprimere.PrinterCapabilities? left, Latiprimere.PrinterCapabilities? right) -> bool
+static Latiprimere.PrinterInfo.operator !=(Latiprimere.PrinterInfo? left, Latiprimere.PrinterInfo? right) -> bool
+static Latiprimere.PrinterInfo.operator ==(Latiprimere.PrinterInfo? left, Latiprimere.PrinterInfo? right) -> bool
+static Latiprimere.PrinterNotFoundException.FromPrinterId(string! printerId) -> Latiprimere.PrinterNotFoundException!
+static Latiprimere.Rendering.PageSize.operator !=(Latiprimere.Rendering.PageSize left, Latiprimere.Rendering.PageSize right) -> bool
+static Latiprimere.Rendering.PageSize.operator ==(Latiprimere.Rendering.PageSize left, Latiprimere.Rendering.PageSize right) -> bool
+static Latiprimere.Rendering.RasterBand.Create(int pageWidth, int pageHeight, int top, int height) -> Latiprimere.Rendering.RasterBand
+static Latiprimere.Rendering.RasterBand.operator !=(Latiprimere.Rendering.RasterBand left, Latiprimere.Rendering.RasterBand right) -> bool
+static Latiprimere.Rendering.RasterBand.operator ==(Latiprimere.Rendering.RasterBand left, Latiprimere.Rendering.RasterBand right) -> bool
+static readonly Latiprimere.PrintOptions.Default -> Latiprimere.PrintOptions!
+static readonly Latiprimere.PrintOptions.MinimumCopies -> int
+static readonly Latiprimere.Rendering.PageSize.PointsPerInch -> double
+static readonly Latiprimere.Rendering.RasterBand.BytesPerPixel -> int
+~override Latiprimere.Rendering.PageSize.Equals(object obj) -> bool
+~override Latiprimere.Rendering.PageSize.ToString() -> string
+~override Latiprimere.Rendering.RasterBand.Equals(object obj) -> bool
+~override Latiprimere.Rendering.RasterBand.ToString() -> string
