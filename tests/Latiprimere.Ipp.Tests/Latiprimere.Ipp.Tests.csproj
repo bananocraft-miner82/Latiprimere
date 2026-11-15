@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Latiprimere.Ipp\Latiprimere.Ipp.csproj" />
+		<ProjectReference Include="..\Latiprimere.Ipp.Testing\Latiprimere.Ipp.Testing.csproj" />
+		<ProjectReference Include="..\Latiprimere.Testing\Latiprimere.Testing.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+		<PackageReference Include="SharpIppNext" />
+	</ItemGroup>
+
+	<!-- Attribute dumps captured from the CUPS test container: ipptool text for reading, and raw IPP responses (.ipp)
+	     that tests replay through the real decoder -->
+	<ItemGroup>
+		<None Include="Data\*.txt" />
+		<None Include="Data\*.ipp" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<Description>Windows adapter for Latiprimere: print through the Windows print spooler.</Description>
+		<PackageTags>$(PackageTags);windows</PackageTags>
+		<!-- Required by the LibraryImport source generator and for pointer access to spooler buffers -->
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Latiprimere.Abstractions\Latiprimere.Abstractions.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Latiprimere.Windows.Tests" />
+	</ItemGroup>
+
+	<!-- Messages; the source generator gives them strongly typed classes the editor sees without a build -->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.ResxSourceGenerator" PrivateAssets="all" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<Description>PDF rasteriser for Latiprimere, built on PDFium. Needed to print PDF documents through the Windows spooler.</Description>
+		<PackageTags>$(PackageTags);pdf;pdfium</PackageTags>
+		<!-- Required by the LibraryImport source generator and for pointer access to pixel buffers -->
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Latiprimere.Abstractions\Latiprimere.Abstractions.csproj" />
+	</ItemGroup>
+
+	<!-- PDFium native binaries for each platform, from https://github.com/bblanchon/pdfium-binaries -->
+	<ItemGroup>
+		<PackageReference Include="bblanchon.PDFium.Win32" />
+		<PackageReference Include="bblanchon.PDFium.Linux" />
+		<PackageReference Include="bblanchon.PDFium.macOS" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Latiprimere.Rendering.Pdfium.Tests" />
+	</ItemGroup>
+
+	<!-- Exception messages; the source generator gives them strongly typed classes the editor sees without a build -->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.ResxSourceGenerator" PrivateAssets="all" />
+	</ItemGroup>
+
+</Project>

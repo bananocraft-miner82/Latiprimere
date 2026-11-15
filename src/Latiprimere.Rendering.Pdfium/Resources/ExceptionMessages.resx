@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+	<resheader name="resmimetype">
+		<value>text/microsoft-resx</value>
+	</resheader>
+	<resheader name="version">
+		<value>2.0</value>
+	</resheader>
+	<resheader name="reader">
+		<value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+	</resheader>
+	<resheader name="writer">
+		<value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+	</resheader>
+	<data name="PdfNotReadable" xml:space="preserve">
+		<value>The document could not be read as a PDF (PDFium error {0}).</value>
+		<comment>{0} is the PDFium error code.</comment>
+	</data>
+	<data name="PdfTooLarge" xml:space="preserve">
+		<value>The PDF is larger than {0} bytes, the most Latiprimere can render.</value>
+		<comment>{0} is the limit in bytes, about 2 GB, formatted with digit grouping.</comment>
+	</data>
+	<data name="PdfPasswordProtected" xml:space="preserve">
+		<value>The PDF is password-protected and cannot be printed.</value>
+	</data>
+	<data name="PageLoadFailed" xml:space="preserve">
+		<value>Page {0} of the PDF could not be loaded.</value>
+		<comment>{0} is the one-based page number.</comment>
+	</data>
+	<data name="BitmapCreateFailed" xml:space="preserve">
+		<value>PDFium could not create a bitmap for rendering.</value>
+	</data>
+	<data name="PixelBufferTooSmall" xml:space="preserve">
+		<value>The pixel buffer holds {0} bytes, but the band needs {1}.</value>
+		<comment>{0} is the buffer length, {1} the bytes needed.</comment>
+	</data>
+	<data name="StrideTooSmall" xml:space="preserve">
+		<value>The stride must be at least the page width times 4 bytes.</value>
+	</data>
+	<data name="BandOutsidePage" xml:space="preserve">
+		<value>The band must lie within the page.</value>
+	</data>
+</root>

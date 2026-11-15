@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+	<resheader name="resmimetype">
+		<value>text/microsoft-resx</value>
+	</resheader>
+	<resheader name="version">
+		<value>2.0</value>
+	</resheader>
+	<resheader name="reader">
+		<value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+	</resheader>
+	<resheader name="writer">
+		<value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+	</resheader>
+	<data name="SpoolerCallFailed" xml:space="preserve">
+		<value>The Windows print spooler call '{0}' failed for printer '{1}': {2}</value>
+		<comment>{0} is the Win32 function name, {1} the printer name, {2} the Windows error description.</comment>
+	</data>
+	<data name="SpoolerCallFailedWithoutPrinter" xml:space="preserve">
+		<value>The Windows print spooler call '{0}' failed: {1}</value>
+		<comment>{0} is the Win32 function name, {1} the Windows error description. For calls not about one printer, such as listing printers.</comment>
+	</data>
+	<data name="ExplainedSpoolerError" xml:space="preserve">
+		<value>{0} {1}</value>
+		<comment>{0} is the explanation, such as SpoolerNotRunning; {1} the failed call, from SpoolerCallFailed.</comment>
+	</data>
+	<data name="NoErrorReported" xml:space="preserve">
+		<value>Windows gave no reason.</value>
+		<comment>Used instead of the Windows description when a call failed without setting an error code.</comment>
+	</data>
+	<data name="SpoolerNotRunning" xml:space="preserve">
+		<value>The Windows Print Spooler service isn't running. Start it, for example with 'net start spooler' as an administrator.</value>
+	</data>
+	<data name="PrintServerUnreachable" xml:space="preserve">
+		<value>The print server sharing this printer can't be reached.</value>
+	</data>
+	<data name="AccessDenied" xml:space="preserve">
+		<value>Windows denied access: the account running the application may not be allowed to use or manage this printer.</value>
+	</data>
+	<data name="PrinterRemoved" xml:space="preserve">
+		<value>The printer has been removed from Windows.</value>
+	</data>
+	<data name="DriverRefusesRawData" xml:space="preserve">
+		<value>The printer's driver doesn't accept raw printer data.</value>
+	</data>
+	<data name="DriverNotInstalled" xml:space="preserve">
+		<value>The printer's driver isn't installed.</value>
+	</data>
+	<data name="JobDeletedWhileSending" xml:space="preserve">
+		<value>The job was deleted from the print queue while it was being sent.</value>
+	</data>
+	<data name="CancelledByDriverDialog" xml:space="preserve">
+		<value>The printer driver's request was cancelled, for example by closing its Save dialog. Virtual printers such as Microsoft Print to PDF need PrintOptions.OutputFile in applications that run without a user interface.</value>
+	</data>
+	<data name="PathNotFound" xml:space="preserve">
+		<value>Windows can't find a file or folder. If PrintOptions.OutputFile is set, check that its folder exists.</value>
+	</data>
+	<data name="DiskFull" xml:space="preserve">
+		<value>The disk used by the print spooler, or by the output file, is full.</value>
+	</data>
+	<data name="DocumentFormatNotSupported" xml:space="preserve">
+		<value>The Windows print spooler adapter cannot print '{0}' documents.</value>
+		<comment>{0} is the document format, such as Pdf.</comment>
+	</data>
+	<data name="PrinterNoLongerAvailable" xml:space="preserve">
+		<value>The printer '{0}' could no longer be found.</value>
+		<comment>{0} is the printer name.</comment>
+	</data>
+	<data name="DriverDropsRawData" xml:space="preserve">
+		<value>The printer '{0}' can't print raw data: its driver, {1}, accepts the job but writes nothing. Send a PDF instead.</value>
+		<comment>{0} is the printer name, {1} the driver name, such as Microsoft Print To PDF.</comment>
+	</data>
+	<data name="RawCopiesNeedSeekableStream" xml:space="preserve">
+		<value>Printing {0} copies of raw data needs a stream that can seek, so the data can be sent again for each copy. Use a seekable stream, such as a file or memory stream, or submit one copy at a time.</value>
+		<comment>{0} is the number of copies asked for. Raw data bypasses the printer driver, which would otherwise make the copies.</comment>
+	</data>
+	<data name="PdfNeedsRasterizer" xml:space="preserve">
+		<value>Printing PDF documents on Windows needs a PDF rasteriser. Add the Latiprimere.Rendering.Pdfium package and call AddLatiprimerePdfium(), or pass a rasteriser to WindowsPrintSystemFactory.Create().</value>
+	</data>
+	<data name="WindowsOnly" xml:space="preserve">
+		<value>The Windows print spooler is only available on Windows.</value>
+	</data>
+</root>

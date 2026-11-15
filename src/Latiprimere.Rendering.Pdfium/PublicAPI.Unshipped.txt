@@ -1,0 +1,6 @@
+#nullable enable
+Latiprimere.Rendering.Pdfium.PdfiumRasterizer
+Latiprimere.Rendering.Pdfium.PdfiumRasterizer.Open(System.IO.Stream! content) -> Latiprimere.Rendering.IRasterDocument!
+Latiprimere.Rendering.Pdfium.PdfiumRasterizer.PdfiumRasterizer() -> void
+Microsoft.Extensions.DependencyInjection.LatiprimerePdfiumServiceCollectionExtensions
+static Microsoft.Extensions.DependencyInjection.LatiprimerePdfiumServiceCollectionExtensions.AddLatiprimerePdfium(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

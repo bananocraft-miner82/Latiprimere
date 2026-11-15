@@ -1,0 +1,9 @@
+#nullable enable
+Latiprimere.Windows.WindowsOptions
+Latiprimere.Windows.WindowsOptions.AllowAnyPrinterName.get -> bool
+Latiprimere.Windows.WindowsOptions.AllowAnyPrinterName.set -> void
+Latiprimere.Windows.WindowsOptions.WindowsOptions() -> void
+Latiprimere.Windows.WindowsPrintSystemFactory
+Microsoft.Extensions.DependencyInjection.LatiprimereWindowsServiceCollectionExtensions
+static Latiprimere.Windows.WindowsPrintSystemFactory.Create(Latiprimere.Rendering.IPdfRasterizer? pdfRasterizer = null, Latiprimere.Windows.WindowsOptions? options = null) -> Latiprimere.IPrintSystem!
+static Microsoft.Extensions.DependencyInjection.LatiprimereWindowsServiceCollectionExtensions.AddLatiprimereWindows(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Latiprimere.Windows.WindowsOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

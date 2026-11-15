@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+	<resheader name="resmimetype">
+		<value>text/microsoft-resx</value>
+	</resheader>
+	<resheader name="version">
+		<value>2.0</value>
+	</resheader>
+	<resheader name="reader">
+		<value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+	</resheader>
+	<resheader name="writer">
+		<value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+	</resheader>
+	<data name="IppRequestRejected" xml:space="preserve">
+		<value>The print system at '{0}' rejected the request with IPP status '{1}'.</value>
+		<comment>{0} is the printer or server URI. {1} is the IPP status code name.</comment>
+	</data>
+	<data name="IppConnectionFailed" xml:space="preserve">
+		<value>Could not communicate with the print system at '{0}'.</value>
+		<comment>{0} is the printer or server URI. The inner exception has the details.</comment>
+	</data>
+	<data name="IppConnectionTimedOut" xml:space="preserve">
+		<value>The print system at '{0}' did not answer in time.</value>
+		<comment>{0} is the printer or server URI. Raised when the connection doesn't open within the connect timeout, or a request other than Print-Job doesn't finish within the response timeout.</comment>
+	</data>
+	<data name="IppAuthenticationRequired" xml:space="preserve">
+		<value>The print system at '{0}' needs a user name and password for this request.</value>
+		<comment>{0} is the printer or server URI. Raised for HTTP 401 or IPP client-error-not-authenticated when no credentials were configured.</comment>
+	</data>
+	<data name="IppCredentialsRejected" xml:space="preserve">
+		<value>The print system at '{0}' did not accept the user name and password.</value>
+		<comment>{0} is the printer or server URI. Raised for HTTP 401 or IPP client-error-not-authenticated when credentials were sent.</comment>
+	</data>
+	<data name="IppEncryptedAuthenticationRequired" xml:space="preserve">
+		<value>The print system at '{0}' needs a user name and password, sent over an encrypted connection, for this request.</value>
+		<comment>{0} is the printer or server URI. Raised for HTTP 426 when no credentials were configured: CUPS asks for encryption before it asks for a password.</comment>
+	</data>
+	<data name="IppEncryptionRequired" xml:space="preserve">
+		<value>The print system at '{0}' only accepts the user name and password over an encrypted connection, but encryption is turned off.</value>
+		<comment>{0} is the printer or server URI. Raised for HTTP 426 when credentials were configured without encryption.</comment>
+	</data>
+	<data name="IppRequestForbidden" xml:space="preserve">
+		<value>The print system at '{0}' does not allow this user to make this request.</value>
+		<comment>{0} is the printer or server URI. Raised for HTTP 403 or IPP client-error-not-authorized.</comment>
+	</data>
+	<data name="IppSecureConnectionFailed" xml:space="preserve">
+		<value>Could not open an encrypted connection to the print system at '{0}'. CUPS servers use a self-signed certificate unless given another, which isn't trusted by default: check it in a server certificate validation callback.</value>
+		<comment>{0} is the printer or server URI. The inner exception has the TLS failure, such as an untrusted certificate.</comment>
+	</data>
+	<data name="IppResponseUnreadable" xml:space="preserve">
+		<value>The print system at '{0}' sent an answer Latiprimere can't read.</value>
+		<comment>{0} is the printer or server URI. The inner exception says what couldn't be read, such as an answer cut short, a number too large or a value of the wrong type.</comment>
+	</data>
+	<data name="IppResponseNotIpp" xml:space="preserve">
+		<value>The address '{0}' answered, but not with IPP. It may be a web page, such as a printer's or CUPS's web interface, rather than the IPP address of a printer or print server.</value>
+		<comment>{0} is the printer or server URI. Raised when the answer's Content-Type isn't application/ipp.</comment>
+	</data>
+	<data name="PrinterNoLongerAvailable" xml:space="preserve">
+		<value>The printer at '{0}' could no longer be found.</value>
+		<comment>{0} is the printer URI.</comment>
+	</data>
+	<data name="IppResponseMissingJob" xml:space="preserve">
+		<value>The print system at '{0}' accepted the job but did not return its job ID.</value>
+		<comment>{0} is the printer URI.</comment>
+	</data>
+	<data name="OutputFileNotSupported" xml:space="preserve">
+		<value>IPP and CUPS printers cannot print to a file. Remove PrintOptions.OutputFile, or use a Windows printer.</value>
+	</data>
+	<data name="DocumentFormatNotSupportedByPrinter" xml:space="preserve">
+		<value>The printer does not accept '{0}' documents. It accepts: {1}.</value>
+		<comment>{0} is the MIME type sent, {1} the comma-separated MIME types the printer reports.</comment>
+	</data>
+</root>

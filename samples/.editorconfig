@@ -1,0 +1,6 @@
+# Sample-application overrides of the root .editorconfig.
+
+[*.cs]
+
+# Samples are applications, not library code, so they don't need ConfigureAwait(false)
+dotnet_diagnostic.CA2007.severity = none

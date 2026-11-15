@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Fixtures shared by the test projects: the shared test documents, the environment variables that switch on the
+	     integration tests, a printer catalog built the way applications build it, and waits for jobs and output files -->
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Latiprimere\Latiprimere.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+	</ItemGroup>
+
+	<!-- The shared test documents, copied into Data/ here and in every project that references this one -->
+	<ItemGroup>
+		<None Include="..\..\tools\test-documents\*.pdf" Link="Data\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
+
+</Project>

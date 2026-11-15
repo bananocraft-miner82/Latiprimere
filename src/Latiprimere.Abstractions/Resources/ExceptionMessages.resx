@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+	<resheader name="resmimetype">
+		<value>text/microsoft-resx</value>
+	</resheader>
+	<resheader name="version">
+		<value>2.0</value>
+	</resheader>
+	<resheader name="reader">
+		<value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+	</resheader>
+	<resheader name="writer">
+		<value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+	</resheader>
+	<data name="AuthenticationRequired" xml:space="preserve">
+		<value>The print system needs a user name and password that it accepts.</value>
+		<comment>Default message for PrintAuthenticationException.</comment>
+	</data>
+	<data name="PrintFailed" xml:space="preserve">
+		<value>A printing operation failed.</value>
+		<comment>Default message for PrintException.</comment>
+	</data>
+	<data name="PrinterNotFound" xml:space="preserve">
+		<value>The requested printer was not found.</value>
+		<comment>Default message for PrinterNotFoundException.</comment>
+	</data>
+	<data name="PrinterNotFoundWithId" xml:space="preserve">
+		<value>No printer with the ID '{0}' was found.</value>
+		<comment>{0} is the printer ID that was requested.</comment>
+	</data>
+	<data name="PrintSystemUnavailable" xml:space="preserve">
+		<value>No supported print system is available on this platform. Register a Latiprimere platform adapter for the current operating system.</value>
+		<comment>Default message for PrintSystemUnavailableException.</comment>
+	</data>
+	<data name="StreamNotReadable" xml:space="preserve">
+		<value>The document stream must be readable.</value>
+		<comment>Thrown when PrintContent is created from a stream that cannot be read.</comment>
+	</data>
+</root>

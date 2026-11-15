@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<Description>IPP support for Latiprimere: the shared IPP transport used by the CUPS adapter, and direct printing to IPP network printers.</Description>
+		<PackageTags>$(PackageTags);ipp-everywhere;mdns;network-printer</PackageTags>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Latiprimere.Abstractions\Latiprimere.Abstractions.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+		<PackageReference Include="SharpIppNext" />
+		<PackageReference Include="Tmds.MDns" />
+	</ItemGroup>
+
+	<!-- The IPP transport is shared with the CUPS adapter without exposing SharpIppNext types publicly (ADR 0006) -->
+	<ItemGroup>
+		<InternalsVisibleTo Include="Latiprimere.Cups" />
+		<InternalsVisibleTo Include="Latiprimere.Cups.Tests" />
+		<InternalsVisibleTo Include="Latiprimere.Ipp.Tests" />
+		<InternalsVisibleTo Include="Latiprimere.Ipp.Testing" />
+	</ItemGroup>
+
+	<!-- Exception messages; the source generator gives them strongly typed classes the editor sees without a build -->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.ResxSourceGenerator" PrivateAssets="all" />
+	</ItemGroup>
+
+</Project>

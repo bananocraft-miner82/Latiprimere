@@ -1,0 +1,45 @@
+namespace Latiprimere.Ipp;
+
+/// <summary>
+/// The settings shared by every printer and job of one IPP print system.
+/// </summary>
+internal sealed record IppPrintContext
+{
+	/// <summary>
+	/// Gets the client used to send IPP requests.
+	/// </summary>
+	public required IIppClient Client { get; init; }
+
+	/// <summary>
+	/// Gets the user name sent as <c>requesting-user-name</c>. Print systems use it to decide who owns a job.
+	/// </summary>
+	public required string RequestingUserName { get; init; }
+
+	/// <summary>
+	/// Gets the document format MIME types the print system expects.
+	/// </summary>
+	public required IppDocumentFormats DocumentFormats { get; init; }
+
+	/// <summary>
+	/// Gets the clock used to timestamp job statuses and to time retries.
+	/// </summary>
+	public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
+	/// <summary>
+	/// Gets how long to keep resending a job that the printer turns away with <c>server-error-busy</c>.
+	/// <see cref="TimeSpan.Zero"/>, the default, sends it once.
+	/// </summary>
+	public TimeSpan BusyRetryDuration { get; init; } = TimeSpan.Zero;
+
+	/// <summary>
+	/// Gets the wait before the first resend of a job turned away as busy. Each later wait doubles, up to
+	/// <see cref="BusyRetryMaxDelay"/>.
+	/// </summary>
+	public TimeSpan BusyRetryFirstDelay { get; init; } = TimeSpan.FromSeconds(1);
+
+	/// <summary>
+	/// Gets the longest wait between resends of a job turned away as busy. Each resend uploads the whole document
+	/// again, so the waits grow rather than stay short.
+	/// </summary>
+	public TimeSpan BusyRetryMaxDelay { get; init; } = TimeSpan.FromSeconds(15);
+}

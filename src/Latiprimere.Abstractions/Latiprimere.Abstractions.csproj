@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<Description>Contracts for Latiprimere, the cross-platform .NET printing library: printer catalogs, printers, print jobs, options and exceptions.</Description>
+		<!-- The contracts are in the Latiprimere namespace, so one using covers them and the catalog (ADR 0018);
+		     the package keeps its own name, as Microsoft.Extensions.Logging.Abstractions does -->
+		<RootNamespace>Latiprimere</RootNamespace>
+	</PropertyGroup>
+
+	<!-- Exception messages; the source generator gives them strongly typed classes the editor sees without a build -->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.ResxSourceGenerator" PrivateAssets="all" />
+	</ItemGroup>
+
+</Project>

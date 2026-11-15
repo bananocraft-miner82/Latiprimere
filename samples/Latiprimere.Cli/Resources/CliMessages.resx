@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+	<resheader name="resmimetype">
+		<value>text/microsoft-resx</value>
+	</resheader>
+	<resheader name="version">
+		<value>2.0</value>
+	</resheader>
+	<resheader name="reader">
+		<value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+	</resheader>
+	<resheader name="writer">
+		<value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+	</resheader>
+	<data name="Usage" xml:space="preserve">
+		<value>Usage:
+  Latiprimere.Cli list
+  Latiprimere.Cli caps &lt;printer-id&gt;
+  Latiprimere.Cli print &lt;printer-id&gt; &lt;file&gt; [--raw] [--copies N] [--duplex one|long|short] [--landscape] [--cancel]
+                 [--output FILE] [--stats]
+
+Files are sent as PDF unless --raw is given. --cancel cancels the job straight after submitting it.
+--output prints to FILE instead of the device (Windows printers only). --stats reports time and memory used.
+Set CUPS_SERVER (for example localhost:631) to use a CUPS server from Windows.
+IPP printers on the network are found automatically and listed by name; quote IDs with spaces, for example
+"ipp:dnssd:Office Laser". List other printers in LATIPRIMERE_IPP_PRINTERS (comma-separated URIs, for example
+ipp://192.168.1.20/ipp/print).</value>
+	</data>
+	<data name="PrintersHeading" xml:space="preserve">
+		<value>Printers:</value>
+		<comment>Heading above the printer list.</comment>
+	</data>
+	<data name="PrinterLine" xml:space="preserve">
+		<value>  {0}{1}  ({2}, {3})</value>
+		<comment>{0} is the printer name, {1} is the default marker or empty, {2} is the printer ID, {3} is the printer state.</comment>
+	</data>
+	<data name="PrinterDetailLine" xml:space="preserve">
+		<value>      {0}</value>
+		<comment>{0} is the printer description, location or make and model.</comment>
+	</data>
+	<data name="DefaultMarker" xml:space="preserve">
+		<value> [default]</value>
+		<comment>Shown after the default printer's name.</comment>
+	</data>
+	<data name="NoPrinters" xml:space="preserve">
+		<value>No printers found.</value>
+	</data>
+	<data name="PrintingUnavailable" xml:space="preserve">
+		<value>Printing is not available: {0}</value>
+		<comment>{0} is the reason, from the exception message.</comment>
+	</data>
+	<data name="PrintFailed" xml:space="preserve">
+		<value>Printing failed: {0}</value>
+		<comment>{0} is the reason, from the exception message.</comment>
+	</data>
+	<data name="NativeErrorCode" xml:space="preserve">
+		<value>  Print system error code: {0} (0x{0:X4})</value>
+		<comment>{0} is the native error code.</comment>
+	</data>
+	<data name="JobSubmitted" xml:space="preserve">
+		<value>Submitted job {0} to {1}.</value>
+		<comment>{0} is the job ID, {1} is the printer name.</comment>
+	</data>
+	<data name="JobCancelRequested" xml:space="preserve">
+		<value>Cancellation requested for job {0}.</value>
+		<comment>{0} is the job ID.</comment>
+	</data>
+	<data name="JobAlreadyFinished" xml:space="preserve">
+		<value>Job {0} had already finished, so there was nothing to cancel.</value>
+		<comment>{0} is the job ID.</comment>
+	</data>
+	<data name="JobStatusLine" xml:space="preserve">
+		<value>  {0:HH:mm:ss}  {1}{2}{3}</value>
+		<comment>{0} is the time, {1} the job state, {2} the state message part (or empty), {3} the pages part (or empty).</comment>
+	</data>
+	<data name="JobStatusMessagePart" xml:space="preserve">
+		<value> - {0}</value>
+		<comment>{0} is the job state message.</comment>
+	</data>
+	<data name="JobStatusPagesPart" xml:space="preserve">
+		<value> ({0} pages)</value>
+		<comment>{0} is the number of pages completed.</comment>
+	</data>
+	<data name="Statistics" xml:space="preserve">
+		<value>Submitted in {0:F2} s, finished after {1:F2} s. Peak working set {2:F0} MiB; managed heap {3:F0} MiB.</value>
+		<comment>{0} submit seconds, {1} total seconds, {2} peak working set, {3} managed heap size.</comment>
+	</data>
+	<data name="InvalidArguments" xml:space="preserve">
+		<value>Invalid arguments: {0}</value>
+		<comment>{0} describes the problem.</comment>
+	</data>
+	<data name="MissingPrintArguments" xml:space="preserve">
+		<value>print needs a printer ID and a file.</value>
+	</data>
+	<data name="MissingCapabilitiesArguments" xml:space="preserve">
+		<value>caps needs a printer ID.</value>
+	</data>
+	<data name="CapabilitiesHeading" xml:space="preserve">
+		<value>{0}  ({1})</value>
+		<comment>{0} is the printer name, {1} is the printer ID.</comment>
+	</data>
+	<data name="CapabilityLine" xml:space="preserve">
+		<value>  {0,-14}{1}</value>
+		<comment>{0} is the capability label, {1} its values.</comment>
+	</data>
+	<data name="CapabilityPaperSizes" xml:space="preserve">
+		<value>Paper sizes:</value>
+	</data>
+	<data name="CapabilityDuplex" xml:space="preserve">
+		<value>Duplex:</value>
+	</data>
+	<data name="CapabilityColour" xml:space="preserve">
+		<value>Colour:</value>
+	</data>
+	<data name="CapabilityCopies" xml:space="preserve">
+		<value>Copies:</value>
+	</data>
+	<data name="CapabilityOrientations" xml:space="preserve">
+		<value>Orientations:</value>
+	</data>
+	<data name="CapabilityTrays" xml:space="preserve">
+		<value>Trays:</value>
+	</data>
+	<data name="PaperSizeValue" xml:space="preserve">
+		<value>{0} ({1})</value>
+		<comment>{0} is the paper's display name, {1} its PWG name.</comment>
+	</data>
+	<data name="MaxCopiesValue" xml:space="preserve">
+		<value>up to {0}</value>
+		<comment>{0} is the most copies a job can ask for.</comment>
+	</data>
+	<data name="TrayValue" xml:space="preserve">
+		<value>{0} ({1})</value>
+		<comment>{0} is the tray name, {1} its print-system identifier.</comment>
+	</data>
+	<data name="NotReported" xml:space="preserve">
+		<value>(not reported)</value>
+	</data>
+	<data name="UnknownOption" xml:space="preserve">
+		<value>unknown option '{0}'.</value>
+		<comment>{0} is the option.</comment>
+	</data>
+	<data name="InvalidOptionValue" xml:space="preserve">
+		<value>'{0}' is not a valid value for {1}.</value>
+		<comment>{0} is the value, {1} is the option.</comment>
+	</data>
+</root>

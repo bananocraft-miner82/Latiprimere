@@ -1,0 +1,21 @@
+<Project>
+
+	<Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+	<!-- Nothing under tests/ is packed -->
+	<PropertyGroup>
+		<IsPackable>false</IsPackable>
+	</PropertyGroup>
+
+	<!-- Test projects (*.Tests) are xUnit v3 executables on Microsoft.Testing.Platform (opted in through global.json).
+	     Shared test-support libraries (*.Testing) are ordinary class libraries. -->
+	<PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+		<OutputType>Exe</OutputType>
+		<IsTestProject>true</IsTestProject>
+	</PropertyGroup>
+
+	<ItemGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+		<PackageReference Include="xunit.v3" />
+	</ItemGroup>
+
+</Project>

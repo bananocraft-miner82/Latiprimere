@@ -1,0 +1,56 @@
+%!PS-Adobe-3.0
+% Mixed-content test pages for Latiprimere: a heading, a block of text, filled vector shapes, a line, and an
+% embedded 64x64 colour image on every A4 page. Set /PageTotal before running, for example:
+%   gs -sDEVICE=pdfwrite -o mixed-100-pages.pdf -c "/PageTotal 100 def" -f mixed-content.ps
+
+/PageTotal where { pop } { /PageTotal 1 def } ifelse
+
+<< /PageSize [595 842] >> setpagedevice
+
+/HeadingFont /Helvetica-Bold findfont 24 scalefont def
+/BodyFont /Times-Roman findfont 11 scalefont def
+
+% A 64x64 RGB gradient, built once and reused on every page
+/ImageSize 64 def
+/ImageData ImageSize ImageSize mul 3 mul string def
+0 1 ImageSize 1 sub {
+	/Row exch def
+	0 1 ImageSize 1 sub {
+		/Column exch def
+		/Offset Row ImageSize mul Column add 3 mul def
+		ImageData Offset Column 4 mul put
+		ImageData Offset 1 add Row 4 mul put
+		ImageData Offset 2 add 128 put
+	} for
+} for
+
+1 1 PageTotal {
+	/PageNumber exch def
+
+	% Heading
+	0 setgray
+	HeadingFont setfont
+	72 760 moveto (Latiprimere test page ) show PageNumber 10 string cvs show
+
+	% Body text
+	BodyFont setfont
+	0 1 24 {
+		/Line exch def
+		72 720 Line 14 mul sub moveto
+		(The quick brown fox jumps over the lazy dog. Line ) show
+		Line 1 add 3 string cvs show
+	} for
+
+	% Vector shapes and a rule
+	0.2 0.4 0.8 setrgbcolor 72 300 150 80 rectfill
+	0.8 0.2 0.2 setrgbcolor newpath 350 340 50 0 360 arc fill
+	0 setgray 2 setlinewidth newpath 72 250 moveto 523 250 lineto stroke
+
+	% Embedded raster image
+	gsave
+	373 80 translate 150 150 scale
+	ImageSize ImageSize 8 [ImageSize 0 0 ImageSize neg 0 ImageSize] { ImageData } false 3 colorimage
+	grestore
+
+	showpage
+} for

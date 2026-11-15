@@ -1,0 +1,24 @@
+#nullable enable
+Latiprimere.Cups.CupsOptions
+Latiprimere.Cups.CupsOptions.ConnectTimeout.get -> System.TimeSpan
+Latiprimere.Cups.CupsOptions.ConnectTimeout.set -> void
+Latiprimere.Cups.CupsOptions.CupsOptions() -> void
+Latiprimere.Cups.CupsOptions.Server.get -> string?
+Latiprimere.Cups.CupsOptions.Server.set -> void
+Latiprimere.Cups.CupsOptions.UserName.get -> string?
+Latiprimere.Cups.CupsOptions.UserName.set -> void
+Latiprimere.Cups.CupsPrintSystemFactory
+Microsoft.Extensions.DependencyInjection.LatiprimereCupsServiceCollectionExtensions
+static Latiprimere.Cups.CupsPrintSystemFactory.Create(Latiprimere.Cups.CupsOptions? options = null) -> Latiprimere.IPrintSystem!
+static Microsoft.Extensions.DependencyInjection.LatiprimereCupsServiceCollectionExtensions.AddLatiprimereCups(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Latiprimere.Cups.CupsOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static readonly Latiprimere.Cups.CupsOptions.DefaultConnectTimeout -> System.TimeSpan
+Latiprimere.Cups.CupsEncryption
+Latiprimere.Cups.CupsEncryption.Always = 1 -> Latiprimere.Cups.CupsEncryption
+Latiprimere.Cups.CupsEncryption.Automatic = 0 -> Latiprimere.Cups.CupsEncryption
+Latiprimere.Cups.CupsEncryption.Never = 2 -> Latiprimere.Cups.CupsEncryption
+Latiprimere.Cups.CupsOptions.Credentials.get -> System.Net.NetworkCredential?
+Latiprimere.Cups.CupsOptions.Credentials.set -> void
+Latiprimere.Cups.CupsOptions.Encryption.get -> Latiprimere.Cups.CupsEncryption
+Latiprimere.Cups.CupsOptions.Encryption.set -> void
+Latiprimere.Cups.CupsOptions.ServerCertificateValidationCallback.get -> System.Net.Security.RemoteCertificateValidationCallback?
+Latiprimere.Cups.CupsOptions.ServerCertificateValidationCallback.set -> void

@@ -1,0 +1,20 @@
+# Test-project overrides of the root .editorconfig. See "Unit Tests" in CONTRIBUTING.md.
+
+[*.cs]
+
+# xUnit recommends against ConfigureAwait(false) in test methods
+dotnet_diagnostic.CA2007.severity = none
+
+# Inline expected-value arrays in assertions keep tests readable; their allocation cost doesn't matter here
+dotnet_diagnostic.CA1861.severity = none
+
+# Test methods are named GivenWhenThen, without an Async suffix
+dotnet_naming_rule.async_methods_end_with_async.severity = none
+
+# Test classes and methods are documented by their GivenWhenThen names
+dotnet_diagnostic.SA1600.severity = none
+dotnet_diagnostic.CS1591.severity = none
+
+# Builders, fakes and fixtures are documented like production code
+[**/{Builders,Fakes,Fixtures}/**.cs]
+dotnet_diagnostic.SA1600.severity = error

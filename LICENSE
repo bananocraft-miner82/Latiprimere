@@ -1,0 +1,104 @@
+Latiprimere Licence
+Version 1.0, November 2026
+
+Copyright (c) 2026 Jonathan Price
+
+Latiprimere (the "Software") is available under two licences:
+
+- the Community Licence below, free of charge, for anyone who meets one of the
+  conditions in section 1; and
+- a Commercial Licence, for everyone else. For how to get one, see
+  https://github.com/bananocraft-miner82/Latiprimere/blob/main/COMMERCIAL.md
+
+If you don't meet any of the conditions in section 1, you may not use the
+Software without a Commercial Licence.
+
+
+1. WHO CAN USE THE COMMUNITY LICENCE
+
+You may use the Software under the Community Licence if at least one of these
+applies to you:
+
+  a. Small organisations. You are an individual, or an organisation, whose
+     annual gross revenue was less than US$1,000,000 (or its equivalent in
+     another currency) in its most recent financial year. An organisation
+     counts the revenue of all its affiliates as well as its own.
+
+  b. Non-profits and education. You are a registered charity or other
+     not-for-profit organisation, or an accredited school, college or
+     university, using the Software for its not-for-profit or educational
+     work.
+
+  c. Open source. You use the Software in a project that is published, with
+     its full source code, under a licence approved by the Open Source
+     Initiative. This condition covers your use of the Software in that
+     project only.
+
+  d. Evaluation and development. You use the Software only to evaluate it, or
+     to develop and test your own software, and not in production.
+
+  e. Indirect use. You use the Software only because a product made by someone
+     else includes it or depends on it, and you don't use the Software or its
+     programming interfaces directly.
+
+"Affiliate" means any entity that controls, is controlled by, or is under
+common control with an organisation. "Control" means owning more than 50% of
+the voting shares or other ownership interest, or having the power to direct
+the entity's management.
+
+"Production" means any use of the Software other than evaluating it, or
+developing and testing software with it. It includes:
+
+  - running the Software, or software that includes it, in your own
+    operations;
+  - distributing the Software, or software that includes it, to others,
+    whether for payment or free of charge; and
+  - providing a service to others that uses the Software.
+
+If you stop meeting the conditions you relied on, for example because your
+revenue reaches the limit in 1a, you have 90 days to get a Commercial Licence.
+After that, your rights under the Community Licence end.
+
+
+2. COMMUNITY LICENCE TERMS
+
+If you meet a condition in section 1, the copyright holder grants you a
+worldwide, royalty-free, non-exclusive licence to use, copy, modify, merge,
+publish and distribute the Software, and to permit others to whom you
+distribute it to do the same, on these conditions:
+
+  a. You include this copyright notice and this licence, in full, in all copies
+     or substantial portions of the Software.
+
+  b. Anyone who receives the Software, or a modified version of it, from you
+     receives it under this licence, and must meet its conditions themselves.
+     You may not license the Software to them under any other terms, even when
+     you distribute it as part of a project under another licence, such as an
+     open-source licence.
+
+  c. Your rights end automatically if you break the conditions of this
+     licence.
+
+
+3. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+4. THIRD-PARTY COMPONENTS
+
+The Software depends on third-party packages, such as PDFium, that have their
+own licences. This licence doesn't change the terms of those packages.
+
+
+5. VERSIONS
+
+This licence applies to the versions of the Software that come with it. The
+copyright holder may release later versions under different terms. That
+doesn't change the licence of the versions you already have.

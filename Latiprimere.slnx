@@ -1,0 +1,23 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/Latiprimere.Cli/Latiprimere.Cli.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Latiprimere.Abstractions/Latiprimere.Abstractions.csproj" />
+    <Project Path="src/Latiprimere.Cups/Latiprimere.Cups.csproj" />
+    <Project Path="src/Latiprimere.Ipp/Latiprimere.Ipp.csproj" />
+    <Project Path="src/Latiprimere.Rendering.Pdfium/Latiprimere.Rendering.Pdfium.csproj" />
+    <Project Path="src/Latiprimere.Windows/Latiprimere.Windows.csproj" />
+    <Project Path="src/Latiprimere/Latiprimere.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Latiprimere.Abstractions.Tests/Latiprimere.Abstractions.Tests.csproj" />
+    <Project Path="tests/Latiprimere.Cups.Tests/Latiprimere.Cups.Tests.csproj" />
+    <Project Path="tests/Latiprimere.Ipp.Testing/Latiprimere.Ipp.Testing.csproj" />
+    <Project Path="tests/Latiprimere.Ipp.Tests/Latiprimere.Ipp.Tests.csproj" />
+    <Project Path="tests/Latiprimere.Rendering.Pdfium.Tests/Latiprimere.Rendering.Pdfium.Tests.csproj" />
+    <Project Path="tests/Latiprimere.Testing/Latiprimere.Testing.csproj" />
+    <Project Path="tests/Latiprimere.Tests/Latiprimere.Tests.csproj" />
+    <Project Path="tests/Latiprimere.Windows.Tests/Latiprimere.Windows.Tests.csproj" />
+  </Folder>
+</Solution>

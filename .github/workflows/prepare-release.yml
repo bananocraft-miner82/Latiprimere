@@ -1,0 +1,93 @@
+name: Prepare release
+
+# Opens the pull request for a release: the version set, the public API marked shipped, the package validation
+# baseline and the README status line (tools/releasing/prepare-release.sh). Merging it, then tagging the merge commit,
+# publishes the release (release.yml). See docs/releasing.md.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, such as 0.1.0-preview or 0.1.0-preview.2
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Prepare v${{ inputs.version }}
+    runs-on: ubuntu-latest
+
+    # Releases are made from the default branch only
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+
+    permissions:
+      contents: write      # Push the release branch
+      pull-requests: write # Open the pull request
+      actions: write       # Start build.yml on the branch (see below)
+
+    env:
+      VERSION: ${{ inputs.version }}
+      BRANCH: release/v${{ inputs.version }}
+
+    steps:
+      # All history and tags, to find the previous release
+      - name: Check out
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x
+
+      - name: Prepare the release commit
+        run: sh tools/releasing/prepare-release.sh "$VERSION"
+
+      # The packages must still build and pass package validation with the new version and baseline
+      - name: Build and pack
+        run: |
+          dotnet build --configuration Release
+          dotnet pack --no-build --configuration Release --output artifacts/packages
+
+      - name: Open the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --create "$BRANCH"
+          git add Directory.Build.props src/Directory.Build.props README.md src/*/PublicAPI.Shipped.txt src/*/PublicAPI.Unshipped.txt
+          git commit --message "Release $VERSION" --message "Made by the Prepare release workflow (tools/releasing/prepare-release.sh)."
+          git push origin "$BRANCH"
+
+          cat > "$RUNNER_TEMP/body.md" <<EOF
+          Release $VERSION, prepared by \`tools/releasing/prepare-release.sh\`:
+
+          - the version in \`Directory.Build.props\`;
+          - the public API marked shipped (\`PublicAPI.Unshipped.txt\` moved into \`PublicAPI.Shipped.txt\`);
+          - the package validation baseline set to the previous release, if there was one;
+          - the README status line.
+
+          Before merging:
+
+          - [ ] Add what changed to \`docs/progress.md\`, and tick \`docs/plan.md\`, on this branch.
+          - [ ] The build passes on all three runners.
+
+          After merging, tag the merge commit to publish (docs/releasing.md):
+
+          \`\`\`bash
+          git switch $BASE && git pull
+          git tag v$VERSION && git push origin v$VERSION
+          \`\`\`
+          EOF
+
+          gh pr create --base "$BASE" --head "$BRANCH" --title "Release $VERSION" --body-file "$RUNNER_TEMP/body.md"
+
+          # A push made with the workflow's own token starts no workflows, so the pull request would get no build.
+          # Starting build.yml by hand is allowed, and its checks show on the pull request.
+          gh workflow run build.yml --ref "$BRANCH"

@@ -1,0 +1,56 @@
+<Project>
+
+	<Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+	<!-- Library projects are packable and must stay trim-safe and Native AOT compatible -->
+	<PropertyGroup>
+		<IsPackable>true</IsPackable>
+		<IsAotCompatible>true</IsAotCompatible>
+	</PropertyGroup>
+
+	<!-- The split licence isn't an SPDX licence, so each package carries the licence file itself (ADR 0015) -->
+	<PropertyGroup>
+		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+	</PropertyGroup>
+	<ItemGroup>
+		<None Include="$(MSBuildThisFileDirectory)../LICENSE" Pack="true" PackagePath="/" Visible="false" />
+	</ItemGroup>
+
+	<!-- What nuget.org shows on each package's page: one README for all of them, since each points to the others -->
+	<PropertyGroup>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageReleaseNotes>First preview. The API may still change before 1.0.</PackageReleaseNotes>
+	</PropertyGroup>
+	<ItemGroup>
+		<None Include="$(MSBuildThisFileDirectory)PACKAGE-README.md" Pack="true" PackagePath="README.md" Visible="false" />
+	</ItemGroup>
+
+	<!-- Debugging into the packages: symbols in a .snupkg beside each package, and Source Link to the commit they
+	     were built from. CI builds are deterministic, with paths that don't depend on the build machine. -->
+	<PropertyGroup>
+		<IncludeSymbols>true</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+	</PropertyGroup>
+
+	<!-- Checks each package when it is packed: that its target frameworks agree with each other, and, once a
+	     version has shipped, that it stays compatible with the last one released. tools/releasing/prepare-release.sh
+	     sets the baseline; empty means there is no earlier release to compare with. -->
+	<PropertyGroup>
+		<EnablePackageValidation>true</EnablePackageValidation>
+		<PackageValidationBaselineVersion></PackageValidationBaselineVersion>
+	</PropertyGroup>
+
+	<!-- Every public API change shows up as a change to PublicAPI.Unshipped.txt, which reviewers see (ADR 0018).
+	     tools/releasing/prepare-release.sh moves its lines to PublicAPI.Shipped.txt for each release. -->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+		<AdditionalFiles Include="PublicAPI.Shipped.txt" />
+		<AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+	</ItemGroup>
+
+</Project>

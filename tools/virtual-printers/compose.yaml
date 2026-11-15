@@ -1,0 +1,23 @@
+# CUPS print server with virtual printers for Latiprimere development. See README.md in this folder.
+services:
+  cups:
+    build: .
+    image: latiprimere-virtual-printers
+    container_name: latiprimere-cups
+    ports:
+      # Published on the loopback interface only
+      - "127.0.0.1:631:631"
+      - "127.0.0.1:8631:8631"
+    volumes:
+      # Job output. A volume of its own by default; set LATIPRIMERE_TEST_CUPS_OUTPUT to a host directory to read the
+      # files from the host, as the integration tests do
+      - "${LATIPRIMERE_TEST_CUPS_OUTPUT:-latiprimere-output}:/output"
+    healthcheck:
+      # Healthy once the entrypoint has created the queues and made CUPS-PDF the default, so "up --wait" can wait
+      test: ["CMD-SHELL", "lpstat -d | grep -q CUPS-PDF && ipptool -q ipp://localhost:8631/ipp/print get-printer-attributes.test"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+volumes:
+  latiprimere-output:

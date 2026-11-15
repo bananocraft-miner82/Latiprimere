@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+	<resheader name="resmimetype">
+		<value>text/microsoft-resx</value>
+	</resheader>
+	<resheader name="version">
+		<value>2.0</value>
+	</resheader>
+	<resheader name="reader">
+		<value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+	</resheader>
+	<resheader name="writer">
+		<value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+	</resheader>
+	<data name="JobNoLongerListed" xml:space="preserve">
+		<value>The printer no longer lists the job, so it has finished. The printer keeps no record of whether it printed successfully.</value>
+		<comment>State message for a job the printer or print server answers not-found for, as printers with little job history do soon after a job finishes.</comment>
+	</data>
+	<data name="JobPrinterGone" xml:space="preserve">
+		<value>The printer or queue no longer exists, so how the job ended isn't known.</value>
+		<comment>State message for a job whose printer or CUPS queue now answers not-found too, as when a queue is deleted with its jobs.</comment>
+	</data>
+</root>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Latiprimere.Testing also copies the shared test documents into Data/ -->
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Latiprimere.Rendering.Pdfium\Latiprimere.Rendering.Pdfium.csproj" />
+		<ProjectReference Include="..\Latiprimere.Testing\Latiprimere.Testing.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+	</ItemGroup>
+
+</Project>

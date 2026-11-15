@@ -1,0 +1,4 @@
+# Shell scripts run on Linux, macOS and inside the test container, where a carriage return at the end of a line
+# breaks them. Keep them LF in every checkout, including Windows ones with core.autocrlf=true.
+*.sh text eol=lf
+*.py text eol=lf

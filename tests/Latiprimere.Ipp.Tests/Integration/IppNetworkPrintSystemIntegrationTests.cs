@@ -1,0 +1,211 @@
+using Latiprimere.Testing.Fixtures;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
+
+namespace Latiprimere.Ipp.Tests.Integration;
+
+/// <summary>
+/// End-to-end checks of direct IPP against the virtual IPP Everywhere printer (<c>ippeveprinter</c>) in the test
+/// container (tools/virtual-printers) or on a Mac (tools/macos-test-printers), through the catalog as applications
+/// use it. Nothing reaches paper.
+/// </summary>
+/// <remarks>
+/// Run only when <see cref="IntegrationEnvironment.IppPrinterVariable"/> gives the printer's URI. Discovery is off:
+/// mDNS doesn't cross into the container, and on a Mac the printer doesn't announce itself, so it is configured by
+/// URI.
+/// </remarks>
+[Trait("Category", "Integration")]
+[Trait("OS", "Any")]
+public sealed class IppNetworkPrintSystemIntegrationTests
+{
+	private const int AttributesOrValuesNotSupported = 0x040B; // IPP status for a job the printer can't print as asked
+
+	[Fact]
+	public async Task GivenConfiguredPrinterWhenGetPrintersThenListsItByUri()
+	{
+		// Arrange
+		Uri printerUri = IppNetworkPrintSystemIntegrationTests.GetPrinterUri();
+		await using CatalogFixture fixture = IppNetworkPrintSystemIntegrationTests.CreateCatalog(printerUri);
+
+		// Act
+		IReadOnlyList<PrinterInfo> printers = await fixture.Catalog.GetPrintersAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		PrinterInfo printer = Assert.Single(printers);
+		Assert.Equal(IppNetworkPrintSystemIntegrationTests.GetPrinterId(printerUri), printer.Id);
+	}
+
+	[Fact]
+	public async Task GivenConfiguredPrinterWhenGetPrinterThenReadsItsMakeAndModel()
+	{
+		// Arrange
+		Uri printerUri = IppNetworkPrintSystemIntegrationTests.GetPrinterUri();
+		await using CatalogFixture fixture = IppNetworkPrintSystemIntegrationTests.CreateCatalog(printerUri);
+		string printerId = IppNetworkPrintSystemIntegrationTests.GetPrinterId(printerUri);
+
+		// Act
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(printerId, TestContext.Current.CancellationToken);
+
+		// Assert — the container starts ippeveprinter with make "Latiprimere" and model "Virtual IPP Printer"
+		// Its state isn't checked: it is Processing whenever another test process is printing to it
+		Assert.Equal("Latiprimere Virtual IPP Printer", printer.Info.MakeAndModel);
+	}
+
+	[Fact]
+	public async Task GivenUnknownPathOnPrinterHostWhenGetPrinterThenThrowsPrinterNotFoundException()
+	{
+		// Arrange
+		Uri printerUri = IppNetworkPrintSystemIntegrationTests.GetPrinterUri();
+		await using CatalogFixture fixture = IppNetworkPrintSystemIntegrationTests.CreateCatalog(printerUri);
+		Uri unknownUri = new Uri(printerUri, "/ipp/no-such-printer");
+
+		// Act
+		Func<Task> act = () => fixture.Catalog.GetPrinterAsync
+		(
+			IppNetworkPrintSystemIntegrationTests.GetPrinterId(unknownUri),
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert
+		await Assert.ThrowsAsync<PrinterNotFoundException>(act);
+	}
+
+	[Fact]
+	public async Task GivenVirtualPrinterWhenGetCapabilitiesThenReportsOneSidedLetterAndCopyLimit()
+	{
+		// Arrange
+		Uri printerUri = IppNetworkPrintSystemIntegrationTests.GetPrinterUri();
+		await using CatalogFixture fixture = IppNetworkPrintSystemIntegrationTests.CreateCatalog(printerUri);
+		string printerId = IppNetworkPrintSystemIntegrationTests.GetPrinterId(printerUri);
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(printerId, TestContext.Current.CancellationToken);
+
+		// Act
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal([DuplexMode.OneSided], capabilities.DuplexModes);
+		Assert.Equal("na_letter_8.5x11in", capabilities.DefaultMediaSize?.Name);
+		Assert.Equal(999, capabilities.MaxCopies);
+	}
+
+	[Fact]
+	public async Task GivenPdfWhenPrintedThenJobCompletes()
+	{
+		// Arrange
+		Uri printerUri = IppNetworkPrintSystemIntegrationTests.GetPrinterUri();
+		await using CatalogFixture fixture = IppNetworkPrintSystemIntegrationTests.CreateCatalog(printerUri);
+		string printerId = IppNetworkPrintSystemIntegrationTests.GetPrinterId(printerUri);
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(printerId, TestContext.Current.CancellationToken);
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+		PrintOptions options = new PrintOptions { JobName = "Latiprimere integration test" };
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+		PrintJobStatus status = await PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(PrintJobState.Completed, status.State);
+	}
+
+	[Fact]
+	public async Task GivenDuplexOnOneSidedPrinterWhenPrintedThenPrinterRejectsJobUpFront()
+	{
+		// Arrange — unlike CUPS, which accepts the job and cancels it later
+		Uri printerUri = IppNetworkPrintSystemIntegrationTests.GetPrinterUri();
+		await using CatalogFixture fixture = IppNetworkPrintSystemIntegrationTests.CreateCatalog(printerUri);
+		string printerId = IppNetworkPrintSystemIntegrationTests.GetPrinterId(printerUri);
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(printerId, TestContext.Current.CancellationToken);
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+		PrintOptions options = new PrintOptions { Duplex = DuplexMode.LongEdge };
+
+		// Act
+		Func<Task> act = () => printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(act);
+		Assert.Equal(IppNetworkPrintSystemIntegrationTests.AttributesOrValuesNotSupported, exception.NativeErrorCode);
+	}
+
+	[Fact]
+	public async Task GivenSeveralPdfsSentAtOnceWhenPrintedThenEveryJobCompletes()
+	{
+		// Arrange — ippeveprinter takes one job at a time and answers the others server-error-busy, which
+		// Latiprimere answers by sending them again; the other test process may be printing too
+		Uri printerUri = IppNetworkPrintSystemIntegrationTests.GetPrinterUri();
+		await using CatalogFixture fixture = IppNetworkPrintSystemIntegrationTests.CreateCatalog(printerUri);
+		string printerId = IppNetworkPrintSystemIntegrationTests.GetPrinterId(printerUri);
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(printerId, TestContext.Current.CancellationToken);
+
+		// Act
+		IPrintJob[] jobs = await Task.WhenAll
+		(
+			IppNetworkPrintSystemIntegrationTests.SubmitThreePagesAsync(printer),
+			IppNetworkPrintSystemIntegrationTests.SubmitThreePagesAsync(printer),
+			IppNetworkPrintSystemIntegrationTests.SubmitThreePagesAsync(printer)
+		);
+
+		PrintJobStatus[] statuses = await Task.WhenAll
+		(
+			jobs.Select(job => PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken))
+		);
+
+		// Assert
+		Assert.All(statuses, status => Assert.Equal(PrintJobState.Completed, status.State));
+	}
+
+	/// <summary>
+	/// Prints the three-page test document with default options.
+	/// </summary>
+	/// <param name="printer">The printer.</param>
+	/// <returns>The submitted job.</returns>
+	private static async Task<IPrintJob> SubmitThreePagesAsync(IPrinter printer)
+	{
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+
+		return await printer
+			.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken)
+			.ConfigureAwait(false);
+	}
+
+	/// <summary>
+	/// Gets the virtual printer's URI, or skips the test when none is configured.
+	/// </summary>
+	/// <returns>The printer URI.</returns>
+	private static Uri GetPrinterUri()
+	{
+		Uri? printerUri = IntegrationEnvironment.IppPrinterUri;
+		Assert.SkipWhen(printerUri is null, IntegrationEnvironment.GetSkipReason(IntegrationEnvironment.IppPrinterVariable));
+
+		return printerUri!; // Not null: skipped above otherwise
+	}
+
+	/// <summary>
+	/// Gets the printer ID the direct IPP print system gives a configured printer.
+	/// </summary>
+	/// <param name="printerUri">The printer URI.</param>
+	/// <returns>The printer ID.</returns>
+	private static string GetPrinterId(Uri printerUri)
+	{
+		return "ipp:" + printerUri.AbsoluteUri;
+	}
+
+	/// <summary>
+	/// Creates a catalog over direct IPP with only the given printer configured and discovery off.
+	/// </summary>
+	/// <param name="printerUri">The printer URI.</param>
+	/// <returns>The catalog fixture. The caller disposes it.</returns>
+	private static CatalogFixture CreateCatalog(Uri printerUri)
+	{
+		return new CatalogFixture
+		(
+			services => services.AddLatiprimereIpp
+			(
+				options =>
+				{
+					options.EnableDiscovery = false;
+					options.PrinterUris.Add(printerUri);
+				}
+			)
+		);
+	}
+}

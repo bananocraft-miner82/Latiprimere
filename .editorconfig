@@ -1,0 +1,194 @@
+# Latiprimere editor and analyzer settings.
+# Enforces the rules in CONTRIBUTING.md that tooling can check. Rules marked "error" fail the build.
+
+root = true
+
+[*]
+charset = utf-8
+indent_style = tab
+indent_size = 4
+tab_width = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# CONTRIBUTING.md limits lines to 144 characters (tabs count as 4). No analyzer enforces this; these settings show a
+# guide in editors that support them (max_line_length: Rider and others; guidelines: the Visual Studio
+# "Editor Guidelines" extension). In VS Code, set "editor.rulers": [144].
+max_line_length = 144
+guidelines = 144
+
+[*.{json,yml,yaml}]
+indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+
+#### Layout and braces ####
+
+# Braces on their own line, aligned with the statement that opens the scope
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+
+# Never omit braces
+csharp_prefer_braces = true:error
+dotnet_diagnostic.IDE0011.severity = error
+
+# File-scoped namespaces, with using directives outside the namespace
+csharp_style_namespace_declarations = file_scoped:error
+dotnet_diagnostic.IDE0161.severity = error
+csharp_using_directive_placement = outside_namespace:error
+dotnet_diagnostic.IDE0065.severity = error
+dotnet_sort_system_directives_first = true
+
+# Remove unnecessary using directives
+dotnet_diagnostic.IDE0005.severity = error
+
+#### Explicit typing ####
+
+# var is prohibited
+csharp_style_var_for_built_in_types = false:error
+csharp_style_var_when_type_is_apparent = false:error
+csharp_style_var_elsewhere = false:error
+dotnet_diagnostic.IDE0007.severity = none
+dotnet_diagnostic.IDE0008.severity = error
+
+# Target-typed new() is avoided so the type is visible at the start of a declaration
+csharp_style_implicit_object_creation_when_type_is_apparent = false:error
+dotnet_diagnostic.IDE0090.severity = error
+
+# Use language keywords (int, string) rather than framework type names
+dotnet_style_predefined_type_for_locals_parameters_members = true:error
+dotnet_style_predefined_type_for_member_access = true:error
+dotnet_diagnostic.IDE0049.severity = error
+
+#### Indicating scope ####
+
+# Always qualify instance members with this.
+dotnet_style_qualification_for_field = true:error
+dotnet_style_qualification_for_property = true:error
+dotnet_style_qualification_for_method = true:error
+dotnet_style_qualification_for_event = true:error
+dotnet_diagnostic.IDE0009.severity = error
+
+#### Full member bodies ####
+
+# Expression-bodied members are not used (lambdas are allowed)
+csharp_style_expression_bodied_methods = false:error
+csharp_style_expression_bodied_constructors = false:error
+csharp_style_expression_bodied_operators = false:error
+csharp_style_expression_bodied_conversion_operators = false:error
+csharp_style_expression_bodied_properties = false:error
+csharp_style_expression_bodied_indexers = false:error
+csharp_style_expression_bodied_accessors = false:error
+csharp_style_expression_bodied_local_functions = false:error
+csharp_style_expression_bodied_lambdas = true:silent
+dotnet_diagnostic.IDE0021.severity = error
+dotnet_diagnostic.IDE0022.severity = error
+dotnet_diagnostic.IDE0023.severity = error
+dotnet_diagnostic.IDE0024.severity = error
+dotnet_diagnostic.IDE0025.severity = error
+dotnet_diagnostic.IDE0026.severity = error
+dotnet_diagnostic.IDE0027.severity = error
+dotnet_diagnostic.IDE0061.severity = error
+
+# Dependencies are assigned to fields in an explicit constructor, not a primary constructor
+csharp_style_prefer_primary_constructors = false:silent
+
+#### Async ####
+
+# Library code must not capture the synchronisation context
+dotnet_diagnostic.CA2007.severity = error
+
+#### Initialisation ####
+
+# CONTRIBUTING.md asks for explicit initial values, even when they equal the default
+dotnet_diagnostic.CA1805.severity = none
+
+#### Localisation ####
+
+# Messages come from .resx resources and must follow the current culture, so format strings are not cached
+dotnet_diagnostic.CA1863.severity = none
+
+#### Naming ####
+
+# Interfaces start with I
+dotnet_naming_rule.interfaces_begin_with_i.symbols = interface_symbols
+dotnet_naming_rule.interfaces_begin_with_i.style = begins_with_i_style
+dotnet_naming_rule.interfaces_begin_with_i.severity = error
+
+# Async methods end with Async
+dotnet_naming_rule.async_methods_end_with_async.symbols = async_method_symbols
+dotnet_naming_rule.async_methods_end_with_async.style = ends_with_async_style
+dotnet_naming_rule.async_methods_end_with_async.severity = error
+
+# Types, members and constants are PascalCase
+dotnet_naming_rule.types_and_members_pascal_case.symbols = type_and_member_symbols
+dotnet_naming_rule.types_and_members_pascal_case.style = pascal_case_style
+dotnet_naming_rule.types_and_members_pascal_case.severity = error
+
+# Constants and static read-only fields are PascalCase, whatever their accessibility
+dotnet_naming_rule.constants_pascal_case.symbols = constant_symbols
+dotnet_naming_rule.constants_pascal_case.style = pascal_case_style
+dotnet_naming_rule.constants_pascal_case.severity = error
+
+dotnet_naming_rule.static_readonly_fields_pascal_case.symbols = static_readonly_field_symbols
+dotnet_naming_rule.static_readonly_fields_pascal_case.style = pascal_case_style
+dotnet_naming_rule.static_readonly_fields_pascal_case.severity = error
+
+# Private and protected fields are camelCase with no prefix
+dotnet_naming_rule.private_fields_camel_case.symbols = private_field_symbols
+dotnet_naming_rule.private_fields_camel_case.style = camel_case_style
+dotnet_naming_rule.private_fields_camel_case.severity = error
+
+# Parameters and locals are camelCase
+dotnet_naming_rule.parameters_and_locals_camel_case.symbols = parameter_and_local_symbols
+dotnet_naming_rule.parameters_and_locals_camel_case.style = camel_case_style
+dotnet_naming_rule.parameters_and_locals_camel_case.severity = error
+
+dotnet_naming_symbols.interface_symbols.applicable_kinds = interface
+dotnet_naming_symbols.async_method_symbols.applicable_kinds = method
+dotnet_naming_symbols.async_method_symbols.required_modifiers = async
+dotnet_naming_symbols.type_and_member_symbols.applicable_kinds = class, struct, enum, delegate, method, property, event, namespace
+dotnet_naming_symbols.constant_symbols.applicable_kinds = field
+dotnet_naming_symbols.constant_symbols.required_modifiers = const
+dotnet_naming_symbols.static_readonly_field_symbols.applicable_kinds = field
+dotnet_naming_symbols.static_readonly_field_symbols.required_modifiers = static, readonly
+dotnet_naming_symbols.private_field_symbols.applicable_kinds = field
+dotnet_naming_symbols.private_field_symbols.applicable_accessibilities = private, protected, private_protected
+dotnet_naming_symbols.parameter_and_local_symbols.applicable_kinds = parameter, local, local_function
+
+dotnet_naming_style.begins_with_i_style.required_prefix = I
+dotnet_naming_style.begins_with_i_style.capitalization = pascal_case
+dotnet_naming_style.ends_with_async_style.required_suffix = Async
+dotnet_naming_style.ends_with_async_style.capitalization = pascal_case
+dotnet_naming_style.pascal_case_style.capitalization = pascal_case
+dotnet_naming_style.camel_case_style.capitalization = camel_case
+
+dotnet_diagnostic.IDE1006.severity = error
+
+#### Documentation (StyleCop) ####
+
+# StyleCop is used only to require XML documentation on every element, including private ones, and one type per
+# file named after the type. All other StyleCop rules are switched off; the IDE rules above cover formatting.
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpacingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.ReadabilityRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.OrderingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.NamingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.MaintainabilityRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.LayoutRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.DocumentationRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpecialRules.severity = none
+dotnet_diagnostic.SA1600.severity = error
+dotnet_diagnostic.SA1601.severity = error
+dotnet_diagnostic.SA1602.severity = error
+
+# One type per file (types are configured in stylecop.json), and the file named after it
+dotnet_diagnostic.SA1402.severity = error
+dotnet_diagnostic.SA1649.severity = error

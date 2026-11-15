@@ -1,0 +1,352 @@
+using Latiprimere.Ipp.Testing.Builders;
+using Latiprimere.Ipp.Testing.Fakes;
+using Latiprimere.Testing.Fakes;
+using SharpIpp.Models.Requests;
+using Xunit;
+
+namespace Latiprimere.Ipp.Tests;
+
+public sealed class IppPrinterTests
+{
+	private const int ServerErrorBusy = 0x0507; // IPP status for a printer working on another job
+
+	private static readonly Uri PrinterUri = new Uri("ipp://localhost:631/printers/Office"); // Printer under test
+
+	[Fact]
+	public async Task GivenPdfAndOptionsWhenSubmitThenSendsPrintJobWithDocumentAndAttributes()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient { PrintJobId = 42 };
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+		PrintOptions options = new PrintOptions { JobName = "Invoice", Copies = 2 };
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync
+		(
+			PrintContent.FromPdf(document),
+			options,
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert
+		PrintJobRequest request = Assert.IsType<PrintJobRequest>(client.LastPrintJobRequest);
+		Assert.Same(document, request.Document);
+		Assert.Equal(IppPrinterTests.PrinterUri, request.OperationAttributes?.PrinterUri?.Value);
+		Assert.Equal("tester", request.OperationAttributes?.RequestingUserName?.Value);
+		Assert.Equal("application/pdf", request.OperationAttributes?.DocumentFormat?.Value.Value);
+		Assert.Equal("Invoice", request.OperationAttributes?.JobName?.Value);
+		Assert.Equal(2, request.JobTemplateAttributes?.Copies?.Value);
+		Assert.Equal("42", job.Id);
+		Assert.Equal("cups:Office", job.PrinterId);
+	}
+
+	[Fact]
+	public async Task GivenRawContentWhenSubmitThenSendsRawMimeTypeAndNoJobName()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient();
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x1B, 0x40 });
+
+		// Act
+		await printer.SubmitAsync
+		(
+			PrintContent.FromRaw(document),
+			PrintOptions.Default,
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert
+		PrintJobRequest request = Assert.IsType<PrintJobRequest>(client.LastPrintJobRequest);
+		Assert.Equal("application/vnd.cups-raw", request.OperationAttributes?.DocumentFormat?.Value.Value);
+		Assert.Null(request.OperationAttributes?.JobName);
+	}
+
+	[Fact]
+	public async Task GivenResponseWithoutJobIdWhenSubmitThenThrowsPrintException()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient { PrintJobId = 0 };
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+		using MemoryStream document = new MemoryStream();
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync
+		(
+			PrintContent.FromPdf(document),
+			PrintOptions.Default,
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert
+		await Assert.ThrowsAsync<PrintException>(submit);
+	}
+
+	[Fact]
+	public async Task GivenOutputFileWhenSubmitThenThrowsNotSupportedExceptionWithoutSending()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient();
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+		PrintOptions options = new PrintOptions { OutputFile = "out.pdf" };
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync
+		(
+			PrintContent.FromPdf(document),
+			options,
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert
+		await Assert.ThrowsAsync<NotSupportedException>(submit);
+		Assert.Null(client.LastPrintJobRequest);
+	}
+
+	[Fact]
+	public async Task GivenFormatThePrinterAcceptsWhenSubmitThenSends()
+	{
+		// Arrange — format names compare without regard to case
+		FakeIppClient client = new FakeIppClient();
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client, new[] { "Application/PDF" });
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		await printer.SubmitAsync
+		(
+			PrintContent.FromPdf(document),
+			PrintOptions.Default,
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert
+		Assert.NotNull(client.LastPrintJobRequest);
+	}
+
+	[Fact]
+	public async Task GivenFormatThePrinterDoesNotAcceptWhenSubmitThenThrowsNotSupportedExceptionWithoutSending()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient();
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client, new[] { "image/urf" });
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync
+		(
+			PrintContent.FromPdf(document),
+			PrintOptions.Default,
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert
+		await Assert.ThrowsAsync<NotSupportedException>(submit);
+		Assert.Null(client.LastPrintJobRequest);
+	}
+
+	[Fact]
+	public async Task GivenPrinterWhenGetCapabilitiesThenAsksForCapabilityAttributesAndMapsThem()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient();
+		client.AddPrinter(IppPrinterTests.PrinterUri, new PrinterAttributesBuilder().Build());
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+
+		// Act
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.NotNull(capabilities);
+		GetPrinterAttributesRequest request = Assert.Single(client.GetPrinterAttributesRequests);
+		Assert.Equal(IppPrinterTests.PrinterUri, request.OperationAttributes?.PrinterUri?.Value);
+
+		Assert.Equal
+		(
+			IppRequestedAttributes.CapabilityAttributes,
+			request.OperationAttributes?.RequestedAttributes?.Value
+		);
+	}
+
+	[Fact]
+	public async Task GivenPrinterThatHasGoneWhenGetCapabilitiesThenThrowsPrintException()
+	{
+		// Arrange — the fake client answers not-found for a URI with no printer
+		IppPrinter printer = IppPrinterTests.CreatePrinter(new FakeIppClient());
+
+		// Act
+		Func<Task> getCapabilities = () => printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		await Assert.ThrowsAsync<PrintException>(getCapabilities);
+	}
+
+	[Fact]
+	public async Task GivenNullContentWhenSubmitThenThrowsArgumentNullException()
+	{
+		// Arrange
+		IppPrinter printer = IppPrinterTests.CreatePrinter(new FakeIppClient());
+		PrintContent? content = null;
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync
+		(
+			content!, // Deliberately null to test the guard
+			PrintOptions.Default,
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert
+		await Assert.ThrowsAsync<ArgumentNullException>(submit);
+	}
+
+	[Fact]
+	public async Task GivenPrinterBusyTwiceWhenSubmitThenResendsWholeDocumentUntilAccepted()
+	{
+		// Arrange — the document starts two bytes into the stream, and each attempt must send it from there
+		FakeIppClient client = new FakeIppClient { BusyPrintJobCount = 2, PrintJobId = 7 };
+		IppPrinter printer = IppPrinterTests.CreateRetryingPrinter(client, TimeSpan.FromMinutes(1));
+		using MemoryStream document = new MemoryStream(new byte[] { 0xFF, 0xFF, 0x25, 0x50, 0x44, 0x46 });
+		document.Position = 2;
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync
+		(
+			PrintContent.FromPdf(document),
+			PrintOptions.Default,
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert
+		Assert.Equal("7", job.Id);
+		Assert.Equal(3, client.ReceivedDocuments.Count);
+		Assert.All(client.ReceivedDocuments, received => Assert.Equal(new byte[] { 0x25, 0x50, 0x44, 0x46 }, received));
+	}
+
+	[Fact]
+	public async Task GivenNoBusyRetryWhenPrinterBusyThenThrowsAfterOneAttempt()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient { BusyPrintJobCount = 1 };
+		IppPrinter printer = IppPrinterTests.CreateRetryingPrinter(client, TimeSpan.Zero);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync
+		(
+			PrintContent.FromPdf(document),
+			PrintOptions.Default,
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(submit);
+		Assert.Equal(IppPrinterTests.ServerErrorBusy, exception.NativeErrorCode);
+		Assert.Single(client.ReceivedDocuments);
+	}
+
+	[Fact]
+	public async Task GivenPrinterBusyThroughoutWhenRetryTimeRunsOutThenThrowsBusyError()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient { BusyPrintJobCount = int.MaxValue };
+		IppPrinter printer = IppPrinterTests.CreateRetryingPrinter(client, TimeSpan.FromMilliseconds(50));
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync
+		(
+			PrintContent.FromPdf(document),
+			PrintOptions.Default,
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(submit);
+		Assert.Equal(IppPrinterTests.ServerErrorBusy, exception.NativeErrorCode);
+		Assert.True(client.ReceivedDocuments.Count > 1, "The job was sent only once.");
+	}
+
+	[Fact]
+	public async Task GivenUnseekableDocumentWhenPrinterBusyThenThrowsWithoutResending()
+	{
+		// Arrange — a stream that can't go back can't be sent again
+		FakeIppClient client = new FakeIppClient { BusyPrintJobCount = 1 };
+		IppPrinter printer = IppPrinterTests.CreateRetryingPrinter(client, TimeSpan.FromMinutes(1));
+		using ForwardOnlyStream document = new ForwardOnlyStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync
+		(
+			PrintContent.FromPdf(document),
+			PrintOptions.Default,
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(submit);
+		Assert.Equal(IppPrinterTests.ServerErrorBusy, exception.NativeErrorCode);
+		Assert.Single(client.ReceivedDocuments);
+	}
+
+	[Fact]
+	public async Task GivenRejectionOtherThanBusyWhenSubmitThenThrowsWithoutResending()
+	{
+		// Arrange
+		PrintException rejection = new PrintException("Not supported.") { NativeErrorCode = 0x040B };
+		FakeIppClient client = new FakeIppClient { FailureToThrow = rejection };
+		IppPrinter printer = IppPrinterTests.CreateRetryingPrinter(client, TimeSpan.FromMinutes(1));
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync
+		(
+			PrintContent.FromPdf(document),
+			PrintOptions.Default,
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert — the configured failure is thrown before the request is recorded, so nothing was sent twice
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(submit);
+		Assert.Same(rejection, exception);
+		Assert.Empty(client.ReceivedDocuments);
+	}
+
+	/// <summary>
+	/// Creates a printer that resends jobs turned away as busy, with millisecond waits between attempts.
+	/// </summary>
+	/// <param name="client">The fake IPP client.</param>
+	/// <param name="busyRetryDuration">How long to keep resending.</param>
+	/// <returns>The printer.</returns>
+	private static IppPrinter CreateRetryingPrinter(FakeIppClient client, TimeSpan busyRetryDuration)
+	{
+		IppPrintContext context = new IppPrintContextBuilder()
+			.WithClient(client)
+			.WithBusyRetryDuration(busyRetryDuration)
+			.Build();
+		PrinterInfo info = new PrinterInfo { Id = "ipp:ipp://printer.local/ipp/print", Name = "Office" };
+
+		return new IppPrinter(context, IppPrinterTests.PrinterUri, info);
+	}
+
+	/// <summary>
+	/// Creates a printer that uses the fake client and CUPS document formats.
+	/// </summary>
+	/// <param name="client">The fake IPP client.</param>
+	/// <param name="supportedFormats">
+	/// The MIME types the printer accepts, or <see langword="null"/> to skip the check.
+	/// </param>
+	/// <returns>The printer.</returns>
+	private static IppPrinter CreatePrinter
+	(
+		FakeIppClient                client,
+		IReadOnlyCollection<string>? supportedFormats = null
+	)
+	{
+		IppPrintContext context = new IppPrintContextBuilder().WithClient(client).Build();
+		PrinterInfo info = new PrinterInfo { Id = "cups:Office", Name = "Office" };
+
+		return new IppPrinter(context, IppPrinterTests.PrinterUri, info, supportedFormats);
+	}
+}

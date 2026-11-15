@@ -1,0 +1,114 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Started by prepare-release.yml for the release branch, whose push starts no workflow by itself
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      # The .NET 11 SDK (from global.json) builds both targets; the .NET 10 runtime runs the net10.0 tests
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x
+
+      # Integration tests are skipped unless their LATIPRIMERE_TEST_* variable is set (see CONTRIBUTING.md). Each
+      # runner sets the variables for the virtual printers it has; once set, a test that can't reach them fails.
+
+      # Ubuntu: the CUPS test container, with its five queues and ippeveprinter. Addresses are 127.0.0.1, not
+      # localhost, because the container publishes on IPv4 only.
+      - name: Start virtual printers
+        if: runner.os == 'Linux'
+        env:
+          LATIPRIMERE_TEST_CUPS_OUTPUT: ${{ runner.temp }}/cups-output
+        run: |
+          mkdir -p "$LATIPRIMERE_TEST_CUPS_OUTPUT"
+          docker compose -f tools/virtual-printers/compose.yaml up -d --build --wait
+          {
+            echo "LATIPRIMERE_TEST_CUPS_SERVER=127.0.0.1:631"
+            echo "LATIPRIMERE_TEST_CUPS_OUTPUT=$LATIPRIMERE_TEST_CUPS_OUTPUT"
+            echo "LATIPRIMERE_TEST_IPP_PRINTER=ipp://127.0.0.1:8631/ipp/print"
+          } >> "$GITHUB_ENV"
+
+      # macOS: no Docker on these runners, so the runner's own CUPS gets the container's Raw, Paused and Virtual-IPP
+      # queues, and ippeveprinter on 8631. Raw sends its jobs to a capture server, since Apple's CUPS can't take an
+      # extra backend. The tests of CUPS-PDF and Secure, which only the container has, skip.
+      - name: Set up macOS test printers
+        if: runner.os == 'macOS'
+        run: |
+          output_directory=/Users/Shared/LatiprimereTestOutput
+          sh tools/macos-test-printers/install-test-printers.sh "$output_directory"
+          {
+            echo "LATIPRIMERE_TEST_CUPS_SERVER=127.0.0.1:631"
+            echo "LATIPRIMERE_TEST_CUPS_OUTPUT=$output_directory"
+            echo "LATIPRIMERE_TEST_CUPS_SETUP=macos"
+            echo "LATIPRIMERE_TEST_IPP_PRINTER=ipp://127.0.0.1:8631/ipp/print"
+          } >> "$GITHUB_ENV"
+
+      # Windows: the spooler test printers (Generic / Text Only on file ports, and a paused queue). The runner is
+      # elevated, which the script needs. Microsoft Print to PDF tests run too where the image has that printer.
+      - name: Install Windows test printers
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Start-Service -Name Spooler
+          $outputDirectory = Join-Path $env:ProgramData 'Latiprimere\TestOutput'
+          ./tools/windows-test-printers/Install-TestPrinters.ps1 -OutputDirectory $outputDirectory
+          "LATIPRIMERE_TEST_WINDOWS_OUTPUT=$outputDirectory" >> $env:GITHUB_ENV
+          Get-Printer | Format-Table Name, DriverName, PortName -AutoSize
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release
+
+      # Packs on one runner, so every change shows that the packages still build and pass package validation. The
+      # packages are kept for a few days to inspect; release.yml builds the ones that are published.
+      - name: Pack
+        if: runner.os == 'Linux'
+        run: dotnet pack --no-build --configuration Release --output artifacts/packages
+
+      - name: Keep packages
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: artifacts/packages
+          retention-days: 7
+
+      - name: Show virtual printer logs
+        if: failure() && runner.os == 'Linux'
+        run: |
+          docker logs latiprimere-cups
+          docker exec latiprimere-cups tail -n 200 /var/log/cups/error_log
+
+      - name: Show macOS test printer logs
+        if: failure() && runner.os == 'macOS'
+        run: |
+          lpstat -t || true
+          ls -l /Users/Shared/LatiprimereTestOutput || true
+          cat /tmp/latiprimere-test-printers/capture-server.log || true
+          cat /tmp/latiprimere-test-printers/ippeveprinter.log || true
+          sudo tail -n 300 /var/log/cups/error_log || true

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Fakes and builders shared by the IPP and CUPS test projects -->
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Latiprimere.Ipp\Latiprimere.Ipp.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="SharpIppNext" />
+	</ItemGroup>
+
+	<!-- Builders that create internal Latiprimere.Ipp types are internal too -->
+	<ItemGroup>
+		<InternalsVisibleTo Include="Latiprimere.Cups.Tests" />
+		<InternalsVisibleTo Include="Latiprimere.Ipp.Tests" />
+	</ItemGroup>
+
+</Project>

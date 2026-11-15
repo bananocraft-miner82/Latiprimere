@@ -1,0 +1,53 @@
+using Xunit;
+
+namespace Latiprimere.Ipp.Tests;
+
+public sealed class IppDocumentFormatsTests
+{
+	[Theory]
+	[InlineData(DocumentFormat.Pdf, "application/pdf")]
+	[InlineData(DocumentFormat.Raw, "application/vnd.cups-raw")]
+	public void GivenCupsFormatsWhenGetMimeTypeThenReturnsCupsMimeType(DocumentFormat format, string expectedMimeType)
+	{
+		// Arrange — each document format and the MIME type CUPS expects (provided by InlineData above)
+		IppDocumentFormats formats = IppDocumentFormats.Cups;
+
+		// Act
+		string mimeType = formats.GetMimeType(format);
+
+		// Assert
+		Assert.Equal(expectedMimeType, mimeType);
+	}
+
+	[Theory]
+	[InlineData(DocumentFormat.Pdf, "application/pdf")]
+	[InlineData(DocumentFormat.Raw, "application/octet-stream")]
+	public void GivenStandardFormatsWhenGetMimeTypeThenReturnsIppMimeType
+	(
+		DocumentFormat format,
+		string expectedMimeType
+	)
+	{
+		// Arrange — each document format and the MIME type IPP printers expect (provided by InlineData above)
+		IppDocumentFormats formats = IppDocumentFormats.Standard;
+
+		// Act
+		string mimeType = formats.GetMimeType(format);
+
+		// Assert
+		Assert.Equal(expectedMimeType, mimeType);
+	}
+
+	[Fact]
+	public void GivenUnknownFormatWhenGetMimeTypeThenThrowsArgumentOutOfRangeException()
+	{
+		// Arrange
+		DocumentFormat unknownFormat = (DocumentFormat)99;
+
+		// Act
+		Func<string> getMimeType = () => IppDocumentFormats.Cups.GetMimeType(unknownFormat);
+
+		// Assert
+		Assert.Throws<ArgumentOutOfRangeException>(getMimeType);
+	}
+}

@@ -1,0 +1,45 @@
+<Project>
+
+	<!-- Settings shared by every project in the repository -->
+	<PropertyGroup>
+		<TargetFrameworks>net10.0;net11.0</TargetFrameworks>
+		<LangVersion>14.0</LangVersion>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<AnalysisLevel>latest-recommended</AnalysisLevel>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NeutralLanguage>en</NeutralLanguage>
+	</PropertyGroup>
+
+	<!-- The version of every package and of the CLI. A release changes it here (docs/releasing.md). -->
+	<PropertyGroup>
+		<VersionPrefix>0.1.0</VersionPrefix>
+		<VersionSuffix>preview</VersionSuffix>
+	</PropertyGroup>
+
+	<!-- Package metadata -->
+	<PropertyGroup>
+		<Authors>Latiprimere contributors</Authors>
+		<Copyright>Copyright (c) 2026 Jonathan Price</Copyright>
+		<PackageProjectUrl>https://github.com/bananocraft-miner82/Latiprimere</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/bananocraft-miner82/Latiprimere</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<PackageTags>printing;printer;print;ipp;cups;spooler;cross-platform</PackageTags>
+	</PropertyGroup>
+
+	<!-- Resource classes get a FormatName method for each message with placeholders, so callers don't repeat
+	     string.Format(CultureInfo.CurrentCulture, ...) -->
+	<ItemDefinitionGroup>
+		<EmbeddedResource>
+			<EmitFormatMethods>true</EmitFormatMethods>
+		</EmbeddedResource>
+	</ItemDefinitionGroup>
+
+	<!-- StyleCop is used only to require XML documentation on every member (see .editorconfig) -->
+	<ItemGroup>
+		<AdditionalFiles Include="$(MSBuildThisFileDirectory)stylecop.json" Link="stylecop.json" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,55 @@
+using Latiprimere.Tests.Builders;
+
+namespace Latiprimere.Tests.Fakes;
+
+/// <summary>
+/// An in-memory printer that accepts every job.
+/// </summary>
+internal sealed class FakePrinter : IPrinter
+{
+	/// <summary>
+	/// Initialises a new instance of the <see cref="FakePrinter"/> class.
+	/// </summary>
+	/// <param name="info">The information the printer reports about itself.</param>
+	public FakePrinter(PrinterInfo info)
+	{
+		this.Info = info;
+	}
+
+	/// <summary>
+	/// Gets the information the printer reports about itself.
+	/// </summary>
+	public PrinterInfo Info { get; }
+
+	/// <summary>
+	/// Accepts the document and returns a job that has already completed.
+	/// </summary>
+	/// <param name="content">The document to print. Not used.</param>
+	/// <param name="options">The print options. Not used.</param>
+	/// <param name="cancellationToken">Not used.</param>
+	/// <returns>A job that reports completion on its first status request.</returns>
+	public Task<IPrintJob> SubmitAsync(PrintContent content, PrintOptions options, CancellationToken cancellationToken)
+	{
+		// Hand back a job that has already finished
+		PrintJobStatus completedStatus = new PrintJobStatusBuilder()
+			.WithState(PrintJobState.Completed)
+			.Build();
+
+		IPrintJob job = new FakePrintJob(completedStatus)
+		{
+			PrinterId = this.Info.Id
+		};
+
+		return Task.FromResult(job);
+	}
+
+	/// <summary>
+	/// Returns capabilities that report nothing.
+	/// </summary>
+	/// <param name="cancellationToken">Not used.</param>
+	/// <returns>Empty capabilities.</returns>
+	public Task<PrinterCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken)
+	{
+		return Task.FromResult(new PrinterCapabilities());
+	}
+}
