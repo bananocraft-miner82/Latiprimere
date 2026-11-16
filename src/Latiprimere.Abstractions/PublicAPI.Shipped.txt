@@ -93,18 +93,26 @@ Latiprimere.PrintJobStatus.Timestamp.get -> System.DateTimeOffset
 Latiprimere.PrintJobStatus.Timestamp.init -> void
 Latiprimere.PrintOptions
 Latiprimere.PrintOptions.<Clone>$() -> Latiprimere.PrintOptions!
+Latiprimere.PrintOptions.ColorMode.get -> Latiprimere.ColorMode
+Latiprimere.PrintOptions.ColorMode.init -> void
 Latiprimere.PrintOptions.Copies.get -> int
 Latiprimere.PrintOptions.Copies.init -> void
 Latiprimere.PrintOptions.Duplex.get -> Latiprimere.DuplexMode
 Latiprimere.PrintOptions.Duplex.init -> void
 Latiprimere.PrintOptions.Equals(Latiprimere.PrintOptions? other) -> bool
+Latiprimere.PrintOptions.InputTray.get -> Latiprimere.InputTray?
+Latiprimere.PrintOptions.InputTray.init -> void
 Latiprimere.PrintOptions.JobName.get -> string?
 Latiprimere.PrintOptions.JobName.init -> void
+Latiprimere.PrintOptions.MediaSize.get -> Latiprimere.MediaSize?
+Latiprimere.PrintOptions.MediaSize.init -> void
 Latiprimere.PrintOptions.Orientation.get -> Latiprimere.PageOrientation
 Latiprimere.PrintOptions.Orientation.init -> void
 Latiprimere.PrintOptions.OutputFile.get -> string?
 Latiprimere.PrintOptions.OutputFile.init -> void
 Latiprimere.PrintOptions.PrintOptions() -> void
+Latiprimere.PrintOptions.VendorOptions.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Latiprimere.PrintOptions.VendorOptions.init -> void
 Latiprimere.PrintSystemUnavailableException
 Latiprimere.PrintSystemUnavailableException.PrintSystemUnavailableException() -> void
 Latiprimere.PrintSystemUnavailableException.PrintSystemUnavailableException(string! message) -> void

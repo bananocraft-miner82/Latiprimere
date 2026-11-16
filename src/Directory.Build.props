@@ -45,7 +45,7 @@
 	     sets the baseline; empty means there is no earlier release to compare with. -->
 	<PropertyGroup>
 		<EnablePackageValidation>true</EnablePackageValidation>
-		<PackageValidationBaselineVersion></PackageValidationBaselineVersion>
+		<PackageValidationBaselineVersion>0.1.0-preview</PackageValidationBaselineVersion>
 	</PropertyGroup>
 
 	<!-- Every public API change shows up as a change to PublicAPI.Unshipped.txt, which reviewers see (ADR 0018).
