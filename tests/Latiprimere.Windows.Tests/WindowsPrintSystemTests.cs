@@ -1,3 +1,5 @@
+using System.Runtime.Versioning;
+using Latiprimere.Windows.Gdi;
 using Latiprimere.Windows.Spooler;
 using Latiprimere.Windows.Tests.Builders;
 using Latiprimere.Windows.Tests.Fakes;
@@ -187,6 +189,72 @@ public sealed class WindowsPrintSystemTests
 		// Assert
 		Assert.Equal(isWindows, printSystem.IsSupported);
 		Assert.Equal("Windows", printSystem.Name);
+	}
+
+	[Theory]
+	[InlineData(null, GdiRenderSettings.UnlimitedRenderDpi)]
+	[InlineData(300, 300)]
+	[SupportedOSPlatform("windows")] // Skipped elsewhere
+	public void GivenRenderDpiOptionWhenCreateOnWindowsThenGdiPrinterRendersAtIt(int? maxRenderDpi, int expectedDpi)
+	{
+		// Arrange — the option, and the cap the GDI printer should get (provided by InlineData above)
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The GDI printer is only created on Windows.");
+		WindowsOptions options = new WindowsOptions { MaxRenderDpi = maxRenderDpi };
+
+		// Act
+		IPrintSystem printSystem = WindowsPrintSystemFactory.Create(pdfRasterizer: null, options);
+
+		// Assert
+		WindowsPrintSystem windows = Assert.IsType<WindowsPrintSystem>(printSystem);
+		Assert.Equal(expectedDpi, Assert.IsType<GdiRasterPrinter>(windows.Gdi).MaxRenderDpi);
+	}
+
+	[Fact]
+	[SupportedOSPlatform("windows")] // Skipped elsewhere
+	public void GivenPdfOverIppOffWhenCreateOnWindowsThenHasNoRoute()
+	{
+		// Arrange
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The route is only created on Windows.");
+
+		// Act
+		using IPrintSystem printSystem = WindowsPrintSystemFactory.Create(pdfRasterizer: null, new WindowsOptions());
+
+		// Assert — off by default
+		Assert.Null(Assert.IsType<WindowsPrintSystem>(printSystem).IppRoute);
+	}
+
+	[Fact]
+	[SupportedOSPlatform("windows")] // Skipped elsewhere
+	public void GivenPdfOverIppWithConfiguredUriWhenCreateOnWindowsThenRouteKnowsIt()
+	{
+		// Arrange
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The route is only created on Windows.");
+		WindowsOptions options = new WindowsOptions { PrintPdfOverIpp = true };
+		options.IppPrinterUris["Office"] = new Uri("http://10.0.0.5:631/ipp/print");
+
+		// Act
+		using IPrintSystem printSystem = WindowsPrintSystemFactory.Create(pdfRasterizer: null, options);
+
+		// Assert
+		Latiprimere.Windows.DirectIpp.WindowsIppRoute? route = Assert.IsType<WindowsPrintSystem>(printSystem).IppRoute;
+		Assert.NotNull(route);
+		Assert.Equal(new Uri("ipp://10.0.0.5:631/ipp/print"), route.FindPrinterUri("office", portName: null));
+		Assert.Equal("application/pdf", route.Context.DocumentFormats.GetMimeType(DocumentFormat.Pdf));
+	}
+
+	[Fact]
+	public void GivenPdfOverIppWithUriIppCantUseWhenCreateThenThrowsArgumentException()
+	{
+		// Arrange
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The route is only created on Windows.");
+		WindowsOptions options = new WindowsOptions { PrintPdfOverIpp = true };
+		options.IppPrinterUris["Office"] = new Uri("ftp://10.0.0.5/queue");
+
+		// Act
+		Func<IPrintSystem> create = () => WindowsPrintSystemFactory.Create(pdfRasterizer: null, options);
+
+		// Assert
+		Assert.Throws<ArgumentException>(create);
 	}
 
 	/// <summary>

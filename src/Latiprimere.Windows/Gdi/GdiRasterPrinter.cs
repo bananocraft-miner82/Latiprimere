@@ -25,6 +25,18 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 		this.maxRenderDpi = maxRenderDpi;
 	}
 
+	/// <summary>
+	/// Gets the highest resolution pages are rendered at, or <see cref="GdiRenderSettings.UnlimitedRenderDpi"/> for
+	/// the device's own.
+	/// </summary>
+	internal int MaxRenderDpi
+	{
+		get
+		{
+			return this.maxRenderDpi;
+		}
+	}
+
 	/// <inheritdoc/>
 	public int PrintRasterDocument(GdiPrintRequest request, CancellationToken cancellationToken)
 	{
@@ -33,12 +45,7 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 		// Settings go in the DEVMODE before the device context exists; the driver may adjust them
 		bool isFirstPageLandscape = request.Document.PageCount > 0 && request.Document.GetPageSize(0).IsLandscape;
 
-		byte[] devModeBuffer = GdiRasterPrinter.CreateDevMode
-		(
-			request.PrinterName,
-			request.Options,
-			isFirstPageLandscape
-		);
+		byte[] devModeBuffer = GdiRasterPrinter.CreateDevMode(request, isFirstPageLandscape);
 
 		fixed (byte* devModeData = devModeBuffer)
 		{
@@ -228,35 +235,46 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 	}
 
 	/// <summary>
-	/// Gets the printer's default DEVMODE, applies the options, and lets the driver validate the result.
+	/// Starts from a saved DEVMODE or the printer's default one, applies the options, and lets the driver validate
+	/// the result.
 	/// </summary>
-	/// <param name="printerName">The printer name.</param>
-	/// <param name="options">The print options.</param>
+	/// <param name="request">The printer, the print options, the paper and tray chosen, and any saved DEVMODE.</param>
 	/// <param name="isFirstPageLandscape">Whether the first page is landscape.</param>
 	/// <returns>A buffer holding the DEVMODE and the driver's private data.</returns>
-	private static byte[] CreateDevMode(string printerName, PrintOptions options, bool isFirstPageLandscape)
+	private static byte[] CreateDevMode(GdiPrintRequest request, bool isFirstPageLandscape)
 	{
+		string printerName = request.PrinterName;
 		using SafePrinterHandle printerHandle = PrinterHandles.Open(printerName);
 		int size = WinSpoolNative.DocumentProperties(IntPtr.Zero, printerHandle, printerName, null, null, 0);
 		SpoolerErrors.ThrowIfFailed(size > 0, nameof(WinSpoolNative.DocumentProperties), printerName);
 
-		byte[] requested = new byte[size];
+		// A saved DEVMODE may be larger than this driver's, so the buffer holds whichever is bigger
+		byte[] requested = new byte[Math.Max(size, request.SavedDevMode?.Length ?? 0)];
 		byte[] merged = new byte[size];
+		int result;
 
 		fixed (byte* requestedData = requested)
 		fixed (byte* mergedData = merged)
 		{
 			DevMode* requestedMode = (DevMode*)requestedData;
 
-			int result = WinSpoolNative.DocumentProperties
-			(
-				IntPtr.Zero, printerHandle, printerName, requestedMode, null, DevModeConstants.ModeOutBuffer
-			);
+			// Start from the saved DEVMODE, or the driver's defaults
+			if (request.SavedDevMode is not null)
+			{
+				request.SavedDevMode.CopyTo(requested, 0);
+			}
+			else
+			{
+				result = WinSpoolNative.DocumentProperties
+				(
+					IntPtr.Zero, printerHandle, printerName, requestedMode, null, DevModeConstants.ModeOutBuffer
+				);
 
-			SpoolerErrors.ThrowIfFailed(result > 0, nameof(WinSpoolNative.DocumentProperties), printerName);
+				SpoolerErrors.ThrowIfFailed(result > 0, nameof(WinSpoolNative.DocumentProperties), printerName);
+			}
 
 			// Merge the changes through the driver, which drops or adjusts anything it can't do
-			DevModeEditor.Apply(ref *requestedMode, options, isFirstPageLandscape);
+			DevModeEditor.Apply(ref *requestedMode, request.Options, request.PaperId, request.BinId, isFirstPageLandscape);
 
 			result = WinSpoolNative.DocumentProperties
 			(

@@ -2,6 +2,7 @@ using Latiprimere.Ipp.Testing.Builders;
 using Latiprimere.Ipp.Testing.Fakes;
 using Latiprimere.Testing.Fakes;
 using SharpIpp.Models.Requests;
+using SharpIpp.Protocol.Models;
 using Xunit;
 
 namespace Latiprimere.Ipp.Tests;
@@ -39,6 +40,88 @@ public sealed class IppPrinterTests
 		Assert.Equal(2, request.JobTemplateAttributes?.Copies?.Value);
 		Assert.Equal("42", job.Id);
 		Assert.Equal("cups:Office", job.PrinterId);
+	}
+
+	[Fact]
+	public async Task GivenColourSizeAndTrayWhenSubmitThenSendsThemAsJobAttributes()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient();
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		PrintOptions options = new PrintOptions
+		{
+			ColorMode = ColorMode.Color,
+			MediaSize = new MediaSize
+			{
+				Name              = "iso_a5_148x210mm",
+				DisplayName       = "A5",
+				WidthMillimetres  = 148,
+				HeightMillimetres = 210
+			},
+			InputTray = new InputTray { Id = "manual", Name = "Manual" }
+		};
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		PrintJobRequest request = Assert.IsType<PrintJobRequest>(client.LastPrintJobRequest);
+		Assert.Equal("color", request.JobTemplateAttributes?.PrintColorMode?.Value.Value);
+		Assert.Equal("manual", request.JobTemplateAttributes?.MediaCol?.Value.MediaSource?.Value.Value);
+		Assert.Equal(14800, request.JobTemplateAttributes?.MediaCol?.Value.MediaSize?.Value.XDimension?.Value.Lower);
+	}
+
+	[Fact]
+	public async Task GivenVendorOptionsWhenSubmitThenSendsThoseThisPrintSystemReads()
+	{
+		// Arrange — a network printer reads ipp: keys only
+		FakeIppClient client = new FakeIppClient();
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		PrintOptions options = new PrintOptions
+		{
+			VendorOptions = new Dictionary<string, string>
+			{
+				["ipp:print-quality"] = "5",
+				["cups:fit-to-page"]  = "true",
+				["windows:devmode"]   = "AAAA"
+			}
+		};
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		IppVendorAttributes vendorAttributes = Assert.IsType<IppVendorAttributes>(client.LastVendorAttributes);
+		IppAttribute attribute = Assert.Single(vendorAttributes.Job);
+		Assert.Equal("print-quality", attribute.Name);
+		Assert.Equal(5, attribute.Value);
+	}
+
+	[Fact]
+	public async Task GivenVendorOptionRepeatingATypedOptionWhenSubmitThenRefusesBeforeSending()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient();
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		PrintOptions options = new PrintOptions
+		{
+			Copies        = 2,
+			VendorOptions = new Dictionary<string, string> { ["ipp:copies"] = "3" }
+		};
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(submit);
+		Assert.Contains("'ipp:copies'", exception.Message, StringComparison.Ordinal);
+		Assert.Null(client.LastPrintJobRequest);
 	}
 
 	[Fact]

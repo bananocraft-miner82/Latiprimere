@@ -7,6 +7,114 @@ namespace Latiprimere.Windows.Tests.Mapping;
 public sealed class WindowsCapabilitiesMapperTests
 {
 	[Fact]
+	public void GivenSizeTheDriverListsWhenFindPaperIdThenReturnsItsNumber()
+	{
+		// Arrange — A4 listed in landscape, as some drivers do, still has the portrait name
+		WindowsCapabilitiesRecord record = new WindowsCapabilitiesRecord
+		{
+			Papers = new[]
+			{
+				WindowsCapabilitiesMapperTests.Paper(1, "Letter", 2159, 2794),
+				WindowsCapabilitiesMapperTests.Paper(77, "A4 Rotated", 2970, 2100),
+			}
+		};
+
+		// Act
+		short? paperId = WindowsCapabilitiesMapper.FindPaperId(record, "iso_a4_210x297mm");
+
+		// Assert
+		Assert.Equal((short)77, paperId);
+	}
+
+	[Fact]
+	public void GivenSizeListedTwiceWhenFindPaperIdThenReturnsTheFirstAsCapabilitiesDo()
+	{
+		// Arrange — DMPAPER 1 is Letter, 75 Letter Rotated
+		WindowsCapabilitiesRecord record = new WindowsCapabilitiesRecord
+		{
+			Papers = new[]
+			{
+				WindowsCapabilitiesMapperTests.Paper(1, "Letter", 2159, 2794),
+				WindowsCapabilitiesMapperTests.Paper(75, "Letter Rotated", 2794, 2159),
+			}
+		};
+
+		// Act
+		short? paperId = WindowsCapabilitiesMapper.FindPaperId(record, "na_letter_8.5x11in");
+
+		// Assert
+		Assert.Equal((short)1, paperId);
+	}
+
+	[Fact]
+	public void GivenCustomSizeWhenFindPaperIdThenMatchesItsCustomName()
+	{
+		// Arrange — a 100 × 150 mm label, which has no standard name
+		WindowsCapabilitiesRecord record = new WindowsCapabilitiesRecord
+		{
+			Papers = new[] { WindowsCapabilitiesMapperTests.Paper(300, "Label", 1000, 1500) }
+		};
+
+		string name = WindowsCapabilitiesMapper.ToCapabilities(record).MediaSizes[0].Name;
+
+		// Act
+		short? paperId = WindowsCapabilitiesMapper.FindPaperId(record, name);
+
+		// Assert
+		Assert.Equal((short)300, paperId);
+	}
+
+	[Fact]
+	public void GivenSizeTheDriverDoesNotListWhenFindPaperIdThenReturnsNull()
+	{
+		// Arrange
+		WindowsCapabilitiesRecord record = new WindowsCapabilitiesRecord
+		{
+			Papers = new[] { WindowsCapabilitiesMapperTests.Paper(1, "Letter", 2159, 2794) }
+		};
+
+		// Act
+		short? paperId = WindowsCapabilitiesMapper.FindPaperId(record, "iso_a4_210x297mm");
+
+		// Assert
+		Assert.Null(paperId);
+	}
+
+	[Theory]
+	[InlineData("257", (short)257)]
+	[InlineData("4", (short)4)]
+	public void GivenTrayTheDriverListsWhenFindBinIdThenReturnsItsNumber(string trayId, short expectedBinId)
+	{
+		// Arrange — a driver's own tray number and a standard one (provided by InlineData above)
+		WindowsCapabilitiesRecord record = WindowsCapabilitiesMapperTests.TwoBins();
+
+		// Act
+		short? binId = WindowsCapabilitiesMapper.FindBinId(record, trayId);
+
+		// Assert
+		Assert.Equal(expectedBinId, binId);
+	}
+
+	[Theory]
+	[InlineData("7")]
+	[InlineData("by-pass-tray")]
+	[InlineData("-4")]
+	[InlineData(" 4")]
+	[InlineData("99999")]
+	[InlineData("")]
+	public void GivenTrayTheDriverDoesNotListWhenFindBinIdThenReturnsNull(string trayId)
+	{
+		// Arrange — an unlisted number, an IPP keyword, and IDs that aren't bin numbers (provided by InlineData above)
+		WindowsCapabilitiesRecord record = WindowsCapabilitiesMapperTests.TwoBins();
+
+		// Act
+		short? binId = WindowsCapabilitiesMapper.FindBinId(record, trayId);
+
+		// Assert
+		Assert.Null(binId);
+	}
+
+	[Fact]
 	public void GivenColourDuplexPrinterWhenMappedThenReadsAllCoreCapabilities()
 	{
 		// Arrange — values as an inkjet driver reports them (DMPAPER 1 = Letter, 9 = A4; DMBIN 7 = auto)
@@ -143,6 +251,22 @@ public sealed class WindowsCapabilitiesMapperTests
 		Assert.Equal("Label", label.DisplayName);
 		Assert.Equal(100.0, label.WidthMillimetres);
 		Assert.Equal(200.0, label.HeightMillimetres);
+	}
+
+	/// <summary>
+	/// Creates capabilities with a standard tray (DMBIN 4, manual feed) and a driver's own (257).
+	/// </summary>
+	/// <returns>The capabilities.</returns>
+	private static WindowsCapabilitiesRecord TwoBins()
+	{
+		return new WindowsCapabilitiesRecord
+		{
+			Bins = new[]
+			{
+				new WindowsBinRecord { Id = 4, Name = "Manual Feed" },
+				new WindowsBinRecord { Id = 257, Name = "Tray 1" },
+			}
+		};
 	}
 
 	/// <summary>

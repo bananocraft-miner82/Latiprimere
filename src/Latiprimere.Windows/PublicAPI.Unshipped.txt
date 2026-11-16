@@ -1,1 +1,6 @@
 #nullable enable
+Latiprimere.Windows.WindowsOptions.MaxRenderDpi.get -> int?
+Latiprimere.Windows.WindowsOptions.MaxRenderDpi.set -> void
+Latiprimere.Windows.WindowsOptions.IppPrinterUris.get -> System.Collections.Generic.IDictionary<string!, System.Uri!>!
+Latiprimere.Windows.WindowsOptions.PrintPdfOverIpp.get -> bool
+Latiprimere.Windows.WindowsOptions.PrintPdfOverIpp.set -> void

@@ -1,0 +1,46 @@
+name: Update website
+
+# Rebuilds latiprimere.com when what it shows from this repository changes. The website reads the changelog and the
+# docs only when it is built, so without this they stay as they were until its next deployment:
+# - the changelog page shows CHANGELOG.md from main;
+# - the docs come from the newest release, so a release rebuilds the site once its packages are published.
+# It calls a Workers Builds deploy hook for the website's production branch. See "Update the website" in
+# docs/releasing.md for setting it up.
+on:
+  push:
+    branches: [main]
+    paths:
+      - CHANGELOG.md
+      - docs/site/**
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+
+permissions: {}
+
+# A newer run replaces one still waiting: each build reads the latest state anyway
+concurrency:
+  group: update-website
+  cancel-in-progress: true
+
+jobs:
+  rebuild:
+    name: Rebuild latiprimere.com
+    runs-on: ubuntu-latest
+
+    # After a release, only once the packages were published
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Start a build of the website
+        env:
+          DEPLOY_HOOK: ${{ secrets.WEBSITE_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "::warning::The WEBSITE_DEPLOY_HOOK secret isn't set, so the website wasn't rebuilt. See docs/releasing.md."
+            exit 0
+          fi
+
+          # The hook's URL is the credential, so it is never printed; Cloudflare's answer names the build it started
+          curl --fail-with-body --silent --show-error --max-time 30 --retry 3 --request POST "$DEPLOY_HOOK"

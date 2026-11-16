@@ -11,6 +11,15 @@ internal static class DevModeConstants
 	/// <summary>DM_PAPERSIZE.</summary>
 	internal const uint FieldPaperSize = 0x00000002;
 
+	/// <summary>DM_PAPERLENGTH: overrides the length of <c>dmPaperSize</c> when set.</summary>
+	internal const uint FieldPaperLength = 0x00000004;
+
+	/// <summary>DM_PAPERWIDTH: overrides the width of <c>dmPaperSize</c> when set.</summary>
+	internal const uint FieldPaperWidth = 0x00000008;
+
+	/// <summary>DM_FORMNAME: a form chosen by name, which some drivers prefer to <c>dmPaperSize</c>.</summary>
+	internal const uint FieldFormName = 0x00010000;
+
 	/// <summary>DM_DEFAULTSOURCE.</summary>
 	internal const uint FieldDefaultSource = 0x00000200;
 

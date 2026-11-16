@@ -9,6 +9,8 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Latiprimere.Abstractions\Latiprimere.Abstractions.csproj" />
+		<!-- Direct IPP for Windows queues (ADR 0027) -->
+		<ProjectReference Include="..\Latiprimere.Ipp\Latiprimere.Ipp.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

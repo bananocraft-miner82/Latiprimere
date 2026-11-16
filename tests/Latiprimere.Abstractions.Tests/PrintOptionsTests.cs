@@ -17,7 +17,79 @@ public sealed class PrintOptionsTests
 		Assert.Equal(1, copies);
 		Assert.Equal(DuplexMode.PrinterDefault, options.Duplex);
 		Assert.Equal(PageOrientation.PrinterDefault, options.Orientation);
+		Assert.Equal(ColorMode.PrinterDefault, options.ColorMode);
+		Assert.Null(options.MediaSize);
+		Assert.Null(options.InputTray);
+		Assert.Empty(options.VendorOptions);
 		Assert.Null(options.JobName);
+	}
+
+	[Fact]
+	public void GivenVendorOptionsWhenInitialisedThenKeepsACopy()
+	{
+		// Arrange
+		Dictionary<string, string> settings = new Dictionary<string, string>
+		{
+			["ipp:print-quality"]  = "5",
+			["cups:fit-to-page"]   = "true",
+			["windows:devmode"]    = "AAAA"
+		};
+
+		// Act
+		PrintOptions options = new PrintOptions { VendorOptions = settings };
+		settings["ipp:print-quality"] = "3";
+		settings["ipp:finishings"] = "4";
+
+		// Assert — later changes to the caller's dictionary change nothing
+		Assert.Equal(3, options.VendorOptions.Count);
+		Assert.Equal("5", options.VendorOptions["ipp:print-quality"]);
+		Assert.False(options.VendorOptions.ContainsKey("ipp:finishings"));
+	}
+
+	[Theory]
+	[InlineData("print-quality")]
+	[InlineData("ipps:print-quality")]
+	[InlineData("IPP:print-quality")]
+	[InlineData("ipp:")]
+	[InlineData("")]
+	public void GivenVendorOptionKeyWithoutKnownPrefixAndNameWhenInitialisedThenThrowsArgumentException(string key)
+	{
+		// Arrange — keys no print system would read (provided by InlineData above)
+		Dictionary<string, string> settings = new Dictionary<string, string> { [key] = "5" };
+
+		// Act
+		Func<PrintOptions> createOptions = () => new PrintOptions { VendorOptions = settings };
+
+		// Assert
+		ArgumentException exception = Assert.Throws<ArgumentException>(createOptions);
+		Assert.Equal(nameof(PrintOptions.VendorOptions), exception.ParamName);
+		Assert.Contains($"'{key}'", exception.Message, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public void GivenNullVendorOptionsWhenInitialisedThenThrowsArgumentNullException()
+	{
+		// Arrange
+		IReadOnlyDictionary<string, string>? settings = null;
+
+		// Act
+		Func<PrintOptions> createOptions = () => new PrintOptions { VendorOptions = settings! }; // Deliberately null
+
+		// Assert
+		Assert.Throws<ArgumentNullException>(createOptions);
+	}
+
+	[Fact]
+	public void GivenVendorOptionWithNullValueWhenInitialisedThenThrowsArgumentNullException()
+	{
+		// Arrange
+		Dictionary<string, string> settings = new Dictionary<string, string> { ["ipp:print-quality"] = null! }; // Deliberately null
+
+		// Act
+		Func<PrintOptions> createOptions = () => new PrintOptions { VendorOptions = settings };
+
+		// Assert
+		Assert.Throws<ArgumentNullException>(createOptions);
 	}
 
 	[Fact]

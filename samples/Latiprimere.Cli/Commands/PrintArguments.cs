@@ -29,6 +29,18 @@ internal sealed record PrintArguments
 	/// <summary>Option: report timing and memory use.</summary>
 	private const string StatsOption = "--stats";
 
+	/// <summary>Option: paper size, by PWG name.</summary>
+	private const string PaperOption = "--paper";
+
+	/// <summary>Option: colour mode.</summary>
+	private const string ColorOption = "--color";
+
+	/// <summary>Option: paper tray, by ID.</summary>
+	private const string TrayOption = "--tray";
+
+	/// <summary>Option: a vendor option, KEY=VALUE; may be repeated.</summary>
+	private const string VendorOption = "--option";
+
 	/// <summary>Gets the ID of the printer to print to.</summary>
 	public required string PrinterId { get; init; }
 
@@ -43,6 +55,12 @@ internal sealed record PrintArguments
 
 	/// <summary>Gets a value indicating whether to report timing and memory use.</summary>
 	public bool ShowStatistics { get; init; }
+
+	/// <summary>Gets the PWG name of the paper size to look up in the printer's capabilities, or <see langword="null"/>.</summary>
+	public string? PaperName { get; init; }
+
+	/// <summary>Gets the ID of the tray to look up in the printer's capabilities, or <see langword="null"/>.</summary>
+	public string? TrayId { get; init; }
 
 	/// <summary>Gets the print options.</summary>
 	public PrintOptions Options { get; init; } = PrintOptions.Default;
@@ -105,6 +123,16 @@ internal sealed record PrintArguments
 			PrintArguments.CopiesOption    => PrintArguments.ApplyCopies(parsed, value, index),
 			PrintArguments.DuplexOption    => PrintArguments.ApplyDuplex(parsed, value, index),
 			PrintArguments.OutputOption    => PrintArguments.ApplyOutput(parsed, value, index),
+			PrintArguments.ColorOption     => PrintArguments.ApplyColor(parsed, value, index),
+			PrintArguments.VendorOption    => PrintArguments.ApplyVendorOption(parsed, value, index),
+			PrintArguments.PaperOption when !string.IsNullOrWhiteSpace(value) => (parsed with { PaperName = value }, index + 2, null),
+			PrintArguments.TrayOption when !string.IsNullOrWhiteSpace(value)  => (parsed with { TrayId = value }, index + 2, null),
+			PrintArguments.PaperOption or PrintArguments.TrayOption =>
+			(
+				null,
+				index,
+				PrintArguments.Format(CliMessages.InvalidOptionValue, value, option)
+			),
 			_ => (null, index, PrintArguments.Format(CliMessages.UnknownOption, option)),
 		};
 	}
@@ -169,6 +197,62 @@ internal sealed record PrintArguments
 		}
 
 		return (parsed with { Options = parsed.Options with { Duplex = duplex.Value } }, index + 2, null);
+	}
+
+	/// <summary>
+	/// Applies the <c>--color</c> option.
+	/// </summary>
+	/// <param name="parsed">The arguments parsed so far.</param>
+	/// <param name="value">The option value: color or mono.</param>
+	/// <param name="index">The position of the option.</param>
+	/// <returns>The updated arguments (or <see langword="null"/> on error), the next position, and any error.</returns>
+	private static (PrintArguments? Parsed, int NextIndex, string? Error) ApplyColor(PrintArguments parsed, string? value, int index)
+	{
+		ColorMode? colorMode = value switch
+		{
+			"color" => ColorMode.Color,
+			"mono"  => ColorMode.Monochrome,
+			_       => null,
+		};
+
+		if (colorMode is null)
+		{
+			return (null, index, PrintArguments.Format(CliMessages.InvalidOptionValue, value, PrintArguments.ColorOption));
+		}
+
+		return (parsed with { Options = parsed.Options with { ColorMode = colorMode.Value } }, index + 2, null);
+	}
+
+	/// <summary>
+	/// Applies an <c>--option KEY=VALUE</c> option, adding to any given before.
+	/// </summary>
+	/// <param name="parsed">The arguments parsed so far.</param>
+	/// <param name="value">The option value, such as <c>ipp:print-quality=5</c>.</param>
+	/// <param name="index">The position of the option.</param>
+	/// <returns>The updated arguments (or <see langword="null"/> on error), the next position, and any error.</returns>
+	private static (PrintArguments? Parsed, int NextIndex, string? Error) ApplyVendorOption(PrintArguments parsed, string? value, int index)
+	{
+		int separator = value?.IndexOf('=', StringComparison.Ordinal) ?? -1;
+
+		if (value is null || separator <= 0)
+		{
+			return (null, index, PrintArguments.Format(CliMessages.InvalidOptionValue, value, PrintArguments.VendorOption));
+		}
+
+		Dictionary<string, string> vendorOptions = new Dictionary<string, string>(parsed.Options.VendorOptions, StringComparer.Ordinal)
+		{
+			[value[..separator]] = value[(separator + 1)..]
+		};
+
+		try
+		{
+			return (parsed with { Options = parsed.Options with { VendorOptions = vendorOptions } }, index + 2, null);
+		}
+		catch (ArgumentException exception)
+		{
+			// The key has no ipp:, cups: or windows: prefix
+			return (null, index, exception.Message);
+		}
 	}
 
 	/// <summary>

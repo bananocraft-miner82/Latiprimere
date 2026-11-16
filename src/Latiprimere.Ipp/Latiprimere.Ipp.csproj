@@ -21,6 +21,8 @@
 		<InternalsVisibleTo Include="Latiprimere.Cups.Tests" />
 		<InternalsVisibleTo Include="Latiprimere.Ipp.Tests" />
 		<InternalsVisibleTo Include="Latiprimere.Ipp.Testing" />
+		<InternalsVisibleTo Include="Latiprimere.Windows" />
+		<InternalsVisibleTo Include="Latiprimere.Windows.Tests" />
 	</ItemGroup>
 
 	<!-- Exception messages; the source generator gives them strongly typed classes the editor sees without a build -->

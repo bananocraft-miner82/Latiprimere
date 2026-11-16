@@ -2,6 +2,7 @@ using System.Net;
 using Latiprimere.Cups.Resources;
 using Latiprimere.Ipp;
 using Latiprimere.Ipp.Connections;
+using Latiprimere.Ipp.Mapping;
 
 namespace Latiprimere.Cups;
 
@@ -52,8 +53,9 @@ public static class CupsPrintSystemFactory
 			IppPrintContext failingContext = new IppPrintContext
 			{
 				Client             = new InvalidServerIppClient(endpoint.InvalidEnvironmentServer),
-				RequestingUserName = CupsPrintSystemFactory.GetRequestingUserName(options),
-				DocumentFormats    = IppDocumentFormats.Cups
+				RequestingUserName   = CupsPrintSystemFactory.GetRequestingUserName(options),
+				DocumentFormats      = IppDocumentFormats.Cups,
+				VendorOptionPrefixes = IppVendorAttributeMapper.CupsPrefixes
 			};
 
 			return new CupsPrintSystem(failingContext, endpoint, isSupported: true, ownedClient: null);
@@ -70,9 +72,10 @@ public static class CupsPrintSystemFactory
 
 		IppPrintContext context = new IppPrintContext
 		{
-			Client             = client,
-			RequestingUserName = CupsPrintSystemFactory.GetRequestingUserName(options),
-			DocumentFormats    = IppDocumentFormats.Cups
+			Client               = client,
+			RequestingUserName   = CupsPrintSystemFactory.GetRequestingUserName(options),
+			DocumentFormats      = IppDocumentFormats.Cups,
+			VendorOptionPrefixes = IppVendorAttributeMapper.CupsPrefixes
 		};
 
 		bool isSupported = endpoint.IsExplicit || platform != CupsPlatform.Other;

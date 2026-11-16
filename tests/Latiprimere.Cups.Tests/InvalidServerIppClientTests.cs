@@ -43,7 +43,7 @@ public sealed class InvalidServerIppClientTests
 			"CUPS-Get-Printers" => client.GetCupsPrintersAsync(new CUPSGetPrintersRequest(), cancellationToken),
 			"CUPS-Get-Default" => client.GetCupsDefaultPrinterNameAsync(new Uri("ipp://localhost:631/"), "ann", cancellationToken),
 			"Get-Printer-Attributes" => client.GetPrinterAttributesAsync(new GetPrinterAttributesRequest(), cancellationToken),
-			"Print-Job" => client.PrintJobAsync(new PrintJobRequest(), cancellationToken),
+			"Print-Job" => client.PrintJobAsync(new PrintJobRequest(), Latiprimere.Ipp.IppVendorAttributes.None, cancellationToken),
 			"Get-Job-Attributes" => client.GetJobAttributesAsync(new GetJobAttributesRequest(), cancellationToken),
 			_ => client.CancelJobAsync(new CancelJobRequest(), cancellationToken),
 		};

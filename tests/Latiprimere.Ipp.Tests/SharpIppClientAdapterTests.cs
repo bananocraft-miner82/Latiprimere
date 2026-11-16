@@ -170,6 +170,182 @@ public sealed class SharpIppClientAdapterTests
 	}
 
 	[Fact]
+	public async Task GivenColourTrayAndSizeWhenPrintJobSentThenEncodesThemAsPrintersExpect()
+	{
+		// Arrange
+		StubHttpMessageHandler stub = new StubHttpMessageHandler
+		(
+			HttpStatusCode.OK,
+			"application/ipp",
+			SharpIppClientAdapterTests.CreateIppResponse(0x0000)
+		);
+
+		using SharpIppClientAdapter client = new SharpIppClientAdapter(new HttpClient(stub, disposeHandler: true), sendsCredentials: false);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		PrintOptions options = new PrintOptions
+		{
+			ColorMode = ColorMode.Monochrome,
+			MediaSize = new MediaSize
+			{
+				Name              = "iso_a4_210x297mm",
+				DisplayName       = "A4",
+				WidthMillimetres  = 210,
+				HeightMillimetres = 297
+			},
+			InputTray = new InputTray { Id = "tray-1", Name = "Tray 1" }
+		};
+
+		PrintJobRequest request = new PrintJobRequest
+		{
+			Document              = document,
+			OperationAttributes   = new PrintJobOperationAttributes
+			{
+				PrinterUri         = new IppValue<Uri>(SharpIppClientAdapterTests.PrinterUri),
+				RequestingUserName = new StringWithLanguage("ann")
+			},
+			JobTemplateAttributes = Latiprimere.Ipp.Mapping.IppJobTemplateMapper.ToJobTemplateAttributes(options)
+		};
+
+		// Act
+		await client.PrintJobAsync(request, IppVendorAttributes.None, TestContext.Current.CancellationToken);
+
+		// Assert — media-size dimensions must be plain integers (tag 0x21), not ranges (0x33), inside a request
+		byte[] body = Assert.IsType<byte[]>(stub.LastRequestBody);
+		Assert.True(SharpIppClientAdapterTests.Contains(body, SharpIppClientAdapterTests.EncodeValue(0x44, "print-color-mode", "monochrome")));
+		Assert.True(SharpIppClientAdapterTests.Contains(body, SharpIppClientAdapterTests.EncodeMember(0x44, "media-source", Encoding.ASCII.GetBytes("tray-1"))));
+		Assert.True(SharpIppClientAdapterTests.Contains(body, SharpIppClientAdapterTests.EncodeMember(0x21, "x-dimension", [0x00, 0x00, 0x52, 0x08])));
+		Assert.True(SharpIppClientAdapterTests.Contains(body, SharpIppClientAdapterTests.EncodeMember(0x21, "y-dimension", [0x00, 0x00, 0x74, 0x04])));
+	}
+
+	[Fact]
+	public async Task GivenVendorAttributesWhenPrintJobSentThenAddsThemToTheirGroupsAndReadsTheJob()
+	{
+		// Arrange — a printer accepting the job as job 42, pending
+		StubHttpMessageHandler stub = new StubHttpMessageHandler
+		(
+			HttpStatusCode.OK,
+			"application/ipp",
+			SharpIppClientAdapterTests.CreatePrintJobResponse(42)
+		);
+
+		using SharpIppClientAdapter client = new SharpIppClientAdapter(new HttpClient(stub, disposeHandler: true), sendsCredentials: false);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		PrintJobRequest request = new PrintJobRequest
+		{
+			Document              = document,
+			OperationAttributes   = new PrintJobOperationAttributes
+			{
+				PrinterUri         = new IppValue<Uri>(SharpIppClientAdapterTests.PrinterUri),
+				RequestingUserName = new StringWithLanguage("ann")
+			},
+			JobTemplateAttributes = new JobTemplateAttributes { Copies = new IppValue<int>(2) }
+		};
+
+		IppVendorAttributes vendorAttributes = new IppVendorAttributes
+		{
+			Operation = [new IppAttribute(Tag.Boolean, "ipp-attribute-fidelity", true)],
+			Job       = [new IppAttribute(Tag.Enum, "print-quality", 5)]
+		};
+
+		// Act
+		PrintJobResponse response = await client.PrintJobAsync(request, vendorAttributes, TestContext.Current.CancellationToken);
+
+		// Assert — fidelity in the operation group (tag 0x01) before the job group (0x02), which keeps copies
+		byte[] body = Assert.IsType<byte[]>(stub.LastRequestBody);
+		int fidelity = body.AsSpan().IndexOf(SharpIppClientAdapterTests.EncodeAttribute(0x22, "ipp-attribute-fidelity", [0x01]));
+		int jobGroup = body.AsSpan().IndexOf(SharpIppClientAdapterTests.EncodeAttribute(0x21, "copies", [0x00, 0x00, 0x00, 0x02]));
+		int quality = body.AsSpan().IndexOf(SharpIppClientAdapterTests.EncodeAttribute(0x23, "print-quality", [0x00, 0x00, 0x00, 0x05]));
+		Assert.True(fidelity > 0);
+		Assert.True(jobGroup > fidelity);
+		Assert.True(quality > jobGroup);
+		Assert.Equal(0x02, body[jobGroup - 1]);
+		Assert.Equal(42, response.JobAttributes?.JobId);
+		Assert.Equal(JobState.Pending, response.JobAttributes?.JobState);
+		Assert.Equal(new byte[] { 0x25, 0x50, 0x44, 0x46 }, body[^4..]);
+	}
+
+	[Fact]
+	public async Task GivenVendorAttributesRefusedByPrinterWhenPrintJobSentThenThrowsPrintExceptionWithTheStatus()
+	{
+		// Arrange — client-error-attributes-or-values-not-supported (0x040B)
+		StubHttpMessageHandler stub = new StubHttpMessageHandler
+		(
+			HttpStatusCode.OK,
+			"application/ipp",
+			SharpIppClientAdapterTests.CreateIppResponse(0x040B)
+		);
+
+		using SharpIppClientAdapter client = new SharpIppClientAdapter(new HttpClient(stub, disposeHandler: true), sendsCredentials: false);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		PrintJobRequest request = new PrintJobRequest
+		{
+			Document            = document,
+			OperationAttributes = new PrintJobOperationAttributes
+			{
+				PrinterUri         = new IppValue<Uri>(SharpIppClientAdapterTests.PrinterUri),
+				RequestingUserName = new StringWithLanguage("ann")
+			}
+		};
+
+		IppVendorAttributes vendorAttributes = new IppVendorAttributes { Job = [new IppAttribute(Tag.Enum, "print-quality", 99)] };
+
+		// Act
+		Func<Task> send = () => client.PrintJobAsync(request, vendorAttributes, TestContext.Current.CancellationToken);
+
+		// Assert — the same as for a typed request
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(send);
+		Assert.Equal(0x040B, exception.NativeErrorCode);
+	}
+
+	[Fact]
+	public async Task GivenSizeWithoutTrayWhenPrintJobSentThenEncodesMediaKeyword()
+	{
+		// Arrange
+		StubHttpMessageHandler stub = new StubHttpMessageHandler
+		(
+			HttpStatusCode.OK,
+			"application/ipp",
+			SharpIppClientAdapterTests.CreateIppResponse(0x0000)
+		);
+
+		using SharpIppClientAdapter client = new SharpIppClientAdapter(new HttpClient(stub, disposeHandler: true), sendsCredentials: false);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		PrintOptions options = new PrintOptions
+		{
+			MediaSize = new MediaSize
+			{
+				Name              = "na_letter_8.5x11in",
+				DisplayName       = "Letter",
+				WidthMillimetres  = 215.9,
+				HeightMillimetres = 279.4
+			}
+		};
+
+		PrintJobRequest request = new PrintJobRequest
+		{
+			Document              = document,
+			OperationAttributes   = new PrintJobOperationAttributes
+			{
+				PrinterUri         = new IppValue<Uri>(SharpIppClientAdapterTests.PrinterUri),
+				RequestingUserName = new StringWithLanguage("ann")
+			},
+			JobTemplateAttributes = Latiprimere.Ipp.Mapping.IppJobTemplateMapper.ToJobTemplateAttributes(options)
+		};
+
+		// Act
+		await client.PrintJobAsync(request, IppVendorAttributes.None, TestContext.Current.CancellationToken);
+
+		// Assert
+		byte[] body = Assert.IsType<byte[]>(stub.LastRequestBody);
+		Assert.True(SharpIppClientAdapterTests.Contains(body, SharpIppClientAdapterTests.EncodeValue(0x44, "media", "na_letter_8.5x11in")));
+		Assert.False(SharpIppClientAdapterTests.Contains(body, Encoding.ASCII.GetBytes("media-col")));
+	}
+
+	[Fact]
 	public async Task GivenPrintJobTakingLongerThanResponseTimeoutWhenSentThenWaitsForTheAnswer()
 	{
 		// Arrange — uploading a document can take far longer than a query, so Print-Job has no response timeout
@@ -201,7 +377,7 @@ public sealed class SharpIppClientAdapterTests
 		};
 
 		// Act
-		PrintJobResponse response = await client.PrintJobAsync(request, TestContext.Current.CancellationToken);
+		PrintJobResponse response = await client.PrintJobAsync(request, IppVendorAttributes.None, TestContext.Current.CancellationToken);
 
 		// Assert
 		Assert.Equal(IppStatusCode.SuccessfulOk, response.StatusCode);
@@ -410,6 +586,94 @@ public sealed class SharpIppClientAdapterTests
 		PrintException exception = await Assert.ThrowsAsync<PrintException>(request);
 		Assert.Equal((int)IppStatusCode.ClientErrorDocumentFormatNotSupported, exception.NativeErrorCode);
 		Assert.Same(refusal, exception.InnerException);
+	}
+
+	/// <summary>
+	/// Encodes an attribute with a single string value: value tag, name length and name, value length and value.
+	/// </summary>
+	/// <param name="tag">The value tag, such as 0x44 for a keyword.</param>
+	/// <param name="name">The attribute name.</param>
+	/// <param name="value">The value.</param>
+	/// <returns>The encoded attribute.</returns>
+	private static byte[] EncodeValue(byte tag, string name, string value)
+	{
+		using MemoryStream stream = new MemoryStream();
+		using BinaryWriter writer = new BinaryWriter(stream);
+		SharpIppClientAdapterTests.WriteAttribute(writer, tag, name, value);
+		writer.Flush();
+
+		return stream.ToArray();
+	}
+
+	/// <summary>
+	/// Encodes an attribute with one value: value tag, name length and name, value length and value.
+	/// </summary>
+	/// <param name="tag">The value tag.</param>
+	/// <param name="name">The attribute name.</param>
+	/// <param name="value">The encoded value.</param>
+	/// <returns>The encoded attribute.</returns>
+	private static byte[] EncodeAttribute(byte tag, string name, byte[] value)
+	{
+		using MemoryStream stream = new MemoryStream();
+		using BinaryWriter writer = new BinaryWriter(stream);
+		SharpIppClientAdapterTests.WriteAttribute(writer, tag, name, value);
+		writer.Flush();
+
+		return stream.ToArray();
+	}
+
+	/// <summary>
+	/// Creates a successful Print-Job response for a pending job.
+	/// </summary>
+	/// <param name="jobId">The job's ID.</param>
+	/// <returns>The encoded response.</returns>
+	private static byte[] CreatePrintJobResponse(int jobId)
+	{
+		using MemoryStream stream = new MemoryStream();
+		using BinaryWriter writer = new BinaryWriter(stream);
+
+		// Version 1.1, successful-ok, request ID 1
+		writer.Write(new byte[] { 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 });
+		writer.Write((byte)0x01);
+		SharpIppClientAdapterTests.WriteAttribute(writer, 0x47, "attributes-charset", "utf-8");
+		SharpIppClientAdapterTests.WriteAttribute(writer, 0x48, "attributes-natural-language", "en");
+		writer.Write((byte)0x02);
+		SharpIppClientAdapterTests.WriteAttribute(writer, 0x21, "job-id", [0x00, 0x00, (byte)(jobId >> 8), (byte)jobId]);
+		SharpIppClientAdapterTests.WriteAttribute(writer, 0x23, "job-state", [0x00, 0x00, 0x00, 0x03]);
+		writer.Write((byte)0x03);
+		writer.Flush();
+
+		return stream.ToArray();
+	}
+
+	/// <summary>
+	/// Encodes a collection member as RFC 8010 does: a <c>memberAttrName</c> (tag 0x4A, no name, the member's name as
+	/// its value), then the member's value with no name.
+	/// </summary>
+	/// <param name="tag">The member value's tag.</param>
+	/// <param name="name">The member's name.</param>
+	/// <param name="value">The member's encoded value.</param>
+	/// <returns>The encoded member.</returns>
+	private static byte[] EncodeMember(byte tag, string name, byte[] value)
+	{
+		using MemoryStream stream = new MemoryStream();
+		using BinaryWriter writer = new BinaryWriter(stream);
+		SharpIppClientAdapterTests.WriteAttribute(writer, 0x4A, string.Empty, Encoding.ASCII.GetBytes(name));
+		SharpIppClientAdapterTests.WriteAttribute(writer, tag, string.Empty, value);
+		writer.Flush();
+
+		return stream.ToArray();
+	}
+
+	/// <summary>
+	/// Checks whether a byte sequence appears in a buffer.
+	/// </summary>
+	/// <param name="buffer">The buffer.</param>
+	/// <param name="sequence">The sequence.</param>
+	/// <returns>Whether it appears.</returns>
+	private static bool Contains(byte[] buffer, byte[] sequence)
+	{
+		return buffer.AsSpan().IndexOf(sequence) >= 0;
 	}
 
 	/// <summary>

@@ -8,13 +8,22 @@ namespace Latiprimere.Windows.Gdi;
 internal static class DevModeEditor
 {
 	/// <summary>
-	/// Sets copies, duplex and orientation on a DEVMODE. Settings left at their defaults keep the printer's values,
-	/// except orientation, which follows the document's first page when not chosen.
+	/// Sets copies, duplex, colour, paper size, tray and orientation on a DEVMODE. Settings left at their defaults
+	/// keep the printer's values, except orientation, which follows the document's first page when not chosen.
 	/// </summary>
 	/// <param name="devMode">The DEVMODE to change.</param>
 	/// <param name="options">The print options.</param>
+	/// <param name="paperId">The DMPAPER_* number of the chosen paper size, or <see langword="null"/>.</param>
+	/// <param name="binId">The DMBIN_* number of the chosen tray, or <see langword="null"/>.</param>
 	/// <param name="isFirstPageLandscape">Whether the document's first page is wider than it is tall.</param>
-	internal static void Apply(ref DevMode devMode, PrintOptions options, bool isFirstPageLandscape)
+	internal static void Apply
+	(
+		ref DevMode  devMode,
+		PrintOptions options,
+		short?       paperId,
+		short?       binId,
+		bool         isFirstPageLandscape
+	)
 	{
 		ArgumentNullException.ThrowIfNull(options);
 
@@ -35,6 +44,30 @@ internal static class DevModeEditor
 		{
 			devMode.Duplex = duplex.Value;
 			devMode.Fields |= DevModeConstants.FieldDuplex;
+		}
+
+		// Colour, only when chosen
+		short? color = DevModeEditor.ToColor(options.ColorMode);
+
+		if (color is not null)
+		{
+			devMode.Color = color.Value;
+			devMode.Fields |= DevModeConstants.FieldColor;
+		}
+
+		// Paper size, only when chosen; a length, width or form name left set would override it
+		if (paperId is not null)
+		{
+			devMode.PaperSize = paperId.Value;
+			devMode.Fields |= DevModeConstants.FieldPaperSize;
+			devMode.Fields &= ~(DevModeConstants.FieldPaperLength | DevModeConstants.FieldPaperWidth | DevModeConstants.FieldFormName);
+		}
+
+		// Tray, only when chosen
+		if (binId is not null)
+		{
+			devMode.DefaultSource = binId.Value;
+			devMode.Fields |= DevModeConstants.FieldDefaultSource;
 		}
 
 		// Orientation: the caller's choice, otherwise the first page's
@@ -78,6 +111,21 @@ internal static class DevModeEditor
 			DuplexMode.OneSided  => DevModeConstants.DuplexSimplex,
 			DuplexMode.LongEdge  => DevModeConstants.DuplexVertical,
 			DuplexMode.ShortEdge => DevModeConstants.DuplexHorizontal,
+			_                    => null,
+		};
+	}
+
+	/// <summary>
+	/// Maps a colour mode to a DMCOLOR_* value.
+	/// </summary>
+	/// <param name="colorMode">The colour mode.</param>
+	/// <returns>The value, or <see langword="null"/> to keep the printer's setting.</returns>
+	internal static short? ToColor(ColorMode colorMode)
+	{
+		return colorMode switch
+		{
+			ColorMode.Monochrome => DevModeConstants.ColorMonochrome,
+			ColorMode.Color      => DevModeConstants.ColorColor,
 			_                    => null,
 		};
 	}

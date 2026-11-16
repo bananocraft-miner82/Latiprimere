@@ -45,7 +45,7 @@ internal sealed class InvalidServerIppClient : IIppClient
 	}
 
 	/// <inheritdoc/>
-	public Task<PrintJobResponse> PrintJobAsync(PrintJobRequest request, CancellationToken cancellationToken)
+	public Task<PrintJobResponse> PrintJobAsync(PrintJobRequest request, IppVendorAttributes vendorAttributes, CancellationToken cancellationToken)
 	{
 		return Task.FromException<PrintJobResponse>(this.CreateException());
 	}

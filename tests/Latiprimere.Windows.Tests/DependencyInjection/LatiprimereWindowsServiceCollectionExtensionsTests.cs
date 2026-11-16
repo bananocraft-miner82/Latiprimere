@@ -1,3 +1,5 @@
+using System.Runtime.Versioning;
+using Latiprimere.Windows.Gdi;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -36,6 +38,24 @@ public sealed class LatiprimereWindowsServiceCollectionExtensionsTests
 
 		// Assert
 		Assert.Equal(allowAnyPrinterName, Assert.IsType<WindowsPrintSystem>(printSystem).AllowsAnyPrinterName);
+	}
+
+	[Fact]
+	[SupportedOSPlatform("windows")] // Skipped elsewhere
+	public void GivenRenderDpiSettingWhenAddLatiprimereWindowsThenGdiPrinterRendersAtIt()
+	{
+		// Arrange
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The GDI printer is only created on Windows.");
+		ServiceCollection services = new ServiceCollection();
+
+		// Act
+		services.AddLatiprimereWindows(options => options.MaxRenderDpi = 200);
+		using ServiceProvider serviceProvider = services.BuildServiceProvider();
+		IPrintSystem printSystem = Assert.Single(serviceProvider.GetServices<IPrintSystem>());
+
+		// Assert
+		WindowsPrintSystem windows = Assert.IsType<WindowsPrintSystem>(printSystem);
+		Assert.Equal(200, Assert.IsType<GdiRasterPrinter>(windows.Gdi).MaxRenderDpi);
 	}
 
 	[Fact]

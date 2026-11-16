@@ -17,10 +17,12 @@
   Latiprimere.Cli list
   Latiprimere.Cli caps &lt;printer-id&gt;
   Latiprimere.Cli print &lt;printer-id&gt; &lt;file&gt; [--raw] [--copies N] [--duplex one|long|short] [--landscape] [--cancel]
-                 [--output FILE] [--stats]
+                 [--output FILE] [--stats] [--paper NAME] [--color color|mono] [--tray ID] [--option KEY=VALUE]...
 
 Files are sent as PDF unless --raw is given. --cancel cancels the job straight after submitting it.
 --output prints to FILE instead of the device (Windows printers only). --stats reports time and memory used.
+--paper and --tray take a paper size's name (such as iso_a4_210x297mm) and a tray's ID, as caps lists them.
+--option sets a vendor option, such as ipp:print-quality=5; repeat it for more.
 Set CUPS_SERVER (for example localhost:631) to use a CUPS server from Windows.
 IPP printers on the network are found automatically and listed by name; quote IDs with spaces, for example
 "ipp:dnssd:Office Laser". List other printers in LATIPRIMERE_IPP_PRINTERS (comma-separated URIs, for example
@@ -139,6 +141,14 @@ ipp://192.168.1.20/ipp/print).</value>
 	<data name="UnknownOption" xml:space="preserve">
 		<value>unknown option '{0}'.</value>
 		<comment>{0} is the option.</comment>
+	</data>
+	<data name="PaperNotListed" xml:space="preserve">
+		<value>{0} doesn't list the paper size '{1}'. Run caps to see the sizes it has.</value>
+		<comment>{0} is the printer name, {1} the paper size's name.</comment>
+	</data>
+	<data name="TrayNotListed" xml:space="preserve">
+		<value>{0} doesn't list the tray '{1}'. Run caps to see the trays it has.</value>
+		<comment>{0} is the printer name, {1} the tray ID.</comment>
 	</data>
 	<data name="InvalidOptionValue" xml:space="preserve">
 		<value>'{0}' is not a valid value for {1}.</value>

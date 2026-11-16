@@ -21,4 +21,15 @@ internal sealed record GdiPrintRequest
 
 	/// <summary>Gets how to print it.</summary>
 	public required PrintOptions Options { get; init; }
+
+	/// <summary>Gets the DMPAPER_* number of the chosen paper size, or <see langword="null"/> to keep the
+	/// printer's.</summary>
+	public short? PaperId { get; init; }
+
+	/// <summary>Gets the DMBIN_* number of the chosen tray, or <see langword="null"/> to keep the printer's.</summary>
+	public short? BinId { get; init; }
+
+	/// <summary>Gets a DEVMODE saved from the driver (<c>windows:devmode</c>), with its private data, to start from
+	/// instead of the driver's defaults; or <see langword="null"/>.</summary>
+	public byte[]? SavedDevMode { get; init; }
 }

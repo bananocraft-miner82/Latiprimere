@@ -3,6 +3,7 @@
 | Document | Purpose |
 |---|---|
 | [progress.md](progress.md) | **Start here.** Current status and dated progress log |
+| [site/](site/) | The developer documentation published at [latiprimere.com/docs](https://latiprimere.com/docs/). The website copies these pages in at build time; the sidebar follows the folders and each page's `sidebar.order` |
 | [plan.md](plan.md) | Vision, scope, architecture, phases, risks, open questions |
 | [poc-plan.md](poc-plan.md) | Phase 0 proof-of-concept spikes and go/no-go criteria |
 | [go-no-go.md](go-no-go.md) | Phase 0 go/no-go review: results against the criteria, and the recommendation |
@@ -17,3 +18,4 @@
 - After each working session, add an entry to the top of [progress.md](progress.md) and update its "Current status" table.
 - Tick milestone checkboxes in [plan.md](plan.md) as they complete.
 - Record significant choices as a new ADR in [decisions/](decisions/README.md) rather than editing accepted ones.
+- The code in [site/](site/) is copied from [samples/Latiprimere.Examples](../samples/Latiprimere.Examples/), which the build compiles. Change the example first, then the page, so the docs never show code that doesn't build.

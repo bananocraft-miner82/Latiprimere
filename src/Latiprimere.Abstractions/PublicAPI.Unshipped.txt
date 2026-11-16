@@ -1,1 +1,9 @@
 #nullable enable
+Latiprimere.PrintOptions.ColorMode.get -> Latiprimere.ColorMode
+Latiprimere.PrintOptions.ColorMode.init -> void
+Latiprimere.PrintOptions.InputTray.get -> Latiprimere.InputTray?
+Latiprimere.PrintOptions.InputTray.init -> void
+Latiprimere.PrintOptions.MediaSize.get -> Latiprimere.MediaSize?
+Latiprimere.PrintOptions.MediaSize.init -> void
+Latiprimere.PrintOptions.VendorOptions.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Latiprimere.PrintOptions.VendorOptions.init -> void

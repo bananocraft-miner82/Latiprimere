@@ -13,6 +13,7 @@ internal sealed class WindowsPrintContextBuilder
 	private IWinSpool spool = new FakeWinSpool();           // The spooler
 	private IGdiPrinter gdi = new FakeGdiPrinter();         // The GDI printer
 	private IPdfRasterizer? pdfRasterizer = null;           // The PDF rasteriser, if any
+	private Latiprimere.Windows.DirectIpp.WindowsIppRoute? ippRoute = null; // The route to IPP printers, if on
 
 	/// <summary>Sets the spooler.</summary>
 	/// <param name="spool">The spooler.</param>
@@ -30,6 +31,16 @@ internal sealed class WindowsPrintContextBuilder
 	public WindowsPrintContextBuilder WithGdi(IGdiPrinter gdi)
 	{
 		this.gdi = gdi;
+
+		return this;
+	}
+
+	/// <summary>Turns on sending PDF jobs straight to IPP printers.</summary>
+	/// <param name="ippRoute">The route.</param>
+	/// <returns>This builder, for chaining.</returns>
+	public WindowsPrintContextBuilder WithIppRoute(Latiprimere.Windows.DirectIpp.WindowsIppRoute ippRoute)
+	{
+		this.ippRoute = ippRoute;
 
 		return this;
 	}
@@ -52,7 +63,8 @@ internal sealed class WindowsPrintContextBuilder
 		{
 			Spool         = this.spool,
 			Gdi           = this.gdi,
-			PdfRasterizer = this.pdfRasterizer
+			PdfRasterizer = this.pdfRasterizer,
+			IppRoute      = this.ippRoute
 		};
 	}
 }

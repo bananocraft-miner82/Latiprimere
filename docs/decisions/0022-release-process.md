@@ -48,4 +48,4 @@ The choices are mine, for the owner to review. The steps are in [releasing.md](.
   - optionally, the reservation of the `Latiprimere` ID prefix.
 - **Every package gets a new version at each release,** even if it didn't change. That's simpler for users, who can keep all Latiprimere packages at one version.
 - **A version can't be taken back,** only unlisted. The tag check and the approval step guard against publishing by mistake.
-- **No package icon yet;** nuget.org shows its default until `PackageIcon` is set.
+- **The package icon** came after 0.1.0-preview, which shows nuget.org's default. Later releases carry `src/icon.png`.

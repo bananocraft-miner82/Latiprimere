@@ -35,6 +35,9 @@ internal sealed class StubHttpMessageHandler : HttpMessageHandler
 	/// <summary>Gets the Authorization header of the last request, or <see langword="null"/> if it had none.</summary>
 	public AuthenticationHeaderValue? LastAuthorization { get; private set; }
 
+	/// <summary>Gets the body of the last request, or <see langword="null"/> before the first.</summary>
+	public byte[]? LastRequestBody { get; private set; }
+
 	/// <summary>
 	/// Records the request and answers it.
 	/// </summary>
@@ -45,6 +48,9 @@ internal sealed class StubHttpMessageHandler : HttpMessageHandler
 	{
 		this.LastRequestUri = request.RequestUri;
 		this.LastAuthorization = request.Headers.Authorization;
+		this.LastRequestBody = request.Content is null
+			? null
+			: await request.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
 
 		if (this.delay > TimeSpan.Zero)
 		{
