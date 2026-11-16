@@ -5,6 +5,8 @@
 		<!-- PDFium, for the end-to-end PDF test through the catalog -->
 		<ProjectReference Include="..\..\src\Latiprimere.Rendering.Pdfium\Latiprimere.Rendering.Pdfium.csproj" />
 		<ProjectReference Include="..\Latiprimere.Testing\Latiprimere.Testing.csproj" />
+		<!-- A fake IPP client, for PDF jobs sent straight to printers (ADR 0027) -->
+		<ProjectReference Include="..\Latiprimere.Ipp.Testing\Latiprimere.Ipp.Testing.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

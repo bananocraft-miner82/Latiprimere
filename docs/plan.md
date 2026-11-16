@@ -149,17 +149,18 @@ Phase 0 leaves working slices; Phase 1 completes them.
 - [x] Connect timeout for IPP requests: 10 s by default, set through `IppNetworkOptions.ConnectTimeout` and `CupsOptions.ConnectTimeout` (done 2026-11-13). Without it, the default `HttpClient` waited about 21 s on Windows for an address with nothing behind it
 - [x] Connect over IPv4 and IPv6 together (Happy Eyeballs, RFC 8305; done 2026-11-13). .NET tried a name's addresses one at a time, so `localhost` on Windows spent about 2 s on IPv6 before reaching a server that listens on IPv4 only; now 250 ms
 - [x] Resend jobs that a busy printer turns away with `server-error-busy`, for up to 2 minutes by default (owner decision 2026-11-13; [ADR 0017](decisions/0017-retry-busy-ipp-printers.md))
-- [ ] First preview package on NuGet (`0.1.0-preview`). Prepared 2026-11-13: version, package README, symbols and Source Link, and a tag-triggered release workflow with nuget.org trusted publishing ([ADR 0022](decisions/0022-release-process.md), proposed; steps in [releasing.md](releasing.md)). Licensing contact added to COMMERCIAL.md 2026-11-14. Still to do: the owner's one-time setup, then the release
+- [x] First preview package on NuGet (`0.1.0-preview`). Published 2026-11-15 by the Release workflow. Prepared 2026-11-13: version, package README, symbols and Source Link, and a tag-triggered release workflow with nuget.org trusted publishing ([ADR 0022](decisions/0022-release-process.md), proposed; steps in [releasing.md](releasing.md)). Licensing contact added to COMMERCIAL.md 2026-11-14. Still to do: the owner's one-time setup, then the release
 
 ### Phase 2: PDF and capabilities (≈3–4 weeks)
 
 - [ ] Capability model: media sizes, duplex, colour, copies, orientation, input trays (reading them done in Spike 5)
-- [ ] Choose paper size, colour mode and tray in `PrintOptions`, and apply them through IPP job attributes and the DEVMODE
+- [x] Choose paper size, colour mode and tray in `PrintOptions`, and apply them through IPP job attributes and the DEVMODE. Done 2026-11-16 ([ADR 0025](decisions/0025-choose-paper-colour-and-tray.md), proposed); checked with Microsoft Print to PDF and against the CUPS container's `ippeveprinter`
 - [ ] Windows PDF printing via `Latiprimere.Rendering.Pdfium`
-- [ ] **Make the Windows PDF render resolution configurable** (owner decision 2026-11-11). Default stays at full device resolution; expose `GdiRasterPrinter`'s existing `maxRenderDpi` cap, for example as a Windows adapter option. Measured trade-offs in [ADR 0009](decisions/0009-windows-pdf-printing.md).
-- [ ] Prefer direct IPP on Windows where the queue supports it
-- [ ] Vendor-specific option escape hatch: a dictionary of `ipp:`, `cups:` and `windows:` settings on `PrintOptions` (ADR 0012, accepted)
-- [ ] Trimming and Native AOT verification
+- [x] **Make the Windows PDF render resolution configurable** (owner decision 2026-11-11). Default stays at full device resolution; expose `GdiRasterPrinter`'s existing `maxRenderDpi` cap, for example as a Windows adapter option. Measured trade-offs in [ADR 0009](decisions/0009-windows-pdf-printing.md). Done 2026-11-16 as `WindowsOptions.MaxRenderDpi`
+- [x] Prefer direct IPP on Windows where the queue supports it. Done 2026-11-16 as `WindowsOptions.PrintPdfOverIpp` ([ADR 0027](decisions/0027-direct-ipp-for-windows-queues.md), accepted): PDF jobs to queues with a known IPP URI, off by default. Still open: how Windows 11 names driverless IPP queues' ports, which needs output from a PC with one
+- [x] Vendor-specific option escape hatch: a dictionary of `ipp:`, `cups:` and `windows:` settings on `PrintOptions` (ADR 0012, accepted). Done 2026-11-16 as `PrintOptions.VendorOptions` ([ADR 0026](decisions/0026-vendor-options-in-detail.md), proposed), with `windows:devmode`
+- [ ] `windows:print-ticket`: merge a Print Ticket through `prntvpt.dll` (ADR 0012); needs new interop
+- [x] Trimming and Native AOT verification. Done 2026-11-16: CI publishes the CLI sample with Native AOT for both targets on all three runners, fails on any IL2xxx/IL3xxx warning, and runs the native program against the runner's test printers (`tools/aot-check/check-aot.sh`). Not yet run in CI
 
 ### Phase 3: Direct IPP and v1.0 (≈2–3 weeks)
 

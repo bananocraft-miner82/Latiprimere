@@ -10,6 +10,7 @@ internal sealed class IppPrintContextBuilder
 	private IIppClient client = new FakeIppClient();                         // The client requests go to
 	private IppDocumentFormats documentFormats = IppDocumentFormats.Cups;    // The MIME types documents are sent as
 	private TimeSpan busyRetryDuration = TimeSpan.Zero;                      // How long jobs turned away as busy are resent
+	private IReadOnlyList<string> vendorOptionPrefixes = Mapping.IppVendorAttributeMapper.NetworkPrefixes; // Keys read
 
 	/// <summary>Sets how long to resend jobs turned away as busy, with millisecond waits between attempts.</summary>
 	/// <param name="busyRetryDuration">How long to keep resending.</param>
@@ -17,6 +18,16 @@ internal sealed class IppPrintContextBuilder
 	public IppPrintContextBuilder WithBusyRetryDuration(TimeSpan busyRetryDuration)
 	{
 		this.busyRetryDuration = busyRetryDuration;
+
+		return this;
+	}
+
+	/// <summary>Sets the vendor option prefixes the print system reads.</summary>
+	/// <param name="prefixes">The prefixes, such as <c>ipp:</c> and <c>cups:</c>.</param>
+	/// <returns>This builder, for chaining.</returns>
+	public IppPrintContextBuilder WithVendorOptionPrefixes(IReadOnlyList<string> prefixes)
+	{
+		this.vendorOptionPrefixes = prefixes;
 
 		return this;
 	}
@@ -50,12 +61,13 @@ internal sealed class IppPrintContextBuilder
 	{
 		return new IppPrintContext
 		{
-			Client              = this.client,
-			RequestingUserName  = "tester",
-			DocumentFormats     = this.documentFormats,
-			BusyRetryDuration   = this.busyRetryDuration,
-			BusyRetryFirstDelay = TimeSpan.FromMilliseconds(1),
-			BusyRetryMaxDelay   = TimeSpan.FromMilliseconds(4)
+			Client               = this.client,
+			RequestingUserName   = "tester",
+			DocumentFormats      = this.documentFormats,
+			BusyRetryDuration    = this.busyRetryDuration,
+			VendorOptionPrefixes = this.vendorOptionPrefixes,
+			BusyRetryFirstDelay  = TimeSpan.FromMilliseconds(1),
+			BusyRetryMaxDelay    = TimeSpan.FromMilliseconds(4)
 		};
 	}
 }

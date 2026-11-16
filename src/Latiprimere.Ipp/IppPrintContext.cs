@@ -21,6 +21,12 @@ internal sealed record IppPrintContext
 	public required IppDocumentFormats DocumentFormats { get; init; }
 
 	/// <summary>
+	/// Gets the prefixes of the <see cref="PrintOptions.VendorOptions"/> keys this print system reads: <c>ipp:</c>
+	/// for network printers, and <c>cups:</c> as well for CUPS.
+	/// </summary>
+	public IReadOnlyList<string> VendorOptionPrefixes { get; init; } = Mapping.IppVendorAttributeMapper.NetworkPrefixes;
+
+	/// <summary>
 	/// Gets the clock used to timestamp job statuses and to time retries.
 	/// </summary>
 	public TimeProvider TimeProvider { get; init; } = TimeProvider.System;

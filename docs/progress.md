@@ -6,10 +6,240 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 | Item | Value |
 |---|---|
-| Phase | 1: Harden core and raw printing (Phase 0 decided: **Go**, 2026-11-12) |
+| Phase | 2: PDF and capabilities, begun; Phase 1's open items remain (Phase 0 decided: **Go**, 2026-11-12) |
+| Released | `0.1.0-preview` on nuget.org, 2026-11-15 |
 | State | Phase 1 under way. The public API for 0.1 is settled and applied ([ADR 0018](decisions/0018-api-review-0-1.md)), guarded by the public API analyzer. Windows errors now map to explained exceptions ([ADR 0019](decisions/0019-windows-error-mapping.md), proposed), and raw data to Microsoft Print to PDF is refused. CUPS servers that need a password can be used, over TLS ([ADR 0020](decisions/0020-cups-authentication.md), proposed). Integration tests against the virtual printers are wired into CI on all three runners: the CUPS container on Ubuntu, the runner's own CUPS on macOS, and the spooler test printers on Windows. The first Ubuntu run found a permissions bug in the test container, now fixed; none has passed in CI yet. Direct IPP resends jobs a busy printer turns away; IPP connections give up after 10 s and try IPv6 and IPv4 together. Still open from Phase 0: the Mac checks (Spikes 1 and 4). |
-| Next step | Owner: review and push `feature/bug-hunt-review` (22 fixes from three code-review rounds), especially [ADR 0024](decisions/0024-known-ipp-printer-uris.md), which changes which IPP URIs can be looked up. Review ADR [0020](decisions/0020-cups-authentication.md) (CUPS authentication). Review ADRs [0011](decisions/0011-capability-model.md) and [0019](decisions/0019-windows-error-mapping.md). For the first preview: review [ADR 0022](decisions/0022-release-process.md), and do the one-time nuget.org and GitHub setup in [releasing.md](releasing.md); then run "Prepare release" for `0.1.0-preview`. |
+| Next step | Owner: review `feature/print-media-options`: [ADR 0025](decisions/0025-choose-paper-colour-and-tray.md) (choosing paper, colour and tray), `WindowsOptions.MaxRenderDpi`, [ADR 0026](decisions/0026-vendor-options-in-detail.md) (vendor options), the Native AOT check in CI, and direct IPP for Windows queues ([ADR 0027](decisions/0027-direct-ipp-for-windows-queues.md), accepted); then push for CI. Phase 2's checklist is done. If anyone has a Windows 11 PC with a driverless IPP queue, its `Get-Printer` and `Get-PrinterPort` output would settle ADR 0027's last open point. Still proposed and waiting for review: ADRs [0011](decisions/0011-capability-model.md), [0019](decisions/0019-windows-error-mapping.md), [0020](decisions/0020-cups-authentication.md), [0022](decisions/0022-release-process.md) and [0024](decisions/0024-known-ipp-printer-uris.md). |
 | Blockers | None |
+
+---
+
+## 2026-11-16: Direct IPP for Windows queues, built
+
+**Done** (owner: "Yes, build it", accepting [ADR 0027](decisions/0027-direct-ipp-for-windows-queues.md) as written; on `feature/print-media-options`)
+- **ADR 0027 accepted,** with one refinement written into it before acceptance: the printer is asked whether it takes PDF at its first PDF job, not at lookup, so a lookup never waits on a printer that doesn't answer. [ADR 0026](decisions/0026-vendor-options-in-detail.md) now says `ipp:` keys reach routed jobs.
+- **`WindowsOptions`:**
+  - `PrintPdfOverIpp` (off by default);
+  - `IppPrinterUris`, queue names (not case-sensitive) to URIs; anything but an absolute `ipp`, `ipps`, `http` or `https` URI is refused when the print system is created.
+
+  Three lines in Windows' `PublicAPI.Unshipped.txt`.
+- **`WindowsIppRoute`** (new `DirectIpp/` folder):
+  - finds a queue's IPP URI: configured first, otherwise the port name when it is an absolute URL (`http` becomes `ipp`, `https` becomes `ipps`, keeping ports 80 and 443 explicit);
+  - never for a print server's queue; nothing is guessed from WSD or TCP/IP ports;
+  - owns the IPP client, which `WindowsPrintSystem.Dispose` now releases.
+- **`WindowsPrinter`:**
+  - a PDF job goes through `IppPrinter`, keeping the `windows:` printer ID, when the route is on, the URI is known, the printer lists `application/pdf`, and the job has no `OutputFile`, tray or `windows:` key;
+  - the answer is kept: yes for good, "no PDF" for good, "couldn't ask" not at all;
+  - a connect failure (`IppConnectionErrors.IsConnectFailure`: connection refused, name not resolved, connect timeout) rewinds the document and uses the spooler; any other failure is thrown, so nothing prints twice; a stream that can't seek isn't retried;
+  - raw jobs and capabilities stay with the spooler.
+- **Packages:** `Latiprimere.Windows` references `Latiprimere.Ipp`, which lets it see Ipp's internals. Packed, the nuspec lists `Latiprimere.Ipp` for both frameworks.
+- **Tests:**
+  - new: `IppConnectionErrors` (which failures count as never connected); `WindowsIppRoute` (URLs from ports, ports that don't name a printer, configured URIs winning and ignoring case, print servers, bad URIs, disposal); routing in `WindowsPrinter` (routed with the Windows ID and `ipp:` keys; a printer without PDF; one that can't be asked, then can; each spooler-only option; a WSD queue and a print server's; the option off; a connect failure falling back from the start of the document; a refusal thrown without the spooler; a stream that can't seek; raw jobs); the factory (off by default, a configured URI, a bad one);
+  - integration: Microsoft Print to PDF's queue, mapped to the container's `ippeveprinter`, sent a PDF that `ippeveprinter` completed. Its log shows the Print-Jobs with `document-format="application/pdf"`. Without the route, the job would have gone to the driver, which needs a file name;
+  - 1,480 runs locally against the container: 1,472 passed, 8 skipped (the Windows test printers), 0 failed. Release build clean; the Native AOT check passes.
+
+**Not done**
+- **Not tried with a queue added by URL,** which needs an admin to add; the port-name path is unit-tested only. The Windows CI runner is elevated but has no `ippeveprinter`, so the end-to-end test skips there.
+- **Driverless Windows 11 queues** are still unexamined (ADR 0027, decision 4).
+
+**Next**
+- Owner: as in the status table.
+
+---
+
+## 2026-11-16: Direct IPP for Windows queues, design
+
+**Done** (owner: "Start the direct IPP on Windows design next"; design only, no code)
+- **[ADR 0027](decisions/0027-direct-ipp-for-windows-queues.md), proposed.** Four options:
+  - (a) leave it to applications, which can already print to a printer's `ipp:` ID;
+  - (b) route PDF jobs for known queues over IPP, inside the Windows print system;
+  - (c) merge printers in the catalog;
+  - (d) send PDFs through the spooler unchanged.
+- **Recommended: (a) as documentation, and (b), off by default** (`WindowsOptions.PrintPdfOverIpp`). A PDF job goes straight to the printer only if all of these hold, and otherwise through the spooler as today:
+  - the queue's IPP URI is known exactly, either configured in `WindowsOptions.IppPrinterUris` or because the port name is the URL;
+  - the printer lists `application/pdf`;
+  - the job uses nothing only the spooler can do (`OutputFile`, a tray, `windows:` keys).
+
+  Routed jobs keep the `windows:` printer ID, and report the printer's real outcome. A connect failure falls back to the spooler. Nothing is guessed from TCP/IP or WSD ports.
+- **Four questions for the owner** are in the ADR: the default, `ipp:` vendor options on routed jobs, the new dependency of `Latiprimere.Windows` on `Latiprimere.Ipp`, and output from a Windows 11 PC with a driverless IPP queue.
+
+**Learned**
+- **This PC's queues:**
+  - the HP ENVY sits on a WSD port, whose name is only a local GUID; its address shows only in the queue's location, as a WSD endpoint;
+  - a Standard TCP/IP port gives a host and raw port 9100, not an IPP URI;
+  - no queue here uses an IPP port.
+- **Microsoft doesn't document** how Windows 11 names the ports of the queues it creates for driverless IPP printers. That decides how many queues can be routed without configuration.
+
+**Next**
+- Owner: answer ADR 0027's questions. Then build it, with a CI test that adds a queue by URL in front of `ippeveprinter` on the elevated Windows runner.
+
+---
+
+## 2026-11-16: Trimming and Native AOT check
+
+**Done** (owner: "Start the trimming and AOT check next", on `feature/print-media-options`)
+- **Published the CLI sample with Native AOT** for `net10.0` and `net11.0` on Windows (win-x64), from clean:
+  - no IL2xxx (trimming) or IL3xxx (AOT) warnings, with `TrimmerSingleWarn=false` so each would be reported on its own;
+  - 16.1 MB and 15.8 MB, plus `pdfium.dll`.
+
+  That covers every package and their dependencies (SharpIppNext, Tmds.MDns and Microsoft.Extensions.DependencyInjection), which the `IsAotCompatible` analyzers on `src/` can't see into.
+- **Ran the native program for real,** both frameworks:
+  - listing CUPS, Windows and IPP printers, with mDNS discovery;
+  - capabilities of Microsoft Print to PDF and `ippeveprinter`;
+  - A5 and monochrome to Microsoft Print to PDF, whose file has A5 MediaBoxes;
+  - direct IPP with paper, tray, colour and vendor options through SharpIppNext's raw request; `print-quality` 99 refused with 1035;
+  - CUPS Virtual-IPP with `ipp:` and `cups:` options, landscape;
+  - raw data to `cups:Raw` byte for byte; a job on `cups:Paused` cancelled;
+  - a vendor key without a prefix refused.
+- **CLI sample:** `print` gained `--paper NAME`, `--color color|mono`, `--tray ID` and `--option KEY=VALUE` (repeatable). Paper and tray are looked up in the printer's capabilities, as the library expects, with a message naming the printer when it doesn't list them.
+- **[tools/aot-check/check-aot.sh](../tools/aot-check/check-aot.sh):**
+  - publishes the CLI with Native AOT for one framework and fails on any trimming or AOT warning;
+  - then runs the native program against the machine's test printers: always `list`; CUPS Virtual-IPP when `LATIPRIMERE_TEST_CUPS_SERVER` is set; direct IPP, including a value that must be refused, when `LATIPRIMERE_TEST_IPP_PRINTER` is; and A5 to Microsoft Print to PDF on Windows, checking the MediaBoxes;
+  - written for bash 3.2, as on macOS.
+- **CI:** [build.yml](../.github/workflows/build.yml) runs it for both frameworks on all three runners after the tests. Linux installs clang and zlib first.
+- **CONTRIBUTING.md** says when to run it.
+- **Checked:**
+  - the script passes locally for both frameworks against the container and this PC's spooler;
+  - with a `Type.GetType(string)` call added to the CLI, the publish fails with IL2057 and the script exits 1. The repository's `TreatWarningsAsErrors` makes the AOT compiler's warnings errors, and the script's own check stays as a second guard.
+
+**Learned**
+- **The AOT compiler finds the Windows linker through `vswhere.exe`,** which Git Bash doesn't have on its path; PowerShell does. The script adds the Visual Studio Installer folder when it's there.
+- **A raw job's copies on CUPS are the backend's job:** CUPS passes the count to the backend. The test container's capture backend writes the data once, so `--copies 2` to `cups:Raw` gives one copy, with or without AOT. CUPS's own `socket` backend repeats the data. Not a Latiprimere bug, but worth remembering before a test counts raw copies on CUPS.
+
+**Not done**
+- **Not run in CI yet:** the Linux and macOS publishes, and the Windows runner's toolchain, are untested until the push.
+- **Not run on macOS or Linux locally.**
+
+**Next**
+- Owner: as in the status table.
+
+---
+
+## 2026-11-16: Vendor options
+
+**Done** (owner: "Start the vendor options next", on `feature/print-media-options`; the shape is from [ADR 0012](decisions/0012-vendor-option-escape-hatch.md), accepted)
+- **Details in [ADR 0026](decisions/0026-vendor-options-in-detail.md), proposed:** the choices are mine, for the owner to review.
+- **`PrintOptions.VendorOptions`** (`IReadOnlyDictionary<string, string>`, empty by default):
+  - copied when set;
+  - every key must start with `ipp:`, `cups:` or `windows:` followed by a name, or it is refused with `ArgumentException`, so a mistyped prefix isn't silently ignored;
+  - two lines in Abstractions' `PublicAPI.Unshipped.txt`.
+- **IPP (`IppVendorAttributeMapper`):**
+  - Direct IPP reads `ipp:`; CUPS reads `ipp:` and `cups:` (`IppPrintContext.VendorOptionPrefixes`).
+  - Commas separate values.
+  - Types are inferred: integer, or enum for the six enum attributes; `true`/`false`; keyword; otherwise name.
+  - Eight Print-Job operation attributes, such as `ipp-attribute-fidelity`, go in the operation group; the rest in the job group.
+  - Refused with `ArgumentException` before anything is sent:
+    - a name that isn't an IPP keyword;
+    - an empty value;
+    - an attribute set by two keys (`ipp:x` and `cups:x`);
+    - an attribute Latiprimere already sends, such as `ipp:copies` with `Copies` set, or `ipp:printer-uri`.
+  - **Sending:** SharpIppNext's typed requests can't carry other attributes, so a job with vendor attributes goes through `CreateRawRequest` and `SendAsync`, and the job ID and state are read from the raw answer. Jobs without them use the typed request, as before. `IIppClient.PrintJobAsync` gained an `IppVendorAttributes` parameter, and the test fake is now internal.
+- **Windows (`WindowsVendorOptions`):**
+  - `windows:devmode`, in base64, replaces the driver's defaults as the DEVMODE a PDF job starts from; the typed options are applied on top, and the driver merges the result.
+  - It is refused with `ArgumentException` if it isn't base64, has a public part shorter than up to `dmFormName`, or its sizes run past the data.
+  - Any other `windows:` key is refused with `NotSupportedException`, for raw jobs too.
+  - `WindowsCapabilityReader.ReadDefaultDevMode` now reads the driver's default DEVMODE for both the capabilities and the test.
+- **Tests:**
+  - new: `PrintOptions` (copying, refused keys and values); the mapper (types, enums, sets, groups, prefixes, every refusal); the raw request on the wire (groups, tags, the document after the attributes, the job read back) and a printer refusing it; `IppPrinter` passing the attributes on and refusing a clash before sending; `WindowsVendorOptions`; `WindowsPrinter` passing the DEVMODE to GDI and refusing an unsupported key for a raw job;
+  - integration, container: `ippeveprinter` completes a job with `ipp:print-quality` 5 and refuses 99 up front, so the attribute reaches it; CUPS's Virtual-IPP queue completes a job with `ipp:` and `cups:` options;
+  - integration, Windows: Microsoft Print to PDF's own DEVMODE, changed to A5 and passed as `windows:devmode`, gives A5 pages. With the saved DEVMODE ignored, the test fails with A4;
+  - 1,396 runs locally against the container: 1,388 passed, 8 skipped (the Windows test printers), 0 failed. Release build clean.
+
+**Learned**
+- **SharpIppNext's raw path reports errors the same way as its typed one** (`IppResponseException` with the status), so the adapter's error mapping and busy retries work unchanged.
+- **SharpIppNext writes repeated attributes with the same name as one attribute with several values,** giving the later ones an empty name, as IPP requires.
+
+**Not done**
+- **`windows:print-ticket`:** needs `prntvpt.dll` interop; listed in plan.md.
+- **Collections, ranges and resolutions** can't be expressed as vendor values yet (ADR 0026, consequences).
+- **The macOS runner** hasn't run the new IPP tests; CI will.
+
+**Next**
+- Owner: as in the status table.
+
+---
+
+## 2026-11-16: Windows PDF render resolution
+
+**Done** (owner: "Yes, start it", on `feature/print-media-options`; the decision itself is from 2026-11-11, in [ADR 0009](decisions/0009-windows-pdf-printing.md))
+- **`WindowsOptions.MaxRenderDpi`** (`int?`): the highest resolution PDF pages are rendered at on Windows.
+  - `null`, the default, renders at the printer's resolution, as before.
+  - Zero or less is refused when set (`ArgumentOutOfRangeException`).
+  - Set through `AddLatiprimereWindows(options => options.MaxRenderDpi = 300)` or `WindowsPrintSystemFactory.Create(rasterizer, options)`. It reaches `GdiRasterPrinter`'s existing cap, and the factory's TODO is gone.
+  - Its docs give ADR 0009's measurements, and say raw jobs aren't affected.
+  - Two lines in Windows' `PublicAPI.Unshipped.txt`.
+- **For tests:** an internal `GdiRasterPrinter.MaxRenderDpi`, and `WindowsPrintSystem.Gdi`.
+- **Tests:**
+  - new: the option's default, values and refusals; the factory and the DI setup passing it on;
+  - integration: one page to Microsoft Print to PDF with a 100 DPI cap embeds only images at most 828 pixels wide, A4 at 100 DPI. With the option not passed on, the test fails with 4,957, the driver's 600 DPI;
+  - 1,274 runs locally against the container: 1,266 passed, 8 skipped (the Windows test printers), 0 failed. Release build clean.
+
+**Learned**
+- **Microsoft Print to PDF embeds the bitmaps it is given unchanged,** so the render resolution shows directly in its output. One mixed-content A4 page: 1.7 MB in nine 4957-pixel strips at full resolution, 123 KB as one 826 × 1169 image at 100 DPI. ADR 0009 measured 300 DPI files 3.4× *larger* over 100 pages, so file size depends on the content; it isn't a reliable reason to lower the resolution.
+
+**Next**
+- Owner: as in the status table.
+
+---
+
+## 2026-11-16: Choosing paper size, colour mode and tray
+
+**Done** (owner: "Paper, colour, tray", on `feature/print-media-options`)
+- **Design in [ADR 0025](decisions/0025-choose-paper-colour-and-tray.md), proposed:** the choices are mine, for the owner to review.
+- **`PrintOptions` gains three properties,** each defaulting to the printer's own setting:
+  - `MediaSize`, matched by its PWG name;
+  - `ColorMode`;
+  - `InputTray`, matched by its ID.
+
+  Callers pass values from `GetCapabilitiesAsync`. Six lines in Abstractions' `PublicAPI.Unshipped.txt`.
+- **IPP (CUPS and direct):**
+  - colour as `print-color-mode`;
+  - a size alone as the `media` keyword;
+  - a tray as `media-col` with `media-source`, carrying the size as `media-size` dimensions in hundredths of a millimetre when one is chosen too.
+
+  `media` and `media-col` can't both be sent, and `media-source` exists only inside `media-col`.
+- **Windows (PDF jobs):**
+  - colour in `dmColor`;
+  - the size's DMPAPER number, found in the driver's paper list by the same PWG name the capabilities give, in `dmPaperSize`, with `DM_PAPERLENGTH`, `DM_PAPERWIDTH` and `DM_FORMNAME` cleared, since each overrides it;
+  - the tray's DMBIN number in `dmDefaultSource`.
+
+  A size or tray the driver doesn't list is refused with `NotSupportedException` (new messages `MediaSizeNotListed` and `InputTrayNotListed`) before the PDF is opened. The driver's lists are read only when a size or tray is chosen. Raw jobs ignore all three, as they already ignore duplex.
+- **Tests:**
+  - new: the IPP mapping (colour, `media`, `media-col` with and without a size, three sizes in hundredths); the request as SharpIppNext encodes it on the wire; `IppPrinter` passing them on; the DEVMODE edits; finding papers and bins (rotated, duplicated and custom sizes; IDs that aren't bin numbers); `WindowsPrinter` passing the numbers to GDI and refusing unlisted ones; defaults in `PrintOptions`;
+  - integration, Windows: A5 to Microsoft Print to PDF, checking every page of the PDF it writes is A5. With the paper setting switched off, the test fails with A4 pages;
+  - integration, container: tray, size and colour from the capabilities complete on `ippeveprinter`, directly and through CUPS's Virtual-IPP queue. A size `ippeveprinter` doesn't support is refused up front both as `media` and, with a tray, as `media-size` inside `media-col`, so the size reaches the printer either way;
+  - 1,252 runs locally against the container: 1,244 passed, 8 skipped (the Windows test printers), 0 failed. Release build clean.
+
+**Learned**
+- **SharpIppNext models `media-size` dimensions as ranges,** but sends a range with equal bounds as a plain integer (tag 0x21), which is what a request needs. A test now checks the encoding, in case a SharpIppNext update changes it.
+- **`ToCapabilities` already named sizes the way a lookup needs,** so finding a driver's paper reuses its naming instead of a second table.
+
+**Not done**
+- **Not run on the macOS runner yet,** where `ippeveprinter` comes from Homebrew; CI will.
+- **Not tried on a printer with real trays,** or with colour on a colour printer: Microsoft Print to PDF has neither.
+- **The developer docs** at docs/site still say 0.1 can't choose these settings, which stays true until the next release.
+
+**Next**
+- Owner: review ADR 0025, then push for CI.
+- Update docs/site's capabilities page when this is released.
+
+---
+
+## 2026-11-15: Developer documentation and examples
+
+**Done** (owner: "Yes, write them", the ten documents proposed)
+- **Ten pages in [site/](site/),** published at latiprimere.com/docs: Getting started (installation, first print job, finding printers), Guides (options and following jobs, capabilities, labels and receipts, errors and troubleshooting, a web app with a background service) and Print systems (network printers over IPP, CUPS servers and the Windows spooler), plus an overview page.
+- **[samples/Latiprimere.Examples](../samples/Latiprimere.Examples/)** holds every example on those pages, one file per page, and is in the solution, so CI builds it. Its namespace is `LatiprimereExamples`, so each file needs `using Latiprimere;` as the docs do. `dotnet run -- <name>` runs an example; with no name it lists them.
+- **Checked on Windows:** listing, capabilities, the error example, Print to PDF with `OutputFile` (job completed, file written), and the web example's endpoints and worker.
+- **README:** a quick start, three short examples and links to the docs and examples.
+- **[CHANGELOG.md](../CHANGELOG.md)** added earlier today for users; this log stays the development record.
+
+**Learned**
+- **0.1 can read paper sizes, trays and colour modes but not choose them;** the capabilities page says so. A likely request for the next API round.
+- **The Windows spooler prints PDFs as page images,** so a PDF saved with Microsoft Print to PDF has no text. The docs mention it.
+
+**Next**
+- Owner: review the pages and examples, then commit `docs/site/`, `samples/Latiprimere.Examples/`, the solution file and the README.
 
 ---
 

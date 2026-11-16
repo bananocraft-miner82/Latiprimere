@@ -66,6 +66,29 @@
 		<value>The printer '{0}' could no longer be found.</value>
 		<comment>{0} is the printer name.</comment>
 	</data>
+	<data name="IppPrinterUriInvalid" xml:space="preserve">
+		<value>The IPP URI '{1}' for the Windows queue '{0}' must be an absolute ipp, ipps, http or https URI, such as ipp://192.168.1.20/ipp/print.</value>
+		<comment>{0} is the queue name from WindowsOptions.IppPrinterUris, {1} the URI given.</comment>
+	</data>
+	<data name="VendorOptionNotSupported" xml:space="preserve">
+		<value>The Windows print spooler doesn't support the vendor option '{0}'. It supports {1}.</value>
+		<comment>{0} is the key, such as windows:print-ticket; {1} the supported keys.</comment>
+	</data>
+	<data name="DevModeNotBase64" xml:space="preserve">
+		<value>The vendor option windows:devmode must be a DEVMODE encoded in base64.</value>
+	</data>
+	<data name="DevModeInvalid" xml:space="preserve">
+		<value>The vendor option windows:devmode isn't a DEVMODE: it has {0} bytes, but says its public part has {1} and the driver's data {2}. Save the whole DEVMODE from the printer's driver.</value>
+		<comment>{0} is the decoded length, {1} dmSize, {2} dmDriverExtra.</comment>
+	</data>
+	<data name="MediaSizeNotListed" xml:space="preserve">
+		<value>The printer '{0}' can't print on {1} ({2}): its driver doesn't list that paper size. Choose one of the sizes in the printer's capabilities.</value>
+		<comment>{0} is the printer name, {1} the size's display name, such as A4, {2} its PWG name, such as iso_a4_210x297mm.</comment>
+	</data>
+	<data name="InputTrayNotListed" xml:space="preserve">
+		<value>The printer '{0}' has no tray '{1}' (ID {2}): its driver doesn't list it. Choose one of the trays in the printer's capabilities.</value>
+		<comment>{0} is the printer name, {1} the tray's name, such as Manual Feed, {2} its ID.</comment>
+	</data>
 	<data name="DriverDropsRawData" xml:space="preserve">
 		<value>The printer '{0}' can't print raw data: its driver, {1}, accepts the job but writes nothing. Send a PDF instead.</value>
 		<comment>{0} is the printer name, {1} the driver name, such as Microsoft Print To PDF.</comment>

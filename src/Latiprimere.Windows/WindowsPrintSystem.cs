@@ -1,3 +1,4 @@
+using Latiprimere.Windows.Gdi;
 using Latiprimere.Windows.Mapping;
 using Latiprimere.Windows.Spooler;
 
@@ -50,6 +51,29 @@ internal sealed class WindowsPrintSystem : IPrintSystem
 		get
 		{
 			return this.context.AllowsAnyPrinterName;
+		}
+	}
+
+	/// <summary>
+	/// Gets the route for PDF jobs straight to IPP printers, or <see langword="null"/> when it is off, so the
+	/// settings can be checked.
+	/// </summary>
+	internal DirectIpp.WindowsIppRoute? IppRoute
+	{
+		get
+		{
+			return this.context.IppRoute;
+		}
+	}
+
+	/// <summary>
+	/// Gets the GDI printer that draws rendered PDF pages, so its settings can be checked.
+	/// </summary>
+	internal IGdiPrinter Gdi
+	{
+		get
+		{
+			return this.context.Gdi;
 		}
 	}
 
@@ -114,10 +138,12 @@ internal sealed class WindowsPrintSystem : IPrintSystem
 	}
 
 	/// <summary>
-	/// Does nothing: the spooler needs no connection held open, and each call opens and closes its own handles.
+	/// Releases the IPP connections used for PDF jobs sent straight to printers, if that is on. The spooler needs no
+	/// connection held open: each call opens and closes its own handles.
 	/// </summary>
 	public void Dispose()
 	{
+		this.context.IppRoute?.Dispose();
 	}
 
 	/// <summary>
@@ -175,6 +201,6 @@ internal sealed class WindowsPrintSystem : IPrintSystem
 		bool isDefault = string.Equals(printer.Name, this.context.Spool.GetDefaultPrinterName(), StringComparison.OrdinalIgnoreCase);
 		PrinterInfo info = WindowsPrinterInfoMapper.ToPrinterInfo(printer, WindowsPrintSystem.PrinterIdPrefix + printer.Name, isDefault);
 
-		return new WindowsPrinter(this.context, printer.Name, printer.DriverName, info);
+		return new WindowsPrinter(this.context, printer.Name, printer.DriverName, printer.PortName, info);
 	}
 }

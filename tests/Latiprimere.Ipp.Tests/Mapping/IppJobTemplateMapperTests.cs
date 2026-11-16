@@ -19,6 +19,111 @@ public sealed class IppJobTemplateMapperTests
 		Assert.Null(attributes.Copies);
 		Assert.Null(attributes.Sides);
 		Assert.Null(attributes.OrientationRequested);
+		Assert.Null(attributes.PrintColorMode);
+		Assert.Null(attributes.Media);
+		Assert.Null(attributes.MediaCol);
+	}
+
+	[Theory]
+	[InlineData(ColorMode.Monochrome, "monochrome")]
+	[InlineData(ColorMode.Color, "color")]
+	public void GivenColourModeWhenToJobTemplateAttributesThenSendsPrintColorMode(ColorMode colorMode, string expectedKeyword)
+	{
+		// Arrange — each colour mode and its IPP print-color-mode keyword (provided by InlineData above)
+		PrintOptions options = new PrintOptions { ColorMode = colorMode };
+
+		// Act
+		JobTemplateAttributes attributes = IppJobTemplateMapper.ToJobTemplateAttributes(options);
+
+		// Assert
+		Assert.Equal(expectedKeyword, attributes.PrintColorMode?.Value.Value);
+	}
+
+	[Fact]
+	public void GivenPrinterDefaultColourWhenToPrintColorModeThenReturnsNull()
+	{
+		// Arrange
+		ColorMode colorMode = ColorMode.PrinterDefault;
+
+		// Act
+		PrintColorMode? printColorMode = IppJobTemplateMapper.ToPrintColorMode(colorMode);
+
+		// Assert
+		Assert.Null(printColorMode);
+	}
+
+	[Fact]
+	public void GivenSizeWithoutTrayWhenToJobTemplateAttributesThenSendsMediaKeyword()
+	{
+		// Arrange
+		PrintOptions options = new PrintOptions
+		{
+			MediaSize = new MediaSize
+			{
+				Name              = "iso_a4_210x297mm",
+				DisplayName       = "A4",
+				WidthMillimetres  = 210,
+				HeightMillimetres = 297
+			}
+
+		};
+
+		// Act
+		JobTemplateAttributes attributes = IppJobTemplateMapper.ToJobTemplateAttributes(options);
+
+		// Assert
+		Assert.Equal("iso_a4_210x297mm", attributes.Media?.Value.Value);
+		Assert.True(attributes.Media?.Value.IsKeyword);
+		Assert.Null(attributes.MediaCol);
+	}
+
+	[Fact]
+	public void GivenTrayWithoutSizeWhenToJobTemplateAttributesThenSendsMediaColWithSourceOnly()
+	{
+		// Arrange
+		PrintOptions options = new PrintOptions { InputTray = new InputTray { Id = "by-pass-tray", Name = "Bypass Tray" } };
+
+		// Act
+		JobTemplateAttributes attributes = IppJobTemplateMapper.ToJobTemplateAttributes(options);
+
+		// Assert
+		MediaCol mediaCol = Assert.IsType<MediaCol>(attributes.MediaCol?.Value);
+		Assert.Equal("by-pass-tray", mediaCol.MediaSource?.Value.Value);
+		Assert.Null(mediaCol.MediaSize);
+		Assert.Null(attributes.Media);
+	}
+
+	[Theory]
+	[InlineData("iso_a4_210x297mm", 210.0, 297.0, 21000, 29700)]
+	[InlineData("na_letter_8.5x11in", 215.9, 279.4, 21590, 27940)]
+	[InlineData("na_number-10_4.125x9.5in", 104.78, 241.3, 10478, 24130)]
+	public void GivenTrayAndSizeWhenToJobTemplateAttributesThenSendsBothInMediaColInHundredthsOfMillimetres
+	(
+		string name,
+		double width,
+		double height,
+		int expectedX,
+		int expectedY
+	)
+	{
+		// Arrange — sizes in millimetres, as the capabilities report them (provided by InlineData above)
+		PrintOptions options = new PrintOptions
+		{
+			MediaSize = new MediaSize { Name = name, DisplayName = name, WidthMillimetres = width, HeightMillimetres = height },
+			InputTray = new InputTray { Id = "tray-2", Name = "Tray 2" }
+		};
+
+		// Act
+		JobTemplateAttributes attributes = IppJobTemplateMapper.ToJobTemplateAttributes(options);
+
+		// Assert — media and media-col can't both be sent
+		MediaCol mediaCol = Assert.IsType<MediaCol>(attributes.MediaCol?.Value);
+		Assert.Equal("tray-2", mediaCol.MediaSource?.Value.Value);
+		Assert.Equal(expectedX, mediaCol.MediaSize?.Value.XDimension?.Value.Lower);
+		Assert.Equal(expectedX, mediaCol.MediaSize?.Value.XDimension?.Value.Upper);
+		Assert.Equal(expectedY, mediaCol.MediaSize?.Value.YDimension?.Value.Lower);
+		Assert.Equal(expectedY, mediaCol.MediaSize?.Value.YDimension?.Value.Upper);
+		Assert.Null(attributes.Media);
 	}
 
 	[Fact]

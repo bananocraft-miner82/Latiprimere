@@ -32,11 +32,20 @@ internal static class PrintCommand
 			return ConsoleOutput.WriteUsage();
 		}
 
-		// Submit, timing how long rendering and spooling take
 		IPrinter printer = await catalog.GetPrinterAsync(printArguments.PrinterId, CancellationToken.None);
+
+		// Paper and tray are chosen from what the printer reports, as the library expects
+		PrintArguments? resolved = await PrintCommand.ResolvePaperAndTrayAsync(printer, printArguments);
+
+		if (resolved is null)
+		{
+			return ExitCodes.InvalidArguments;
+		}
+
+		// Submit, timing how long rendering and spooling take
 		Stopwatch stopwatch = Stopwatch.StartNew();
 
-		IPrintJob job = await PrintCommand.SubmitAsync(printer, printArguments);
+		IPrintJob job = await PrintCommand.SubmitAsync(printer, resolved);
 		TimeSpan submitTime = stopwatch.Elapsed;
 
 		ConsoleOutput.Write(CliMessages.JobSubmitted, job.Id, printer.Info.Name);
@@ -56,6 +65,54 @@ internal static class PrintCommand
 		}
 
 		return ExitCodes.Success;
+	}
+
+	/// <summary>
+	/// Looks up the paper size and tray asked for in the printer's capabilities.
+	/// </summary>
+	/// <param name="printer">The printer.</param>
+	/// <param name="printArguments">The parsed arguments.</param>
+	/// <returns>The arguments with the size and tray in their options, or <see langword="null"/> if the printer
+	/// doesn't list one of them, which has been reported.</returns>
+	private static async Task<PrintArguments?> ResolvePaperAndTrayAsync(IPrinter printer, PrintArguments printArguments)
+	{
+		if (printArguments.PaperName is null && printArguments.TrayId is null)
+		{
+			return printArguments;
+		}
+
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(CancellationToken.None);
+		PrintOptions options = printArguments.Options;
+
+		if (printArguments.PaperName is not null)
+		{
+			MediaSize? size = capabilities.MediaSizes.FirstOrDefault(size => size.Name == printArguments.PaperName);
+
+			if (size is null)
+			{
+				ConsoleOutput.WriteError(CliMessages.PaperNotListed, printer.Info.Name, printArguments.PaperName);
+
+				return null;
+			}
+
+			options = options with { MediaSize = size };
+		}
+
+		if (printArguments.TrayId is not null)
+		{
+			InputTray? tray = capabilities.InputTrays.FirstOrDefault(tray => tray.Id == printArguments.TrayId);
+
+			if (tray is null)
+			{
+				ConsoleOutput.WriteError(CliMessages.TrayNotListed, printer.Info.Name, printArguments.TrayId);
+
+				return null;
+			}
+
+			options = options with { InputTray = tray };
+		}
+
+		return printArguments with { Options = options };
 	}
 
 	/// <summary>

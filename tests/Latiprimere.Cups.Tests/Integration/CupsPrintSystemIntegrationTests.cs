@@ -168,6 +168,57 @@ public sealed class CupsPrintSystemIntegrationTests
 	}
 
 	[Fact]
+	public async Task GivenTraySizeAndColourFromCapabilitiesWhenPrintedToIppEverywhereQueueThenJobCompletes()
+	{
+		// Arrange — CUPS passes them on to ippeveprinter behind the queue
+		await using CatalogFixture fixture = CupsPrintSystemIntegrationTests.CreateCatalog();
+		IPrinter printer = await CupsPrintSystemIntegrationTests.GetPrinterAsync(fixture, CupsPrintSystemIntegrationTests.VirtualIppId);
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+		Assert.SkipWhen(capabilities.InputTrays.Count == 0 || capabilities.MediaSizes.Count == 0, "The queue reports no trays or sizes.");
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+
+		PrintOptions options = new PrintOptions
+		{
+			MediaSize = capabilities.MediaSizes[^1],
+			InputTray = capabilities.InputTrays[^1],
+			ColorMode = ColorMode.Monochrome
+		};
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+		PrintJobStatus status = await PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(PrintJobState.Completed, status.State);
+	}
+
+	[Fact]
+	public async Task GivenIppAndCupsVendorOptionsWhenPrintedToIppEverywhereQueueThenJobCompletes()
+	{
+		// Arrange
+		await using CatalogFixture fixture = CupsPrintSystemIntegrationTests.CreateCatalog();
+		IPrinter printer = await CupsPrintSystemIntegrationTests.GetPrinterAsync(fixture, CupsPrintSystemIntegrationTests.VirtualIppId);
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+
+		PrintOptions options = new PrintOptions
+		{
+			VendorOptions = new Dictionary<string, string>
+			{
+				["ipp:print-quality"] = "5",
+				["cups:fit-to-page"]  = "true",
+				["windows:devmode"]   = "AAAA" // Ignored: only Windows reads windows: keys
+			}
+		};
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+		PrintJobStatus status = await PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(PrintJobState.Completed, status.State);
+	}
+
+	[Fact]
 	public async Task GivenJobWaitingOnPausedQueueWhenCancelledThenJobEndsCancelled()
 	{
 		// Arrange

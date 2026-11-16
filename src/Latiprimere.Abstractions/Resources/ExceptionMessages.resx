@@ -32,6 +32,10 @@
 		<value>No supported print system is available on this platform. Register a Latiprimere platform adapter for the current operating system.</value>
 		<comment>Default message for PrintSystemUnavailableException.</comment>
 	</data>
+	<data name="VendorOptionKeyInvalid" xml:space="preserve">
+		<value>The vendor option '{0}' must start with ipp:, cups: or windows:, followed by a name, such as ipp:print-quality.</value>
+		<comment>{0} is the key as given.</comment>
+	</data>
 	<data name="StreamNotReadable" xml:space="preserve">
 		<value>The document stream must be readable.</value>
 		<comment>Thrown when PrintContent is created from a stream that cannot be read.</comment>

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<!-- The code shown in the documentation (docs/site), one file per page. It is built with everything else, so a
+	     change to the API that would break an example breaks the build instead. Program.cs runs one by name, and
+	     lists them all when run without one. -->
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<!-- Every using is written out, so the code in the docs can be copied as it stands -->
+		<ImplicitUsings>disable</ImplicitUsings>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Latiprimere\Latiprimere.csproj" />
+		<ProjectReference Include="..\..\src\Latiprimere.Cups\Latiprimere.Cups.csproj" />
+		<ProjectReference Include="..\..\src\Latiprimere.Ipp\Latiprimere.Ipp.csproj" />
+		<ProjectReference Include="..\..\src\Latiprimere.Rendering.Pdfium\Latiprimere.Rendering.Pdfium.csproj" />
+		<ProjectReference Include="..\..\src\Latiprimere.Windows\Latiprimere.Windows.csproj" />
+	</ItemGroup>
+
+</Project>

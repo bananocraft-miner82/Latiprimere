@@ -44,10 +44,12 @@ internal interface IIppClient
 	/// Sends a Print-Job request.
 	/// </summary>
 	/// <param name="request">The request, including the document.</param>
+	/// <param name="vendorAttributes">Attributes to send beside the request's own, from
+	/// <see cref="PrintOptions.VendorOptions"/>.</param>
 	/// <param name="cancellationToken">A token to cancel the operation.</param>
 	/// <returns>The response.</returns>
 	/// <exception cref="PrintException">The request failed or was rejected.</exception>
-	Task<PrintJobResponse> PrintJobAsync(PrintJobRequest request, CancellationToken cancellationToken);
+	Task<PrintJobResponse> PrintJobAsync(PrintJobRequest request, IppVendorAttributes vendorAttributes, CancellationToken cancellationToken);
 
 	/// <summary>
 	/// Sends a Get-Job-Attributes request.

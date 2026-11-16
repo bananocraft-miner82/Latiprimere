@@ -879,6 +879,9 @@ interface signatures. Print dialogs and previews will live in separate, optional
   `internal` `Interop` folder per package.
 - Wrap native handles in `SafeHandle` subclasses; never pass raw `IntPtr` handles around managed code.
 - Code must be trim-safe and Native AOT compatible: no reflection-based serialisation, no dynamic code generation.
+  `IsAotCompatible` turns on the analyzers for `src/`, but they can't see into dependencies. CI also publishes the CLI
+  sample with Native AOT and runs it (`tools/aot-check/check-aot.sh`); run the script yourself after adding a
+  dependency or a new code path through one. It needs the platform's native toolchain, as the script's header says.
 - Convert native errors into Latiprimere exceptions at the interop boundary, keeping the native code in the exception.
 
 ---

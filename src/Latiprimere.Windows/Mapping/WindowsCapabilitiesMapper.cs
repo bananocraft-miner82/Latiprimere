@@ -66,6 +66,43 @@ internal static class WindowsCapabilitiesMapper
 	}
 
 	/// <summary>
+	/// Finds the driver's paper with a given PWG name, named as <see cref="ToCapabilities"/> names it.
+	/// </summary>
+	/// <param name="record">The driver's capabilities.</param>
+	/// <param name="mediaSizeName">The PWG name, such as <c>iso_a4_210x297mm</c>.</param>
+	/// <returns>The DMPAPER_* number, or <see langword="null"/> if the driver has no such paper.</returns>
+	internal static short? FindPaperId(WindowsCapabilitiesRecord record, string mediaSizeName)
+	{
+		ArgumentNullException.ThrowIfNull(record);
+		ArgumentNullException.ThrowIfNull(mediaSizeName);
+
+		// The first of several driver entries for one size, as in the capabilities
+		return record.Papers
+			.Where(paper => string.Equals(WindowsCapabilitiesMapper.ToMediaSize(paper).Name, mediaSizeName, StringComparison.Ordinal))
+			.Select(paper => (short?)paper.Id)
+			.FirstOrDefault();
+	}
+
+	/// <summary>
+	/// Finds the driver's paper source with a given tray ID.
+	/// </summary>
+	/// <param name="record">The driver's capabilities.</param>
+	/// <param name="trayId">The tray ID, a DMBIN_* number as <see cref="ToCapabilities"/> writes it.</param>
+	/// <returns>The DMBIN_* number, or <see langword="null"/> if the driver has no such source.</returns>
+	internal static short? FindBinId(WindowsCapabilitiesRecord record, string trayId)
+	{
+		ArgumentNullException.ThrowIfNull(record);
+		ArgumentNullException.ThrowIfNull(trayId);
+
+		if (!short.TryParse(trayId, NumberStyles.None, CultureInfo.InvariantCulture, out short binId))
+		{
+			return null;
+		}
+
+		return record.Bins.Any(bin => bin.Id == binId) ? binId : null;
+	}
+
+	/// <summary>
 	/// Names a driver's paper size by its PWG name, turned to portrait.
 	/// </summary>
 	/// <param name="paper">The driver's paper.</param>

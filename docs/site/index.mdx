@@ -1,0 +1,47 @@
+---
+title: Latiprimere documentation
+description: Find printers, read their capabilities, submit jobs and follow them to completion, with the same .NET code on Windows, Linux and macOS.
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Preview">
+  These pages describe 0.1.0-preview. The API may still change before 1.0.
+</Aside>
+
+Latiprimere is a cross-platform printing library for .NET. It finds printers, reads what they can do, sends them PDFs or raw printer data, and follows each job until it finishes. It has no user interface, so it works in console apps, services, containers and web back ends.
+
+## Getting started
+
+<CardGrid>
+  <LinkCard title="Installation" href="/docs/getting-started/installation/" description="Choose the packages for your platforms and set Latiprimere up." />
+  <LinkCard title="Your first print job" href="/docs/getting-started/first-print-job/" description="A complete program that prints a PDF on the default printer." />
+  <LinkCard title="Finding printers" href="/docs/getting-started/finding-printers/" description="List printers, understand printer IDs, and find a saved printer again." />
+</CardGrid>
+
+## Guides
+
+<CardGrid>
+  <LinkCard title="Print options and following jobs" href="/docs/guides/print-options-and-jobs/" description="Copies, two-sided printing and orientation; job states, timeouts and cancelling." />
+  <LinkCard title="Reading printer capabilities" href="/docs/guides/printer-capabilities/" description="Paper sizes, duplex, colour and trays, and choosing options a printer can carry out." />
+  <LinkCard title="Labels and receipts" href="/docs/guides/labels-and-receipts/" description="Send ZPL to label printers and ESC/POS to receipt printers." />
+  <LinkCard title="Errors and troubleshooting" href="/docs/guides/errors-and-troubleshooting/" description="What each exception means, logging, and fixes for common problems." />
+  <LinkCard title="Printing from a web app or background service" href="/docs/guides/web-app-and-background-service/" description="Queue print requests from ASP.NET Core and print them in a background service." />
+</CardGrid>
+
+## Print systems
+
+<CardGrid>
+  <LinkCard title="Network printers over IPP" href="/docs/print-systems/network-printers/" description="Print straight to network printers, found automatically or configured by address." />
+  <LinkCard title="CUPS servers and the Windows spooler" href="/docs/print-systems/cups-and-windows/" description="Remote CUPS servers with passwords and TLS; PDFs, Print to PDF and print servers on Windows." />
+</CardGrid>
+
+## Run the examples
+
+Every example in these pages is in [`samples/Latiprimere.Examples`](https://github.com/bananocraft-miner82/Latiprimere/tree/main/samples/Latiprimere.Examples) in the repository. It is built with every change, so the code here always matches the API. To run one, clone the repository and name the example:
+
+```bash
+dotnet run --project samples/Latiprimere.Examples -f net10.0 -- list
+```
+
+Run it with no name to see them all.

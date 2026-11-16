@@ -1,4 +1,5 @@
 using Latiprimere.Rendering;
+using Latiprimere.Windows.DirectIpp;
 using Latiprimere.Windows.Gdi;
 using Latiprimere.Windows.Spooler;
 
@@ -27,4 +28,10 @@ internal sealed record WindowsPrintContext
 	/// backslash or a comma (<see cref="WindowsOptions.AllowAnyPrinterName"/>).
 	/// </summary>
 	public bool AllowsAnyPrinterName { get; init; }
+
+	/// <summary>
+	/// Gets the route for PDF jobs straight to IPP printers (<see cref="WindowsOptions.PrintPdfOverIpp"/>), or
+	/// <see langword="null"/> when it is off.
+	/// </summary>
+	public WindowsIppRoute? IppRoute { get; init; }
 }

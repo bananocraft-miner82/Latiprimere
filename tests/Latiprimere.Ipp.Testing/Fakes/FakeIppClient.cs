@@ -7,7 +7,7 @@ namespace Latiprimere.Ipp.Testing.Fakes;
 /// <summary>
 /// An in-memory IPP client that returns configured responses and records the requests it receives.
 /// </summary>
-public sealed class FakeIppClient : IIppClient, IDisposable
+internal sealed class FakeIppClient : IIppClient, IDisposable
 {
 	private readonly Dictionary<string, PrinterDescriptionAttributes> printersByUri =
 		new Dictionary<string, PrinterDescriptionAttributes>(); // Printer attributes, by printer URI
@@ -78,6 +78,12 @@ public sealed class FakeIppClient : IIppClient, IDisposable
 	/// <summary>Gets the last Print-Job request received.</summary>
 	public PrintJobRequest? LastPrintJobRequest { get; private set; }
 
+	/// <summary>Gets or sets a failure Print-Job throws after reading the document, or <see langword="null"/>.</summary>
+	public PrintException? PrintJobFailureToThrow { get; set; }
+
+	/// <summary>Gets the vendor attributes sent with the last Print-Job request, or <see langword="null"/> before the first.</summary>
+	public IppVendorAttributes? LastVendorAttributes { get; private set; }
+
 	/// <summary>Gets the last Get-Job-Attributes request received.</summary>
 	public GetJobAttributesRequest? LastGetJobAttributesRequest { get; private set; }
 
@@ -104,6 +110,14 @@ public sealed class FakeIppClient : IIppClient, IDisposable
 	public void AddUnreachable(Uri printerUri)
 	{
 		this.unreachableUris.Add(printerUri.ToString());
+	}
+
+	/// <summary>
+	/// Makes every printer reachable again, as if they had come back on.
+	/// </summary>
+	public void ClearUnreachable()
+	{
+		this.unreachableUris.Clear();
 	}
 
 	/// <summary>
@@ -194,14 +208,21 @@ public sealed class FakeIppClient : IIppClient, IDisposable
 	/// <see cref="BusyPrintJobCount"/> says so, or returns the configured job ID.
 	/// </summary>
 	/// <param name="request">The request, which is recorded.</param>
+	/// <param name="vendorAttributes">The vendor attributes, which are recorded.</param>
 	/// <param name="cancellationToken">Not used.</param>
 	/// <returns>The response.</returns>
 	/// <exception cref="PrintException">A failure has been configured, or the request is turned away as busy.</exception>
-	public Task<PrintJobResponse> PrintJobAsync(PrintJobRequest request, CancellationToken cancellationToken)
+	public Task<PrintJobResponse> PrintJobAsync(PrintJobRequest request, IppVendorAttributes vendorAttributes, CancellationToken cancellationToken)
 	{
 		this.ThrowIfFailing();
 		this.LastPrintJobRequest = request;
+		this.LastVendorAttributes = vendorAttributes;
 		this.receivedDocuments.Add(FakeIppClient.ReadDocument(request.Document));
+
+		if (this.PrintJobFailureToThrow is not null)
+		{
+			throw this.PrintJobFailureToThrow;
+		}
 
 		if (this.BusyPrintJobCount > 0)
 		{

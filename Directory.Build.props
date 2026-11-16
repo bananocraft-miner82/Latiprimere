@@ -23,7 +23,7 @@
 	<PropertyGroup>
 		<Authors>Latiprimere contributors</Authors>
 		<Copyright>Copyright (c) 2026 Jonathan Price</Copyright>
-		<PackageProjectUrl>https://github.com/bananocraft-miner82/Latiprimere</PackageProjectUrl>
+		<PackageProjectUrl>https://latiprimere.com</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/bananocraft-miner82/Latiprimere</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>printing;printer;print;ipp;cups;spooler;cross-platform</PackageTags>

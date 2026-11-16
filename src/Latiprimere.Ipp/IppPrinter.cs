@@ -55,8 +55,20 @@ internal sealed class IppPrinter : IPrinter
 
 		this.EnsureFormatSupported(content.Format);
 
+		// Vendor options are checked against the typed request before anything is sent
+		PrintJobRequest request = this.CreatePrintJobRequest(content, options);
+
+		IppVendorAttributes vendorAttributes = IppVendorAttributeMapper.ToAttributes
+		(
+			options.VendorOptions,
+			this.context.VendorOptionPrefixes,
+			request
+		);
+
 		// Send the document with its job attributes
-		PrintJobResponse response = await this.SendPrintJobAsync(content, options, cancellationToken).ConfigureAwait(false);
+		PrintJobResponse response = await this
+			.SendPrintJobAsync(request, content.Content, vendorAttributes, cancellationToken)
+			.ConfigureAwait(false);
 
 		// The job ID is needed to follow or cancel the job, so a response without one is an error
 		int jobNumber = response.JobAttributes?.JobId ?? 0;
@@ -124,15 +136,21 @@ internal sealed class IppPrinter : IPrinter
 	/// Sends the Print-Job request, sending it again while the printer is busy with another job, for up to
 	/// <see cref="IppPrintContext.BusyRetryDuration"/>.
 	/// </summary>
-	/// <param name="content">The document to print.</param>
-	/// <param name="options">How to print it.</param>
+	/// <param name="request">The request, including the document.</param>
+	/// <param name="document">The request's document, rewound before each resend.</param>
+	/// <param name="vendorAttributes">Attributes from the vendor options.</param>
 	/// <param name="cancellationToken">A token to cancel the request or the wait between attempts.</param>
 	/// <returns>The printer's response.</returns>
 	/// <exception cref="PrintException">The printer rejected the job, or was still busy when the time ran out.</exception>
-	private async Task<PrintJobResponse> SendPrintJobAsync(PrintContent content, PrintOptions options, CancellationToken cancellationToken)
+	private async Task<PrintJobResponse> SendPrintJobAsync
+	(
+		PrintJobRequest     request,
+		Stream              document,
+		IppVendorAttributes vendorAttributes,
+		CancellationToken   cancellationToken
+	)
 	{
 		// The document can only be sent again from where it started, so only seekable streams are retried
-		Stream document = content.Content;
 		long? documentStart = document.CanSeek ? document.Position : null;
 		long startTimestamp = this.context.TimeProvider.GetTimestamp();
 		TimeSpan delay = this.context.BusyRetryFirstDelay;
@@ -142,7 +160,7 @@ internal sealed class IppPrinter : IPrinter
 			try
 			{
 				return await this.context.Client
-					.PrintJobAsync(this.CreatePrintJobRequest(content, options), cancellationToken)
+					.PrintJobAsync(request, vendorAttributes, cancellationToken)
 					.ConfigureAwait(false);
 			}
 			catch (PrintException exception) when (documentStart is not null && this.CanRetryBusy(exception, startTimestamp, delay))

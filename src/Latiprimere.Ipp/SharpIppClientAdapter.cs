@@ -118,15 +118,79 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 	}
 
 	/// <inheritdoc/>
-	public Task<PrintJobResponse> PrintJobAsync(PrintJobRequest request, CancellationToken cancellationToken)
+	public Task<PrintJobResponse> PrintJobAsync(PrintJobRequest request, IppVendorAttributes vendorAttributes, CancellationToken cancellationToken)
 	{
-		return this.SendAsync
-		(
-			request.OperationAttributes?.PrinterUri,
-			token => this.client.PrintJobAsync(request, token),
-			isUpload: true,
-			cancellationToken
-		);
+		// The typed request can't carry attributes SharpIppNext doesn't model, so a job with vendor attributes
+		// goes in its raw form, which SharpIppNext sends and checks the same way
+		Func<CancellationToken, Task<PrintJobResponse>> send = vendorAttributes.IsEmpty
+			? token => this.client.PrintJobAsync(request, token)
+			: token => this.SendRawPrintJobAsync(request, vendorAttributes, token);
+
+		return this.SendAsync(request.OperationAttributes?.PrinterUri, send, isUpload: true, cancellationToken);
+	}
+
+	/// <summary>
+	/// Reads the parts of a raw Print-Job response that <see cref="IppPrinter"/> uses: the status, and the job's
+	/// ID and state.
+	/// </summary>
+	/// <param name="response">The raw response.</param>
+	/// <returns>The response.</returns>
+	internal static PrintJobResponse ToPrintJobResponse(IIppResponseMessage response)
+	{
+		IppAttribute[] jobAttributes = response.JobAttributes.SelectMany(group => group).ToArray();
+		int? jobId = SharpIppClientAdapter.FindInteger(jobAttributes, "job-id");
+		int? jobState = SharpIppClientAdapter.FindInteger(jobAttributes, "job-state");
+
+		// IppPrinter treats a response without a job ID as an error, as for the typed response
+		return new PrintJobResponse
+		{
+			Version       = response.Version,
+			StatusCode    = response.StatusCode,
+			RequestId     = response.RequestId,
+			JobAttributes = jobId is null
+				? null
+				: new JobAttributes { JobId = jobId.Value, JobState = (JobState)(jobState ?? (int)JobState.Pending) }
+		};
+	}
+
+	/// <summary>
+	/// Finds an integer or enum attribute's first value.
+	/// </summary>
+	/// <param name="attributes">The attributes.</param>
+	/// <param name="name">The attribute's name.</param>
+	/// <returns>The value, or <see langword="null"/> if absent or not an integer.</returns>
+	private static int? FindInteger(IEnumerable<IppAttribute> attributes, string name)
+	{
+		return attributes
+			.Where(attribute => attribute.Name == name && attribute.Value is int)
+			.Select(attribute => (int?)(int)attribute.Value)
+			.FirstOrDefault();
+	}
+
+	/// <summary>
+	/// Sends a Print-Job request in its raw form, with the vendor attributes added to their groups.
+	/// </summary>
+	/// <param name="request">The typed request.</param>
+	/// <param name="vendorAttributes">The attributes to add.</param>
+	/// <param name="cancellationToken">A token to cancel the request.</param>
+	/// <returns>The response.</returns>
+	private async Task<PrintJobResponse> SendRawPrintJobAsync
+	(
+		PrintJobRequest     request,
+		IppVendorAttributes vendorAttributes,
+		CancellationToken   cancellationToken
+	)
+	{
+		IIppRequestMessage raw = this.client.CreateRawRequest(request);
+		raw.OperationAttributes.AddRange(vendorAttributes.Operation);
+		raw.JobAttributes.AddRange(vendorAttributes.Job);
+
+		Uri printerUri = request.OperationAttributes?.PrinterUri?.Value
+						 ?? throw new ArgumentException("The request has no printer-uri.", nameof(request));
+
+		IIppResponseMessage response = await this.client.SendAsync(printerUri, raw, cancellationToken).ConfigureAwait(false);
+
+		return SharpIppClientAdapter.ToPrintJobResponse(response);
 	}
 
 	/// <inheritdoc/>

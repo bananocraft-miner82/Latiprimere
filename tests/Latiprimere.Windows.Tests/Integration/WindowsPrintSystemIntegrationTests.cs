@@ -1,7 +1,10 @@
+using System.Buffers.Binary;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
 using Latiprimere.Testing.Fixtures;
+using Latiprimere.Windows.Interop;
 using Latiprimere.Windows.Spooler;
 using Latiprimere.Windows.Tests.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
@@ -195,6 +198,193 @@ public sealed class WindowsPrintSystemIntegrationTests
 		Assert.Equal(PrintJobState.Completed, status.State);
 		Assert.NotNull(written);
 		Assert.Equal("%PDF-"u8.ToArray(), written.AsSpan(0, 5).ToArray());
+		File.Delete(outputFile);
+	}
+
+	[Fact]
+	public async Task GivenQueueMappedToIppPrinterWhenPdfPrintedThenGoesStraightToThePrinterAndReportsItsOutcome()
+	{
+		// Arrange — Microsoft Print to PDF's queue stands in for one in front of an IPP printer: mapped to the test
+		// container's ippeveprinter, a PDF job must reach ippeveprinter, not the driver, which would need a file name
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The Windows spooler is only available on Windows.");
+		Uri? ippPrinter = IntegrationEnvironment.IppPrinterUri;
+		Assert.SkipWhen(ippPrinter is null, IntegrationEnvironment.GetSkipReason(IntegrationEnvironment.IppPrinterVariable));
+
+		Assert.SkipWhen
+		(
+			new WinSpoolApi().GetPrinter(PrinterLock.MicrosoftPrintToPdf) is null,
+			"Microsoft Print to PDF is not installed."
+		);
+
+		await using CatalogFixture fixture = new CatalogFixture
+		(
+			services => services.AddLatiprimerePdfium().AddLatiprimereWindows
+			(
+				options =>
+				{
+					options.PrintPdfOverIpp = true;
+					options.IppPrinterUris[PrinterLock.MicrosoftPrintToPdf] = ippPrinter!;
+				}
+			)
+		);
+
+		IPrinter printer = await WindowsPrintSystemIntegrationTests.GetPrinterAsync(fixture, PrinterLock.MicrosoftPrintToPdf);
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+		PrintOptions options = new PrintOptions { JobName = "Latiprimere direct IPP test", Copies = 2 };
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+		PrintJobStatus status = await PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken);
+
+		// Assert — the printer's own outcome, not the spooler's "left the queue"
+		Assert.Equal(WindowsPrintSystemIntegrationTests.ToId(PrinterLock.MicrosoftPrintToPdf), job.PrinterId);
+		Assert.Equal(PrintJobState.Completed, status.State);
+		Assert.DoesNotContain("Windows does not record", status.StateMessage ?? string.Empty, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task GivenRenderDpiCapWhenPdfPrintedToMicrosoftPrintToPdfThenPagesAreRenderedAtTheCap()
+	{
+		// Arrange — the driver embeds the images it is given as they are, so their size shows the render resolution:
+		// an A4 page at 100 DPI is 827 pixels wide, against about 4,960 at the driver's 600 DPI
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The Windows spooler is only available on Windows.");
+
+		Assert.SkipWhen
+		(
+			new WinSpoolApi().GetPrinter(PrinterLock.MicrosoftPrintToPdf) is null,
+			"Microsoft Print to PDF is not installed."
+		);
+
+		const int maxRenderDpi = 100;
+
+		await using CatalogFixture fixture = new CatalogFixture
+		(
+			services => services.AddLatiprimerePdfium().AddLatiprimereWindows(options => options.MaxRenderDpi = maxRenderDpi)
+		);
+
+		IPrinter printer = await WindowsPrintSystemIntegrationTests.GetPrinterAsync(fixture, PrinterLock.MicrosoftPrintToPdf);
+		using FileStream document = TestDocuments.Open(TestDocuments.MixedOnePage);
+		string outputFile = Path.Combine(Path.GetTempPath(), $"latiprimere-test-{Guid.NewGuid():N}.pdf");
+		PrintOptions options = new PrintOptions { JobName = "Latiprimere render cap test", OutputFile = outputFile };
+		using PrinterLock printerLock = new PrinterLock(PrinterLock.MicrosoftPrintToPdf);
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+		PrintJobStatus status = await PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken);
+		byte[]? written = await OutputFileWaiter.WaitForAnyContentAsync(outputFile, TestContext.Current.CancellationToken);
+
+		// Assert — the driver writes image dictionaries uncompressed, so their widths can be read as text
+		Assert.Equal(PrintJobState.Completed, status.State);
+		Assert.NotNull(written);
+
+		int[] imageWidths = System.Text.RegularExpressions.Regex
+			.Matches(Encoding.Latin1.GetString(written), @"/Width (\d+)")
+			.Select(match => int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture))
+			.ToArray();
+
+		Assert.NotEmpty(imageWidths);
+		Assert.All(imageWidths, width => Assert.InRange(width, 1, (int)Math.Ceiling(8.27 * maxRenderDpi) + 1));
+		File.Delete(outputFile);
+	}
+
+	[Fact]
+	public async Task GivenSavedDevModeForA5WhenPdfPrintedToMicrosoftPrintToPdfThenOutputPagesAreA5()
+	{
+		// Arrange — the driver's own DEVMODE, changed to A5 (DMPAPER 11) as its settings dialog would, and saved
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The Windows spooler is only available on Windows.");
+
+		Assert.SkipWhen
+		(
+			new WinSpoolApi().GetPrinter(PrinterLock.MicrosoftPrintToPdf) is null,
+			"Microsoft Print to PDF is not installed."
+		);
+
+		byte[] saved = WindowsCapabilityReader.ReadDefaultDevMode(PrinterLock.MicrosoftPrintToPdf);
+		BinaryPrimitives.WriteInt16LittleEndian(saved.AsSpan(Marshal.OffsetOf<DevMode>(nameof(DevMode.PaperSize)).ToInt32()), 11);
+		uint fields = BinaryPrimitives.ReadUInt32LittleEndian(saved.AsSpan(Marshal.OffsetOf<DevMode>(nameof(DevMode.Fields)).ToInt32()));
+		fields = (fields | DevModeConstants.FieldPaperSize)
+				 & ~(DevModeConstants.FieldPaperLength | DevModeConstants.FieldPaperWidth | DevModeConstants.FieldFormName);
+		BinaryPrimitives.WriteUInt32LittleEndian(saved.AsSpan(Marshal.OffsetOf<DevMode>(nameof(DevMode.Fields)).ToInt32()), fields);
+
+		await using CatalogFixture fixture = WindowsPrintSystemIntegrationTests.CreateCatalog();
+		IPrinter printer = await WindowsPrintSystemIntegrationTests.GetPrinterAsync(fixture, PrinterLock.MicrosoftPrintToPdf);
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+		string outputFile = Path.Combine(Path.GetTempPath(), $"latiprimere-test-{Guid.NewGuid():N}.pdf");
+
+		PrintOptions options = new PrintOptions
+		{
+			JobName       = "Latiprimere saved DEVMODE test",
+			OutputFile    = outputFile,
+			VendorOptions = new Dictionary<string, string> { ["windows:devmode"] = Convert.ToBase64String(saved) }
+		};
+
+		using PrinterLock printerLock = new PrinterLock(PrinterLock.MicrosoftPrintToPdf);
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+		PrintJobStatus status = await PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken);
+		byte[]? written = await OutputFileWaiter.WaitForAnyContentAsync(outputFile, TestContext.Current.CancellationToken);
+
+		// Assert — A5 is 419.5 × 595.3 points; the driver's default would be A4 or Letter
+		Assert.Equal(PrintJobState.Completed, status.State);
+		Assert.NotNull(written);
+
+		using (MemoryStream output = new MemoryStream(written))
+		using (Latiprimere.Rendering.IRasterDocument printed = new Latiprimere.Rendering.Pdfium.PdfiumRasterizer().Open(output))
+		{
+			Latiprimere.Rendering.PageSize size = printed.GetPageSize(0);
+			Assert.Equal(419.5, Math.Min(size.WidthPoints, size.HeightPoints), 1.5);
+			Assert.Equal(595.3, Math.Max(size.WidthPoints, size.HeightPoints), 1.5);
+		}
+
+		File.Delete(outputFile);
+	}
+
+	[Fact]
+	public async Task GivenPaperSizeFromCapabilitiesWhenPdfPrintedToMicrosoftPrintToPdfThenOutputPagesHaveThatSize()
+	{
+		// Arrange — A5 is neither the A4 nor the Letter default, so a size that wasn't applied shows
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The Windows spooler is only available on Windows.");
+
+		Assert.SkipWhen
+		(
+			new WinSpoolApi().GetPrinter(PrinterLock.MicrosoftPrintToPdf) is null,
+			"Microsoft Print to PDF is not installed."
+		);
+
+		await using CatalogFixture fixture = WindowsPrintSystemIntegrationTests.CreateCatalog();
+		IPrinter printer = await WindowsPrintSystemIntegrationTests.GetPrinterAsync(fixture, PrinterLock.MicrosoftPrintToPdf);
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+		MediaSize? a5 = capabilities.MediaSizes.FirstOrDefault(size => size.Name == "iso_a5_148x210mm");
+		Assert.SkipWhen(a5 is null, "Microsoft Print to PDF doesn't list A5 on this computer.");
+
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+		string outputFile = Path.Combine(Path.GetTempPath(), $"latiprimere-test-{Guid.NewGuid():N}.pdf");
+		PrintOptions options = new PrintOptions { JobName = "Latiprimere A5 test", OutputFile = outputFile, MediaSize = a5 };
+		using PrinterLock printerLock = new PrinterLock(PrinterLock.MicrosoftPrintToPdf);
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+		PrintJobStatus status = await PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken);
+		byte[]? written = await OutputFileWaiter.WaitForAnyContentAsync(outputFile, TestContext.Current.CancellationToken);
+
+		// Assert — A5 is 148 × 210 mm: 419.5 × 595.3 points, in portrait or landscape as the page needs
+		Assert.Equal(PrintJobState.Completed, status.State);
+		Assert.NotNull(written);
+
+		using (MemoryStream output = new MemoryStream(written))
+		using (Latiprimere.Rendering.IRasterDocument printed = new Latiprimere.Rendering.Pdfium.PdfiumRasterizer().Open(output))
+		{
+			Assert.True(printed.PageCount > 0);
+
+			for (int page = 0; page < printed.PageCount; page++)
+			{
+				Latiprimere.Rendering.PageSize size = printed.GetPageSize(page);
+				Assert.Equal(419.5, Math.Min(size.WidthPoints, size.HeightPoints), 1.5);
+				Assert.Equal(595.3, Math.Max(size.WidthPoints, size.HeightPoints), 1.5);
+			}
+		}
+
 		File.Delete(outputFile);
 	}
 

@@ -84,6 +84,20 @@ jobs:
       - name: Test
         run: dotnet test --no-build --configuration Release
 
+      # Native AOT needs the platform's linker: the runners have Visual Studio's C++ tools and Xcode, and Linux needs
+      # clang and zlib
+      - name: Install Native AOT prerequisites
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+
+      # Publishes the CLI sample with Native AOT for each target, fails on any trimming or AOT warning, and runs the
+      # native program against this runner's test printers (tools/aot-check/check-aot.sh)
+      - name: Check Native AOT
+        shell: bash
+        run: |
+          bash tools/aot-check/check-aot.sh net10.0
+          bash tools/aot-check/check-aot.sh net11.0
+
       # Packs on one runner, so every change shows that the packages still build and pass package validation. The
       # packages are kept for a few days to inspect; release.yml builds the ones that are published.
       - name: Pack

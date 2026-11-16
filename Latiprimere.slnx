@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/samples/">
     <Project Path="samples/Latiprimere.Cli/Latiprimere.Cli.csproj" />
+    <Project Path="samples/Latiprimere.Examples/Latiprimere.Examples.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Latiprimere.Abstractions/Latiprimere.Abstractions.csproj" />

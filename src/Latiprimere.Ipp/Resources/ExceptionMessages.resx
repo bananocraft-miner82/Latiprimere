@@ -71,4 +71,20 @@
 		<value>The printer does not accept '{0}' documents. It accepts: {1}.</value>
 		<comment>{0} is the MIME type sent, {1} the comma-separated MIME types the printer reports.</comment>
 	</data>
+	<data name="VendorOptionValueEmpty" xml:space="preserve">
+		<value>The vendor option '{0}' has an empty value. Separate several values with single commas.</value>
+		<comment>{0} is the key, such as ipp:finishings.</comment>
+	</data>
+	<data name="VendorOptionNameInvalid" xml:space="preserve">
+		<value>The vendor option '{0}' doesn't name an IPP attribute: after the prefix, use lower-case letters, digits, '-', '_' and '.', starting with a letter, such as ipp:print-quality.</value>
+		<comment>{0} is the key as given.</comment>
+	</data>
+	<data name="VendorOptionSetByLatiprimere" xml:space="preserve">
+		<value>The vendor option '{0}' sets {1}, which Latiprimere already sends for this job, from PrintOptions or for the request itself. Use the typed option instead, or leave it at its default.</value>
+		<comment>{0} is the key, {1} the IPP attribute name, such as copies.</comment>
+	</data>
+	<data name="VendorOptionSetTwice" xml:space="preserve">
+		<value>The vendor options '{0}' and '{1}' both set {2}. Use one of them.</value>
+		<comment>{0} and {1} are the keys, such as ipp:print-quality and cups:print-quality; {2} the IPP attribute name.</comment>
+	</data>
 </root>

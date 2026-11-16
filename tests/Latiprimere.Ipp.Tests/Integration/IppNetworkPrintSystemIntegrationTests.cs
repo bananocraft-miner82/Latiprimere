@@ -127,6 +127,115 @@ public sealed class IppNetworkPrintSystemIntegrationTests
 	}
 
 	[Fact]
+	public async Task GivenTraySizeAndColourFromCapabilitiesWhenPrintedThenPrinterAcceptsThemAndJobCompletes()
+	{
+		// Arrange — ippeveprinter checks media-col against what it supports, so a size it can't read is refused
+		Uri printerUri = IppNetworkPrintSystemIntegrationTests.GetPrinterUri();
+		await using CatalogFixture fixture = IppNetworkPrintSystemIntegrationTests.CreateCatalog(printerUri);
+		string printerId = IppNetworkPrintSystemIntegrationTests.GetPrinterId(printerUri);
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(printerId, TestContext.Current.CancellationToken);
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+		Assert.SkipWhen(capabilities.InputTrays.Count == 0, "The printer reports no trays.");
+
+		MediaSize size = capabilities.MediaSizes.FirstOrDefault(size => size.Name != capabilities.DefaultMediaSize?.Name)
+						 ?? capabilities.MediaSizes[0];
+
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+
+		PrintOptions options = new PrintOptions
+		{
+			MediaSize = size,
+			InputTray = capabilities.InputTrays[^1],
+			ColorMode = ColorMode.Monochrome
+		};
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+		PrintJobStatus status = await PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(PrintJobState.Completed, status.State);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public async Task GivenSizeThePrinterDoesNotSupportWhenPrintedThenPrinterRejectsJobUpFront(bool withTray)
+	{
+		// Arrange — shows the size reaches the printer rather than being dropped: alone it goes as media, with a
+		// tray as media-size dimensions inside media-col (withTray provided by InlineData above)
+		Uri printerUri = IppNetworkPrintSystemIntegrationTests.GetPrinterUri();
+		await using CatalogFixture fixture = IppNetworkPrintSystemIntegrationTests.CreateCatalog(printerUri);
+		string printerId = IppNetworkPrintSystemIntegrationTests.GetPrinterId(printerUri);
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(printerId, TestContext.Current.CancellationToken);
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+		Assert.SkipWhen(withTray && capabilities.InputTrays.Count == 0, "The printer reports no trays.");
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+
+		PrintOptions options = new PrintOptions
+		{
+			MediaSize = new MediaSize
+			{
+				Name              = "custom_latiprimere_123x45mm",
+				DisplayName       = "123 × 45 mm",
+				WidthMillimetres  = 123,
+				HeightMillimetres = 45
+			},
+			InputTray = withTray ? capabilities.InputTrays[^1] : null
+		};
+
+		// Act
+		Func<Task> act = () => printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(act);
+		Assert.Equal(IppNetworkPrintSystemIntegrationTests.AttributesOrValuesNotSupported, exception.NativeErrorCode);
+	}
+
+	[Theory]
+	[InlineData("5", true)]
+	[InlineData("99", false)]
+	public async Task GivenVendorPrintQualityWhenPrintedThenPrinterAppliesOrRefusesIt(string quality, bool isSupported)
+	{
+		// Arrange — ippeveprinter supports print-quality 3 to 5 and refuses anything else up front, which shows the
+		// attribute reaches it (quality and isSupported provided by InlineData above)
+		Uri printerUri = IppNetworkPrintSystemIntegrationTests.GetPrinterUri();
+		await using CatalogFixture fixture = IppNetworkPrintSystemIntegrationTests.CreateCatalog(printerUri);
+		string printerId = IppNetworkPrintSystemIntegrationTests.GetPrinterId(printerUri);
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(printerId, TestContext.Current.CancellationToken);
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+
+		PrintOptions options = new PrintOptions
+		{
+			VendorOptions = new Dictionary<string, string>
+			{
+				["ipp:print-quality"]          = quality,
+				["ipp:ipp-attribute-fidelity"] = "true",
+				["cups:fit-to-page"]           = "true" // Ignored: only CUPS reads cups: keys
+			}
+		};
+
+		// Act
+		Func<Task<PrintJobStatus>> print = async () =>
+		{
+			IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+			return await PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken);
+		};
+
+		// Assert
+		if (isSupported)
+		{
+			Assert.Equal(PrintJobState.Completed, (await print()).State);
+		}
+		else
+		{
+			PrintException exception = await Assert.ThrowsAsync<PrintException>(print);
+			Assert.Equal(IppNetworkPrintSystemIntegrationTests.AttributesOrValuesNotSupported, exception.NativeErrorCode);
+		}
+	}
+
+	[Fact]
 	public async Task GivenSeveralPdfsSentAtOnceWhenPrintedThenEveryJobCompletes()
 	{
 		// Arrange — ippeveprinter takes one job at a time and answers the others server-error-busy, which

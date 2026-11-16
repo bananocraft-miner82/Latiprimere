@@ -213,12 +213,12 @@ internal static unsafe class WindowsCapabilityReader
 	}
 
 	/// <summary>
-	/// Reads the paper size, duplex and colour from the driver's default DEVMODE.
+	/// Reads the driver's default DEVMODE, with its private data.
 	/// </summary>
 	/// <param name="printerName">The printer name.</param>
-	/// <returns>The defaults the DEVMODE sets.</returns>
+	/// <returns>The DEVMODE, as an application would save it for <c>windows:devmode</c>.</returns>
 	/// <exception cref="PrintException">The printer couldn't be opened or its DEVMODE read.</exception>
-	private static DefaultSettings ReadDefaults(string printerName)
+	internal static byte[] ReadDefaultDevMode(string printerName)
 	{
 		using SafePrinterHandle printerHandle = PrinterHandles.Open(printerName);
 		int size = WinSpoolNative.DocumentProperties(IntPtr.Zero, printerHandle, printerName, null, null, 0);
@@ -228,14 +228,30 @@ internal static unsafe class WindowsCapabilityReader
 
 		fixed (byte* data = buffer)
 		{
-			DevMode* devMode = (DevMode*)data;
-
 			int result = WinSpoolNative.DocumentProperties
 			(
-				IntPtr.Zero, printerHandle, printerName, devMode, null, DevModeConstants.ModeOutBuffer
+				IntPtr.Zero, printerHandle, printerName, (DevMode*)data, null, DevModeConstants.ModeOutBuffer
 			);
 
 			SpoolerErrors.ThrowIfFailed(result > 0, nameof(WinSpoolNative.DocumentProperties), printerName);
+		}
+
+		return buffer;
+	}
+
+	/// <summary>
+	/// Reads the paper size, duplex and colour from the driver's default DEVMODE.
+	/// </summary>
+	/// <param name="printerName">The printer name.</param>
+	/// <returns>The defaults the DEVMODE sets.</returns>
+	/// <exception cref="PrintException">The printer couldn't be opened or its DEVMODE read.</exception>
+	private static DefaultSettings ReadDefaults(string printerName)
+	{
+		byte[] buffer = WindowsCapabilityReader.ReadDefaultDevMode(printerName);
+
+		fixed (byte* data = buffer)
+		{
+			DevMode* devMode = (DevMode*)data;
 
 			// Fields says which members the driver filled in; the rest are meaningless
 			uint fields = devMode->Fields;
