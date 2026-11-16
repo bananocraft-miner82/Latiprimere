@@ -21,6 +21,7 @@ Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` 
 ### Changed
 
 - **`Latiprimere.Windows` now depends on `Latiprimere.Ipp`,** for sending PDFs straight to IPP printers.
+- **Version numbers now follow .NET:** `<.NET major>.0.<build>`, starting at 11.0, the newest .NET the packages target. This release follows 0.1.0-preview. Releases stay previews, ending in `-preview`, until testing with real printers is done. Every package still supports .NET 10 and .NET 11.
 
 ## 0.1.0-preview - 2026-11-15
 

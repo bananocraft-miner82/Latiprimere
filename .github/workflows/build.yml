@@ -4,8 +4,15 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Started by prepare-release.yml for the release branch, whose push starts no workflow by itself
+  # Started by release.yml for the post-release pull request, whose push starts no workflow by itself
   workflow_dispatch:
+  # release.yml builds, tests and packs the release commit with this workflow, then publishes its packages
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to build
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -20,8 +27,11 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+      # The release commit when release.yml calls this, otherwise the commit of the event
       - name: Check out
         uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
 
       # The .NET 11 SDK (from global.json) builds both targets; the .NET 10 runtime runs the net10.0 tests
       - name: Set up .NET
@@ -99,7 +109,7 @@ jobs:
           bash tools/aot-check/check-aot.sh net11.0
 
       # Packs on one runner, so every change shows that the packages still build and pass package validation. The
-      # packages are kept for a few days to inspect; release.yml builds the ones that are published.
+      # packages are kept for a few days to inspect. When release.yml calls this, these are the ones it publishes.
       - name: Pack
         if: runner.os == 'Linux'
         run: dotnet pack --no-build --configuration Release --output artifacts/packages

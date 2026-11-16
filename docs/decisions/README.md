@@ -27,12 +27,13 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0019](0019-windows-error-mapping.md) | Windows error mapping | Proposed |
 | [0020](0020-cups-authentication.md) | CUPS authentication | Proposed |
 | [0021](0021-licence-text-before-first-package.md) | Licence text revised before the first package | Accepted |
-| [0022](0022-release-process.md) | Release process and package contents | Proposed |
+| [0022](0022-release-process.md) | Release process and package contents | Proposed; partly superseded by 0028 |
 | [0023](0023-commercial-licence-price.md) | Commercial Licence price and terms | Accepted |
 | [0024](0024-known-ipp-printer-uris.md) | Look up only known IPP printer URIs and Windows printer names | Proposed |
 | [0025](0025-choose-paper-colour-and-tray.md) | Choose paper size, colour mode and tray | Proposed |
 | [0026](0026-vendor-options-in-detail.md) | Vendor options in detail | Proposed |
 | [0027](0027-direct-ipp-for-windows-queues.md) | Direct IPP for Windows queues | Accepted |
+| [0028](0028-automated-releases.md) | Automated releases from the release branch | Proposed |
 
 ## Template
 

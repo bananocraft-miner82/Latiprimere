@@ -1,20 +1,96 @@
 name: Release
 
-# Publishes the packages to nuget.org when a version tag such as v0.1.0-preview is pushed. See docs/releasing.md.
+# Publishes a release to nuget.org whenever a pull request is merged into the release branch. See docs/releasing.md.
+#
+#  1. prepare: the version is <.NET major>.0.<this workflow's run number>, ending in -preview while the repository
+#     variable RELEASE_PREVIEW isn't false (tools/releasing/next-version.sh). The
+#     release commit sets it, marks the public API shipped and dates the changelog's notes
+#     (tools/releasing/prepare-release.sh), and is pushed to post-release/v<version>.
+#  2. build: build.yml builds, tests and packs that commit on all three runners.
+#  3. publish: pushes those packages to nuget.org, in the "release" environment, which can require an approval.
+#     nuget.org's trusted publishing policy names this workflow file and that environment.
+#  4. finish: tags the release commit v<version>, and opens a pull request that brings it into main.
 on:
   push:
-    tags: ['v*']
+    branches: [release]
 
 permissions:
   contents: read
 
+# One release at a time, each to the end: a second merge waits for the first to finish
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  publish:
-    name: Publish to nuget.org
+  prepare:
+    name: Prepare the release commit
     runs-on: ubuntu-latest
 
-    # The "release" environment can require an approval before anything is pushed. nuget.org's trusted publishing
-    # policy names this workflow file and environment.
+    permissions:
+      contents: write # Push the post-release branch
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      sha: ${{ steps.commit.outputs.sha }}
+
+    steps:
+      # All history and tags, so the script can refuse a version already tagged
+      - name: Check out
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Releases are previews, such as 11.0.42-preview, until the repository variable RELEASE_PREVIEW is set to
+      # false (Settings → Secrets and variables → Actions → Variables). Unset counts as true, so nothing is
+      # released as stable by accident.
+      - name: Choose the version
+        id: version
+        env:
+          PREVIEW: ${{ vars.RELEASE_PREVIEW || 'true' }}
+        run: |
+          case "$PREVIEW" in
+            true) preview=--preview ;;
+            false) preview= ;;
+            *)
+              echo "The variable RELEASE_PREVIEW must be true or false, not '$PREVIEW'." >&2
+              exit 1
+              ;;
+          esac
+
+          version=$(sh tools/releasing/next-version.sh "$GITHUB_RUN_NUMBER" $preview)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Releasing $version" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare the release commit
+        run: sh tools/releasing/prepare-release.sh "${{ steps.version.outputs.version }}"
+
+      # A re-run of the whole workflow makes the commit again, so the branch is replaced rather than added to
+      - name: Commit and push
+        id: commit
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Directory.Build.props src/Directory.Build.props README.md CHANGELOG.md src/*/PublicAPI.Shipped.txt src/*/PublicAPI.Unshipped.txt
+          git commit --message "Release $VERSION" --message "Made by the Release workflow (tools/releasing/prepare-release.sh)."
+          git push --force origin "HEAD:refs/heads/post-release/v$VERSION"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build
+    needs: prepare
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ needs.prepare.outputs.sha }}
+
+  publish:
+    name: Publish to nuget.org
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+
+    # The "release" environment can require an approval before anything is pushed
     environment: release
 
     permissions:
@@ -22,43 +98,28 @@ jobs:
       id-token: write # Lets NuGet/login exchange GitHub's token for a short-lived nuget.org API key
 
     steps:
-      - name: Check out
-        uses: actions/checkout@v5
-
+      # Only for dotnet nuget push, so any current SDK does; there's no checkout, so no global.json
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
         with:
-          global-json-file: global.json
           dotnet-version: 10.0.x
 
-      - name: Restore
-        run: dotnet restore
-
-      # The tag must name the version the packages get from Directory.Build.props, so a typo can't publish a
-      # version nobody meant to
-      - name: Check the tag matches the version
-        run: |
-          version=$(dotnet msbuild src/Latiprimere/Latiprimere.csproj -getProperty:PackageVersion)
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "The tag $GITHUB_REF_NAME doesn't match the package version $version in Directory.Build.props." >&2
-            exit 1
-          fi
-
-      - name: Build
-        run: dotnet build --no-restore --configuration Release
-
-      # Unit tests only: no virtual printers here, so the integration tests skip. build.yml ran them on the commit.
-      - name: Test
-        run: dotnet test --no-build --configuration Release
-
-      - name: Pack
-        run: dotnet pack --no-build --configuration Release --output artifacts/packages
-
-      - name: Keep packages
-        uses: actions/upload-artifact@v4
+      # The packages build.yml made and tested on this run
+      - name: Download packages
+        uses: actions/download-artifact@v4
         with:
           name: packages
           path: artifacts/packages
+
+      - name: Check the packages have the version
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          ls -l artifacts/packages
+          if [ ! -f "artifacts/packages/Latiprimere.$VERSION.nupkg" ]; then
+            echo "The packages aren't version $VERSION." >&2
+            exit 1
+          fi
 
       - name: Sign in to nuget.org
         id: login
@@ -73,3 +134,58 @@ jobs:
           --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
+
+  finish:
+    name: Tag and open the post-release pull request
+    needs: [prepare, publish]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write      # Push the tag
+      pull-requests: write # Open the pull request
+      actions: write       # Start build.yml on its branch (see below)
+
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      SHA: ${{ needs.prepare.outputs.sha }}
+      BRANCH: post-release/v${{ needs.prepare.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      # The website shows the docs of the newest tag. The tag is the commit the packages were built from. Pushing it
+      # again on a re-run is harmless; pushing it for another commit fails, as it should.
+      - name: Tag the release
+        run: |
+          git tag "v$VERSION" "$SHA"
+          git push origin "v$VERSION"
+
+      # The release commit dated the changelog's notes and marked the public API shipped; main needs both. A re-run
+      # finds the pull request already open.
+      - name: Open the post-release pull request
+        run: |
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            echo "The pull request for $BRANCH is already open."
+            exit 0
+          fi
+
+          cat > "$RUNNER_TEMP/body.md" <<EOF
+          Version $VERSION is on nuget.org. This brings the release commit (tagged \`v$VERSION\`) into \`main\`:
+
+          - the version in \`Directory.Build.props\`;
+          - the public API marked shipped;
+          - the package validation baseline set to the previous release;
+          - the README status line and the changelog's notes dated as $VERSION.
+
+          Merge it before the next release, so its changelog notes start from a clean \`## Unreleased\`.
+          EOF
+
+          gh pr create --base main --head "$BRANCH" --title "Post-release $VERSION" --body-file "$RUNNER_TEMP/body.md"
+
+          # A push made with the workflow's own token starts no workflows, so the pull request would get no build.
+          # Starting build.yml by hand is allowed, and its checks show on the pull request.
+          gh workflow run build.yml --ref "$BRANCH"
