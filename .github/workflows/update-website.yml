@@ -1,20 +1,19 @@
 name: Update website
 
-# Rebuilds latiprimere.com when what it shows from this repository changes. The website reads the changelog and the
-# docs only when it is built, so without this they stay as they were until its next deployment:
-# - the changelog page shows CHANGELOG.md from main;
-# - the docs come from the newest release, so a release rebuilds the site once its packages are published.
-# It calls a Workers Builds deploy hook for the website's production branch. See "Update the website" in
-# docs/releasing.md for setting it up.
+# Rebuilds latiprimere.com after each release, once its packages are published. The website reads the docs from the
+# newest release tag, and shows only released versions from CHANGELOG.md, both when it is built, so a release is the
+# only change here that alters the live site. Merges to main don't: their docs and Unreleased notes aren't shown.
+# The one exception is the release's post-release pull request, which brings its dated notes into main, so the site
+# is rebuilt again when that is merged.
+# Run it by hand from the Actions tab after correcting the notes of a version already released.
+# It calls a Workers Builds deploy hook for the website's production branch; see docs/releasing.md for the setup.
 on:
-  push:
-    branches: [main]
-    paths:
-      - CHANGELOG.md
-      - docs/site/**
   workflow_run:
     workflows: [Release]
     types: [completed]
+  pull_request:
+    types: [closed]
+    branches: [main]
   workflow_dispatch:
 
 permissions: {}
@@ -29,8 +28,11 @@ jobs:
     name: Rebuild latiprimere.com
     runs-on: ubuntu-latest
 
-    # After a release, only once the packages were published
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    # After a release, only once the packages were published; of closed pull requests, only a merged post-release one
+    if: >-
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') &&
+      (github.event_name != 'pull_request' ||
+        (github.event.pull_request.merged && startsWith(github.event.pull_request.head.ref, 'post-release/')))
 
     steps:
       - name: Start a build of the website

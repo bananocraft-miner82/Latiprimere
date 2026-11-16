@@ -6,27 +6,43 @@
 #     drops the shipped lines that *REMOVED* entries name;
 #   - has packing compare the packages with the previous release, if there was one
 #     (PackageValidationBaselineVersion in src/Directory.Build.props);
-#   - updates the status line in README.md.
+#   - updates the version in README.md's status line;
+#   - turns the "## Unreleased" heading of CHANGELOG.md into "## <version> - <today>".
 #
-# Usage: sh tools/releasing/prepare-release.sh <version>, for example 0.1.0-preview, from the repository root.
-# The prepare-release workflow runs it; it works locally too (Linux, macOS, or Git Bash on Windows). It only
-# changes files: committing them is up to whoever runs it. Each file keeps its line endings.
+# Usage: sh tools/releasing/prepare-release.sh <version>, for example 11.0.42, from the repository root.
+# The release workflow runs it, with the version from next-version.sh; it works locally too (Linux, macOS, or Git
+# Bash on Windows). It only changes files: committing them is up to whoever runs it. Each file keeps its line
+# endings. It needs to reach nuget.org, to find the previous release.
 set -eu
 
 VERSION="${1:-}"
+NUGET_INDEX=https://api.nuget.org/v3-flatcontainer/latiprimere/index.json
 
 if ! printf '%s\n' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$'; then
-	echo "Give the version to release, such as 0.1.0-preview or 1.0.0: '$VERSION' isn't one." >&2
+	echo "Give the version to release, such as 11.0.42: '$VERSION' isn't one." >&2
 	exit 1
 fi
 
-if [ ! -f Directory.Build.props ] || [ ! -f src/Directory.Build.props ] || [ ! -f README.md ]; then
+if [ ! -f Directory.Build.props ] || [ ! -f src/Directory.Build.props ] || [ ! -f README.md ] || [ ! -f CHANGELOG.md ]; then
 	echo "Run this from the repository root." >&2
 	exit 1
 fi
 
 if git rev-parse -q --verify "refs/tags/v$VERSION" > /dev/null; then
 	echo "v$VERSION is already tagged, and a published version can't be published again." >&2
+	exit 1
+fi
+
+# Every version of the Latiprimere package on nuget.org, oldest first, unlisted ones included
+if ! INDEX=$(curl --fail --silent --show-error --max-time 30 --retry 3 "$NUGET_INDEX"); then
+	echo "Couldn't read the published versions from $NUGET_INDEX." >&2
+	exit 1
+fi
+
+PUBLISHED=$(printf '%s' "$INDEX" | tr -d ' \r\n' | sed -n 's/.*"versions":\[\([^]]*\)\].*/\1/p' | tr ',' '\n' | tr -d '"')
+
+if printf '%s\n' "$PUBLISHED" | grep -qxF "$VERSION"; then
+	echo "$VERSION is already on nuget.org, and a published version can't be published again." >&2
 	exit 1
 fi
 
@@ -37,9 +53,16 @@ case "$VERSION" in
 	*-*) VERSION_SUFFIX="${VERSION#*-}" ;;
 esac
 
-# The last release before this commit, if any: the newest v* tag it contains
-PREVIOUS_TAG=$(git tag --merged HEAD --list 'v*' --sort=-creatordate | head -n 1)
-PREVIOUS_VERSION="${PREVIOUS_TAG#v}"
+# The previous release, if any: the newest version on nuget.org. Package validation downloads it from there, so a
+# version that was tagged but never published can't be the baseline.
+PREVIOUS_VERSION=$(printf '%s\n' "$PUBLISHED" | sed '/^$/d' | tail -n 1)
+
+# The previous release's post-release pull request must be merged first. Otherwise its notes would still be under
+# "## Unreleased", and would be dated again as this version's.
+if [ -n "$PREVIOUS_VERSION" ] && ! tr -d '\r' < CHANGELOG.md | grep -q "^## $PREVIOUS_VERSION - "; then
+	echo "CHANGELOG.md has no '## $PREVIOUS_VERSION - <date>' heading. Merge the pull request 'Post-release $PREVIOUS_VERSION' into main, then main into release." >&2
+	exit 1
+fi
 
 # Writes standard input to a file, with CRLF line endings if the second argument is "crlf"
 write_file()
@@ -122,22 +145,26 @@ for unshipped in src/*/PublicAPI.Unshipped.txt; do
 	echo "$(basename "$project"): $(wc -l < "$WORK/added" | tr -d ' ') shipped, $(wc -l < "$WORK/removed" | tr -d ' ') removed"
 done
 
-# README status line
-MAJOR="${VERSION_PREFIX%%.*}"
-NUGET_LINK="[NuGet](https://www.nuget.org/packages/Latiprimere)"
-
-if [ -n "$VERSION_SUFFIX" ] || [ "$MAJOR" = "0" ]; then
-	STATUS="> **Status:** preview. Version $VERSION is on $NUGET_LINK for evaluation. The API may still change before 1.0, so it isn't ready for production use yet."
-else
-	STATUS="> **Status:** version $VERSION is on $NUGET_LINK."
-fi
-
-if ! read_file README.md | grep -q '^> \*\*Status:\*\*'; then
-	echo "README.md has no '> **Status:**' line to update." >&2
+# README status line: only the version in it changes, as in "Version 11.0.42 is on [NuGet]", so its wording is kept
+if ! read_file README.md | grep -Eq '^> \*\*Status:\*\*.*[Vv]ersion [^ ]+ is on'; then
+	echo "README.md has no '> **Status:**' line saying 'Version <version> is on' to update." >&2
 	exit 1
 fi
 
 endings=$(line_endings README.md)
-read_file README.md | awk -v status="$STATUS" '/^> \*\*Status:\*\*/ { print status; next } { print }' | write_file README.md "$endings"
+read_file README.md \
+	| sed -E "/^> \*\*Status:\*\*/ s/([Vv]ersion) [^ ]+ is on/\1 $VERSION is on/" \
+	| write_file README.md "$endings"
+
+# Changelog: the notes written under "## Unreleased" become this version's. Without them the release still goes
+# ahead, with a warning, and the website shows no entry for it.
+if read_file CHANGELOG.md | grep -qx '## Unreleased'; then
+	endings=$(line_endings CHANGELOG.md)
+	read_file CHANGELOG.md \
+		| awk -v heading="## $VERSION - $(date -u +%Y-%m-%d)" '!done && $0 == "## Unreleased" { print heading; done = 1; next } { print }' \
+		| write_file CHANGELOG.md "$endings"
+else
+	echo "::warning::CHANGELOG.md has no '## Unreleased' notes, so $VERSION has no entry in it."
+fi
 
 echo "Prepared $VERSION. Previous release: ${PREVIOUS_VERSION:-none}."

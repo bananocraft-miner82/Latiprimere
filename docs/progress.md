@@ -14,6 +14,24 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 ---
 
+## 2026-11-16: Automated releases from the release branch
+
+**Done** (owner: "simplify the versioning and release process … including the version numbering"; [ADR 0028](decisions/0028-automated-releases.md), proposed)
+- **Versions are `<.NET major>.0.<build number>`,** such as `11.0.42`: the newest target in `<TargetFrameworks>`, and the Release workflow's run number ([next-version.sh](../tools/releasing/next-version.sh)).
+- **Previews until real printers are tested** (owner: "add a preview mode for the time being"): releases end in `-preview` while the repository variable `RELEASE_PREVIEW` is `true` or unset; `false` makes them stable.
+- **Merging into `release` publishes.** [release.yml](../.github/workflows/release.yml) makes the release commit with [prepare-release.sh](../tools/releasing/prepare-release.sh), builds and tests it with [build.yml](../.github/workflows/build.yml) on all three runners, publishes its packages, tags it, and opens a post-release pull request into `main`. "Prepare release" and the tag trigger are gone.
+- **prepare-release.sh** now also dates the changelog's `## Unreleased` notes, keeps the README status line's wording, takes the package validation baseline from nuget.org rather than the newest tag, and refuses to start until the previous release's post-release pull request is merged.
+- **[releasing.md](releasing.md)** has the new steps and one-time setup.
+
+**Learned**
+- 0.1.1-preview never published: its tag went on the commit before the release commit, so release.yml refused it. nuget.org has only 0.1.0-preview, which the first automated release takes as its baseline.
+
+**Next**
+- Owner: review ADR 0028; delete the `release/v0.1.1-preview` branch, create and protect `release`, and point the `release` environment at it (releasing.md, one-time setup).
+- Owner: once manual testing with real printers is confirmed, set `RELEASE_PREVIEW` to `false` and revise the README status line.
+
+---
+
 ## 2026-11-16: Direct IPP for Windows queues, built
 
 **Done** (owner: "Yes, build it", accepting [ADR 0027](decisions/0027-direct-ipp-for-windows-queues.md) as written; on `feature/print-media-options`)
