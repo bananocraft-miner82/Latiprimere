@@ -2,7 +2,7 @@
 
 A cross-platform printing library for .NET: discover printers, read their capabilities, submit jobs and track them to completion, with the same code on Windows, Linux and macOS.
 
-> **Status:** preview. Version 11.0.3-preview is on [NuGet](https://www.nuget.org/packages/Latiprimere) for evaluation. The API may still change before 1.0, so it isn't ready for production use yet.
+> **Status:** preview. Version 11.0.5-preview is on [NuGet](https://www.nuget.org/packages/Latiprimere) for evaluation. The API may still change before 1.0, so it isn't ready for production use yet.
 
 ## Goals
 
