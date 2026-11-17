@@ -19,6 +19,10 @@ sidebar:
 
 For two-sided printing, `LongEdge` turns pages like a book, and `ShortEdge` flips them like a notepad, which suits landscape pages. `OutputFile` is for virtual printers such as Microsoft Print to PDF: see [CUPS servers and the Windows spooler](/docs/print-systems/cups-and-windows/).
 
+:::note[Orientation and PDFs on CUPS]
+CUPS may not turn a PDF's pages for `Landscape`: in testing with CUPS 2.4, a portrait PDF stayed portrait. To print landscape through CUPS, make the PDF's pages landscape. On Windows, `Landscape` turns the page and scales the content to fit across it. Network printers are sent the setting as IPP's `orientation-requested`, and what a printer does with it for a PDF is up to the printer. See [CUPS servers and the Windows spooler](/docs/print-systems/cups-and-windows/#pdfs-keep-their-own-orientation).
+:::
+
 Setting `Copies` below 1 throws `ArgumentOutOfRangeException`. A printer that doesn't support a setting may ignore it or reject the job, depending on the print system: [Reading printer capabilities](/docs/guides/printer-capabilities/) shows how to check first.
 
 `PrintOptions` is a record, so you can start from the defaults and change one thing:

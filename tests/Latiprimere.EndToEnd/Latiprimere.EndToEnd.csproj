@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- End-to-end scenarios: every package together, through the public API only, the way an application uses them.
+	     Latiprimere.EndToEnd.Tests runs them under xUnit and Latiprimere.TestHarness from the command line
+	     (docs/test-harness-plan.md, ADR 0029). Nothing here may use a package's internals, so the scenarios can later
+	     be built against the packed .nupkg files and published with Native AOT. -->
+
+	<PropertyGroup>
+		<IsAotCompatible>true</IsAotCompatible>
+	</PropertyGroup>
+
+	<!-- Latiprimere from its projects, or in packaged mode from the packed packages (tests/Directory.Build.props) -->
+	<ItemGroup Condition="'$(LatiprimereFromPackages)' == ''">
+		<ProjectReference Include="..\..\src\Latiprimere\Latiprimere.csproj" />
+		<ProjectReference Include="..\..\src\Latiprimere.Cups\Latiprimere.Cups.csproj" />
+		<ProjectReference Include="..\..\src\Latiprimere.Ipp\Latiprimere.Ipp.csproj" />
+		<ProjectReference Include="..\..\src\Latiprimere.Rendering.Pdfium\Latiprimere.Rendering.Pdfium.csproj" />
+		<ProjectReference Include="..\..\src\Latiprimere.Windows\Latiprimere.Windows.csproj" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(LatiprimereFromPackages)' != ''">
+		<PackageReference Include="Latiprimere" />
+		<PackageReference Include="Latiprimere.Cups" />
+		<PackageReference Include="Latiprimere.Ipp" />
+		<PackageReference Include="Latiprimere.Rendering.Pdfium" />
+		<PackageReference Include="Latiprimere.Windows" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Latiprimere.FakeIppPrinter\Latiprimere.FakeIppPrinter.csproj" />
+		<ProjectReference Include="..\Latiprimere.Testing\Latiprimere.Testing.csproj" />
+	</ItemGroup>
+
+	<!-- The samples, run as their own processes by the Samples scenarios: built with this project, not referenced -->
+	<ItemGroup>
+		<ProjectReference Include="..\..\samples\Latiprimere.Cli\Latiprimere.Cli.csproj" ReferenceOutputAssembly="false" />
+		<ProjectReference Include="..\..\samples\Latiprimere.Examples\Latiprimere.Examples.csproj" ReferenceOutputAssembly="false" />
+	</ItemGroup>
+
+</Project>

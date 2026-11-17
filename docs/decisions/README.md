@@ -34,6 +34,7 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0026](0026-vendor-options-in-detail.md) | Vendor options in detail | Proposed |
 | [0027](0027-direct-ipp-for-windows-queues.md) | Direct IPP for Windows queues | Accepted |
 | [0028](0028-automated-releases.md) | Automated releases from the release branch | Proposed |
+| [0029](0029-end-to-end-test-harness.md) | End-to-end test harness | Accepted |
 
 ## Template
 

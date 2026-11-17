@@ -14,6 +14,265 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 ---
 
+## 2026-11-17: run.sh on Linux (WSL Ubuntu 20.04)
+
+**Done** (owner: "run.sh on a Linux machine next", then "Install .NET in WSL")
+- **Set-up:** the .NET 11.0.100 SDK, with the .NET 10 runtime and ASP.NET Core, installed in WSL's `~/.dotnet` with Microsoft's `dotnet-install.sh`, without `sudo`. The working tree, uncommitted changes included, was copied to `~/latiprimere-run`, leaving out `bin`, `obj` and `out`. Docker is Docker Desktop's, through WSL integration.
+- **Results:**
+  - normal mode, after the fix below: 37 passed, 19 skipped (Windows printers, manual, mDNS), 0 failed;
+  - `--packages`: 37 passed, 19 skipped, 0 failed, with the packed version under test;
+  - `--xunit` on net10.0 and net11.0: 74 passed, 38 skipped, 0 failed.
+- **The container check** made the container afresh for the new output path and it came up healthy.
+- **Fixed `ipp.faults.dual-stack`:** it assumed `localhost` resolves to both `::1` and `127.0.0.1`, as on Windows. Ubuntu's `/etc/hosts` gives it `127.0.0.1` only and names `::1` `ip6-localhost`, so the IPv6-only printer was rightly refused. The scenario now looks up `localhost` first. On each family it resolves to, the printer must be found within 1.5 s; on a family it doesn't, the lookup must fail with a `PrintException` within 1.5 s rather than wait. In WSL that took 5 ms; Windows still finds both. The limit in its check names no longer follows the machine's locale ("1,5 s").
+
+**Learned**
+- **WSLg's runtime folder:** .NET stopped at its first command because `XDG_RUNTIME_DIR` (`/mnt/wslg/runtime-dir`) lacked the owner and permissions its named mutexes expect. A private folder fixed it; the harness README says how. This comes from the WSL environment, not from the scripts.
+
+**Not done**
+- **`--aot`** needs `clang` and `zlib1g-dev`, which need `sudo apt`; not installed.
+- **`--host-network`:** not tried. In WSL, the "host" network is Docker Desktop's virtual machine, not a real Linux host, so the CI `mdns` job remains its real test.
+- **macOS:** `run.sh` hasn't run on a Mac.
+- **Clean-up:** `~/.dotnet`, `~/dotnet-install` and `~/latiprimere-run` remain in WSL, about 2 GB with the build output, plus NuGet's package cache in `~/.nuget`; the test container now mounts the WSL copy's output folder, and `run.ps1` recreates it for Windows on its next run.
+
+---
+
+## 2026-11-17: The run scripts make a stopped test container afresh
+
+**Done** (owner: "Update run.sh to recreate the container after a restart")
+- **`tools/test-harness/run.sh`** reads the container's state before `docker compose up`. A container that exists but is stopped, or running but unhealthy, is made afresh from the image (`--force-recreate`). That is how it is left after the host restarts, since it has no restart policy, and starting it again would reuse what the last run left in it. A healthy or starting container is left running, so its job numbers aren't reset every run. `entrypoint.sh` already copes with a restart since the same morning; this gives a clean container either way.
+- **Checked here** with the same lines in Git Bash: after `docker stop`, the state read "exited unhealthy", and the container was recreated and came back healthy. Run again while healthy, it was left running. The script's syntax is checked; the whole script still hasn't run on Linux or a Mac.
+
+- **`run.ps1` does the same** (owner: "Yes, add it"). It first checks the container exists with `docker ps --all`, since `docker inspect` writes an error for a missing one, which Windows PowerShell 5.1 would turn into a stop under the script's `$ErrorActionPreference = 'Stop'`. Checked through the script itself, with one scenario each time: stopped, it was recreated and came back healthy; healthy, it was left running; with no container, it was created as before. All three runs passed.
+
+---
+
+## 2026-11-17: CI's Native AOT check runs the native harness
+
+**Done** (owner: "Replace check-aot.sh's run section with AOT mode", choosing "Same checks as today" for CI)
+- **`tools/aot-check/check-aot.sh`** still publishes the CLI sample with Native AOT and fails on any trimming or AOT warning. It now publishes the end-to-end harness the same way, and its run section runs four of the native harness's scenarios instead of the CLI's commands:
+  - `catalog.list-across-print-systems` (was `list`);
+  - `cups.submission.vendor-options` (was a PDF to Virtual-IPP with `--color mono` and vendor options), new;
+  - `ipp.submission.virtual-printer-options` (was `caps`, a PDF to `ippeveprinter` with paper, tray, colour and vendor options, and `print-quality=99` refused), new;
+  - `windows.output.paper-and-orientation` (was a PDF on A5 to Microsoft Print to PDF, its MediaBox checked).
+
+  A scenario whose printers the runner doesn't have is skipped; one that runs must pass. ADR 0029 records the exception to decision 4; `build.yml`'s comment, CONTRIBUTING.md, plan.md and the harness plan updated.
+- **Results here, as the Windows runner with the container's variables too:** net10.0 and net11.0 each 4 passed, no warnings, about 97 s for both publishes and the run; with no test printers configured, 2 passed and 2 skipped.
+
+**Not done**
+- Not yet run in CI; the Linux and macOS runners will publish the harness with Native AOT for the first time there, ASP.NET Core's Kestrel included.
+
+---
+
+## 2026-11-17: End-to-end test harness, H5: packaged, AOT and mDNS
+
+**Done** (owner: "Start H5")
+- **Packaged mode** (`run.ps1 -Packages`, `run.sh --packages`):
+  - packs every `src` project into `out/harness-packages/<time>` with a version of its own (`<prefix>-preview.e2e.<time>`), so NuGet's cache can't hand back an older build;
+  - writes a `nuget.config` there that takes `Latiprimere*` from the folder and everything else from nuget.org (the repository's maps everything to nuget.org);
+  - `tests/Directory.Build.props` and `Directory.Packages.props` switch `Latiprimere.EndToEnd` and `Latiprimere.Testing` to package references when `LatiprimereFromPackages` is set, building into `out/packaged/{bin,obj}/<project>`. The first attempt built into each project's `bin/packaged` and `obj/packaged`, and the two builds then compiled each other's generated files.
+- **AOT mode** (`run.ps1 -Aot`, `run.sh --aot`): builds the samples, publishes the harness with Native AOT, fails on any IL2xxx or IL3xxx warning, and runs the native program. It combines with packaged mode. To work there, the harness now finds the samples by the .NET it runs on, not by its own folder, and reports "Latiprimere under test" (its informational version) instead of an assembly path, which Native AOT doesn't have.
+- **mDNS discovery:** scenario `ipp.discovery.mdns` (`TargetNeeds.MdnsPrinter`, `LATIPRIMERE_TEST_MDNS_NAME`). It finds the named printer as `ipp:dnssd:<name>`, looks it up and reads its capabilities, and prints nothing.
+  - `compose.host-network.yaml` puts the test container on the host's network (Linux), so its Avahi announcement reaches the host.
+  - A new `mdns` job in `build.yml` runs the scenario against the container's `ippeveprinter` on ubuntu-latest, keeps the report, and has `continue-on-error` while on trial (ADR 0029, decision 6).
+  - `run.sh --host-network` does the same locally on Linux.
+- **Results on the Windows dev machine,** with the container and the Windows test printers:
+  - packaged: 47 passed, 6 skipped (manual); the report shows the packed version, the harness's dependencies point at the packages, and PDFium's native files came from its package;
+  - Native AOT: 47 passed, 6 skipped, no trimming or AOT warnings;
+  - packaged and Native AOT together: 47 passed, 7 skipped (manual, and mDNS with no name set);
+  - `ipp.discovery.mdns` against the HP ENVY on this network: found as `ipp:dnssd:HP ENVY 5640 series [...]`, looked up, 26 paper sizes read;
+  - the normal xUnit host afterwards: 54 scenarios on both frameworks, 94 passed, 14 skipped, 0 failed; Release build clean.
+
+**Not done**
+- **The `mdns` job hasn't run:** it needs a push. Docker Desktop on Windows doesn't pass multicast through, so it can't be tried here. If it proves flaky, drop it.
+- `run.sh` is checked for syntax only; none of its modes has run on Linux or a Mac.
+- `tools/aot-check/check-aot.sh` still ran the CLI sample natively; replaced the same day (next entry).
+
+---
+
+## 2026-11-17: First real-printer run: HP ENVY 5640 through its Windows queue
+
+**Done** (owner, with the harness's manual mode: `manual --printer "windows:<the HP's queue>"`, 10:01, 6 minutes)
+- **Every check passed:** 6 of 6 scenarios, 16 checks, the owner's answers among them. Ten sheets printed through the HP's own Windows driver (WSD port), PDFs rendered by PDFium.
+  - **Details:** the name and model are right; the capabilities match the printer: 24 paper sizes (A4 by default), one-sided and both two-sided modes, monochrome and colour, three trays (Automatically Select, Main Tray, Photo Tray), up to 9999 copies.
+  - **Test page:** one page, all of it there, nothing cut off, the picture in colour.
+  - **A4 and monochrome:** on A4, grey only. This is the first check on real paper of the grey rendering added the same day.
+  - **Two copies of three pages, long-edge two-sided:** both copies in page order, each two-sided, turning like a book. Took 2 minutes 18 seconds.
+  - **Landscape:** printed across the paper.
+  - **Tray:** the paper came from the Main Tray, as chosen.
+- An earlier run at 09:45 checked the printer's details only, and passed.
+
+**Learned**
+- **No attributes captured:** a Windows queue on a WSD port has no IPP address Latiprimere knows, so `manual.printer-details` noted that and moved on. The HP's attributes are already in the test data, captured over IPP on 2026-11-12.
+- **What Windows reports:** two jobs ended "Completed (The job has left the print queue. Windows does not record whether it printed successfully.)", as the Windows adapter reports any job it can't follow to the end (ADR 0007); the person's answers are what showed they printed.
+- **Still unchecked on real paper:** a CUPS queue (Linux or macOS) and a printer reached directly over IPP. The README's status line and `RELEASE_PREVIEW` wait on "manual testing with real printers" (ADR 0028); whether this run is enough is the owner's call.
+
+**Next**
+- H5: packaged mode, AOT mode, and mDNS discovery on the Ubuntu runner.
+
+---
+
+## 2026-11-17: End-to-end test harness, H4: manual mode for real printers
+
+**Done** (owner: "Start H4")
+- **`manual --printer <id>`** in the console harness: a person confirms the printer, and then each test job, before anything prints. They answer `y`, `n` (with what they saw) or `s` about what came out, and the answers are checks in the usual report (`out/harness/...-manual/`). Anything but `y` at "Print it on paper now?" skips that job; when piped answers run out, the empty answer is a no.
+- **Six scenarios** (`manual.*`, area Manual):
+  - the printer's details and capabilities, with its IPP attributes captured; prints nothing;
+  - a test page;
+  - A4 or Letter in monochrome;
+  - two copies of three pages, two-sided where the printer can;
+  - landscape;
+  - a tray the person chooses.
+
+  Each checks only options the printer reports, and is skipped otherwise.
+- **Safety:** the scenarios need `TargetNeeds.Person`, which only manual mode provides (`IPerson`, `ConsolePerson`), so `run`, the xUnit host and the scripts skip them. They print only to the named printer, through `ManualPrinting.PrintAsync`, which shows the document, pages, copies, sheets and options first. Microsoft Print to PDF jobs are saved in the report folder rather than opening a save dialog.
+- **`capture <printer>`** and `IppCapture`: a printer's Get-Printer-Attributes response saved as `.ipp` and `.txt`, as the test data's captures are, with the values to replace before sharing them (UUIDs, device ID, names, addresses).
+- **Docs:** [docs/manual-tests/README.md](manual-tests/README.md) (how to run it, what each scenario prints and asks); the harness README; CONTRIBUTING.md's manual-mode exception no longer "planned".
+- **Tried on virtual printers only,** with answers piped in. The fake printer (ippeveprinter profile, trays and landscape): every scenario ran; a deliberate "no" was recorded as a failed check with its comment. CUPS-PDF through the container: attributes captured through CUPS; a declined job skipped; CUPS-PDF's single copy reported by a "no". `run 'manual.*'` skips all six; the xUnit host, all 53 scenarios on both frameworks: 94 passed, 12 skipped (the manual ones), 0 failed.
+
+**Not done**
+- **The first real-printer run,** H4's "done when": done the same day, in the entry above.
+
+---
+
+## 2026-11-17: Monochrome PDF jobs on Windows rendered grey
+
+**Done** (owner: "Yes, render grey", after H3 found Microsoft Print to PDF ignores `dmColor`)
+- **`GreyscaleConverter`** turns each rendered band grey, by ITU-R BT.601 weights (77, 150 and 29 out of 256, rounded), leaving the unused byte alone. `GdiRasterPrinter` calls it for a monochrome job before drawing each band; `dmColor` is still set. Recorded in [ADR 0025](decisions/0025-choose-paper-colour-and-tray.md); CHANGELOG updated.
+- **Tests:** white, black, grey, red, green and blue pixels; no colour left in a band; only the band's part of the shared buffer changed; a partial pixel left as it is. The harness's `windows.output.colour-mode` now checks a monochrome job has no colour, instead of noting it.
+- **Results:** the Windows tests 538 passed, 10 skipped, 0 failed; Microsoft Print to PDF's monochrome page now 0.0% colour with its content intact (ink 15.6% against 15.8% in colour); the Windows harness scenarios 5 of 5.
+
+- **The capabilities guide brought up to date** (owner: "Yes, fix the guide"): `docs/site/guides/printer-capabilities.md` said `PrintOptions` couldn't choose paper, tray or colour, which was true in 0.1.0-preview but not since ADR 0025. Its "Paper size, trays and colour" section now shows choosing A4 and monochrome from the capabilities (the code added to `samples/Latiprimere.Examples/ReadingCapabilities.cs` as `ChoosePaperAndColourAsync`), how trays are chosen, and what CUPS and network printers, Windows and raw jobs each do with the options. Release build clean; the harness's samples scenarios 9 of 9.
+
+---
+
+## 2026-11-17: End-to-end test harness, H3: inspecting printed PDFs
+
+**Done** (owner: "Start H3")
+- **`PdfInspector`** renders each page of a printed PDF at 36 DPI through `Latiprimere.Rendering.Pdfium` and measures its ink (the share that isn't white) and colour (the share that isn't grey), with its size and orientation (`PdfPage`, `PdfSummary`). **`PdfPrinters`** prints a test document to CUPS-PDF or Microsoft Print to PDF and reads back what was written, keeping it as evidence.
+- **Five scenarios:**
+  - CUPS-PDF on its default A4 and on Letter;
+  - CUPS-PDF in monochrome (no colour) and colour;
+  - Microsoft Print to PDF on A4, on A5, and landscape;
+  - two copies as two pages;
+  - colour kept, with monochrome noted.
+
+  Each printed page's content must be intact: ink within 30% of the page sent, colour kept. The two existing PDF scenarios now also check every page has content.
+- **The CUPS test container survives a restart.** After the PC restarted, Docker restarted the container, and its start-up script failed: the previous run's CUPS socket file was still there, so the wait for CUPS passed before `cupsd` was listening, and `lpadmin` couldn't connect. `entrypoint.sh` now removes the stale socket and PID files, and waits for `lpstat -r` to say the scheduler is running. Checked by `docker restart`.
+- **Results on the Windows dev machine:** the xUnit host, all 47 scenarios on both frameworks at once: 94 passed, 0 skipped, 0 failed. Release build clean.
+
+**Learned** (with `mixed-1-page.pdf`: A4, 16% ink, 8% colour)
+- **CUPS-PDF** honours paper size and monochrome (0.0% colour). It keeps a PDF's own orientation, as CUPS's PDF filter does, and writes one copy, so landscape and copies don't show in its output. It lists A5 as `custom_148.52x209.9mm`, because its PPD gives A5 as 421 x 595 points; that is CUPS's naming, passed through.
+- **Microsoft Print to PDF** honours paper size, landscape (the portrait page scaled to fit across) and copies. **It ignores monochrome:** the page stays 8.2% colour. On Windows, Latiprimere only sets `dmColor` for monochrome (ADR 0025), and leaves it to the driver.
+- The guides didn't say that CUPS keeps a PDF's own orientation. Added the same day (owner: "Add the CUPS orientation note to the guides"): a note on `Orientation` in the print options guide, and "PDFs keep their own orientation" in the CUPS section of the CUPS and Windows guide, saying what was seen with CUPS 2.4 and what to do instead.
+
+**Next**
+- H4: manual mode.
+
+---
+
+## 2026-11-16: PDFs refused to text-only drivers on Windows
+
+**Done** (owner: "Yes, add the check", after the harness found a PDF stops a Generic / Text Only queue)
+- **`DriverQuirks.PrintsTextOnly`,** starting with "Generic / Text Only"; `WindowsPrinter` refuses a PDF to such a driver with `NotSupportedException` before rendering or queueing anything, naming the driver and suggesting raw data. Only the spooler's path refuses: a PDF routed to the queue's IPP printer is sent as before. Recorded in [ADR 0019](decisions/0019-windows-error-mapping.md); CHANGELOG and the labels-and-receipts and errors guides updated.
+- **Tests:** the quirk list; a PDF refused without opening the document or calling GDI; raw data to the same driver still sent; a text-only queue whose IPP printer takes PDF still routed there, and one whose printer doesn't take PDF refused.
+- **Harness:** new scenario `windows.pdf.text-only-refused` (a PDF to "Latiprimere Raw" is refused and its port file doesn't change). The fallback scenarios now see the spooler's path by this refusal, since the paused test printer uses the same driver.
+- **Results:** the Windows tests 506 passed, 10 skipped, 0 failed (on two runs out of three; see below); the harness's Windows scenarios 8 of 8.
+- **The `GetDefaultPrinterName` race, fixed** (owner: "Yes, fix it"): `WinSpoolApi.ReadDefaultPrinterName` asks again with the new length while the name has grown, up to three times as the other spooler calls do, and returns no default if the default was removed in between. Seven unit tests play the race with a fake `GetDefaultPrinter`: a name that grows, shrinks, disappears or keeps growing, no default, and a spooler failure. CHANGELOG has it under Fixed. Afterwards: the Windows tests 520 passed, 10 skipped, 0 failed; the harness, all 42 scenarios on both frameworks, 84 of 84.
+
+**Learned**
+- **A race in `WinSpoolApi.GetDefaultPrinterName`.** One run of the Windows tests failed an existing integration test with "GetDefaultPrinter failed: The data area passed to a system call is too small". It asked for the default printer's name length, then read the name; this PC has "Let Windows manage my default printer" on, so Windows makes the last printer used the default, and with both test processes printing, the default changed to a longer name between the two calls. Fixed the same day, above.
+- **Test runs change the default printer** on a PC where Windows manages it: after the harness, the default was "Latiprimere Paused".
+
+**Next**
+- H3, as before.
+
+---
+
+## 2026-11-16: End-to-end test harness, H2: packages together
+
+**Done** (owner: "Start H2")
+- **Catalog, four scenarios:**
+  - one print system down: CUPS unreachable, the IPP and Windows printers still listed and found, a warning logged, a CUPS ID reported as unreachable rather than missing, and the default printer still found;
+  - every print system down: CUPS's own error, naming the server;
+  - none registered: `PrintSystemUnavailableException` from listing, lookup and the default printer;
+  - unknown IDs: an unknown prefix, an IPP URI that isn't configured (never contacted, ADR 0024) and a missing Windows queue are each `PrinterNotFoundException` with the ID.
+- **Windows IPP route, four scenarios** with a test printer mapped to the scripted printer: the spooler takes the job when the printer doesn't take PDF, can't be reached (after printing one job, so the rewind is used) or wants a password; a refusal is thrown and not printed through the spooler as well. The fallbacks use "Latiprimere Paused": the job waits in its queue as a spooler job and is cancelled; the refusal uses "Latiprimere Raw", whose file must not change.
+- **The documentation's examples,** run as the program a reader would run: listing with and without DI, capabilities, first print job, print options, labels and receipts (the ZPL and ESC/POS found byte for byte in the Raw queue's output), error handling, Microsoft Print to PDF, and the web service. The web service scenario starts the ASP.NET Core example, lists printers over HTTP, has a non-PDF refused (415), sends a job for a missing printer that its hosted worker logs and survives, then one it prints to Completed.
+- **The CLI sample** against the scripted printer: list, caps, a print whose paper, tray, colour and vendor option reach the printer, and exit code 1 for a refused value.
+- **Safety:** `first-print-job` prints to the default printer, so the scenario first works out which printer that would be and skips unless it is a CUPS test queue. The samples get `CUPS_SERVER` set to the test server or removed.
+- **Harness:** `ScenarioContext.Skip`; `RecordingLogger<T>`; `Support/Samples` and `RunningSample` run samples built alongside the harness (`Latiprimere.EndToEnd` builds them without referencing them); `OutputSearch` finds a sample's job in a printer's output by its content.
+- **Results on the Windows dev machine,** with the container, before the Windows test printers were installed: the H2 scenarios 15 passed, 4 skipped; all 41 on both frameworks, 72 passed, 10 skipped, 0 failed. Release build clean.
+
+**Learned**
+- Here the Windows default printer is Microsoft Print to PDF, but `first-print-job` printed to CUPS-PDF: the example registers CUPS first, and the catalog takes the first print system's default. Had CUPS not been configured, the guard would have skipped it rather than open a save dialog.
+- An unreachable CUPS server costs about 2 s per attempt on Windows, which retries a refused connection; listing with one down took about 6 s.
+
+- **With the Windows test printers installed** (owner, 2026-11-16): every scenario ran. The xUnit host, both frameworks at once: 82 passed, 0 skipped, 0 failed; the test printers' queues empty afterwards.
+- **A PDF to the Generic / Text Only driver stops its queue.** The first version of the fallbacks printed to "Latiprimere Raw". The routing was right, but the spooler job went Processing, then Error, and held the queue: that driver can't print the page images a PDF becomes. Each three-page job also made a 380 to 400 MB spool file, rendered at the driver's full resolution (ADR 0009's 139 MB per A4 page at 600 DPI). The scenarios now use the paused printer and `MaxRenderDpi = 72`; the three stuck jobs were removed.
+
+**Not done**
+- `run.sh` still hasn't run on Linux or a Mac.
+
+**Next**
+- H3: inspect printed output (page sizes, orientation, mono) from CUPS-PDF and Microsoft Print to PDF.
+- Decide whether Latiprimere should refuse PDFs to the Generic / Text Only driver up front, as it refuses raw data to Microsoft Print to PDF (ADR 0019). Applications that print receipts through it would otherwise stop their queue with a PDF.
+
+---
+
+## 2026-11-16: End-to-end test harness, H1: the scripted IPP printer
+
+**Done** (owner: "Start H1")
+- **`tests/Latiprimere.FakeIppPrinter`:** `FakePrinter`, an IPP printer on Kestrel at a free loopback port (IPv4, IPv6, or every IPv4 address for use by hand), with `ipps` and a self-signed certificate on request. It references no Latiprimere project.
+  - **Profiles:** printer attributes from the captured `ippeveprinter` and HP ENVY 5640 responses, changeable per scenario (`Set`, `Remove`); the attributes that depend on how it runs (URI, state, security, operations) are its own.
+  - **Records** every request: operation, operation and job attributes as text (collections as `{member=value ...}`), document bytes, credentials sent, and the answer.
+  - **Behaves** like a printer: checks requests as RFC 8011 asks, checks jobs against the profile's `*-supported` values, and moves jobs from pending through processing to completed or aborted.
+  - **Misbehaves** on cue: busy for the next n jobs, slow answers, a dropped connection on Print-Job, stopped with a reason, jobs that take a while or abort with a message, Basic authentication.
+  - **Conformance:** passes every applicable test in `ipptool`'s IPP/1.1 suite, run from the CUPS container. The first run found two encoding faults in the fake, now fixed: SharpIppNext writes a set's later collections, and values inside collections, with names, which `ipptool` reports as duplicates.
+- **18 scenarios against it,** none needing Docker: options, tray and paper, raw bytes and refused values as the printer receives them; the HP ENVY's capabilities, with a PDF refused before sending; job states in order, aborted with a reason, a stopped printer and its waiting job, cancelling; busy then accepted, busy past the limit, a dropped connection, a slow printer, a switched-off printer, IPv4-only and IPv6-only `localhost`; a password demanded, an untrusted certificate; and, on Windows, a PDF routed from Microsoft Print to PDF's queue straight to an IPP printer.
+- **`fake-printer` command** in the console harness, with options for each behaviour; `tools/test-harness/README.md` explains it.
+- **`ScenarioContext.RegisterForDisposal`,** for helpers whose objects a scenario's later steps still use.
+- **Results on the Windows dev machine:** 18 of 18 IPP scenarios pass in the console harness without the container; with it, the xUnit host runs all 24 on both frameworks at once: 46 passed, 2 skipped (the Windows test printers aren't installed). Release build clean.
+
+**Learned**
+- **Listing doesn't contact configured IPP printers,** so their state is Unknown until looked up, as `IppNetworkPrintSystem` documents. The first version of the stopped-printer scenario expected Stopped from the listing.
+- **A misleading message:** an `ipps` printer with an untrusted certificate is refused with "CUPS servers use a self-signed certificate … check it in a server certificate validation callback", but direct IPP has no such callback, and the printer isn't a CUPS server.
+- **The busy retry** waits 1 s, then 2 s, so a printer busy twice takes about 3 s to get the job.
+
+**Not done**
+- No connect-timeout scenario: it needs an address where nothing answers, which the fake can't provide.
+- The Windows IPP route's fallbacks to the spooler: they would send the job to Microsoft Print to PDF without an output file, which needs a file name. They belong with H2's other cross-package checks.
+
+**Next**
+- H2: packages together: catalog failure isolation, the Windows IPP route's fallbacks, the samples and docs examples.
+- Decide what to do about the certificate message for direct IPP printers.
+
+---
+
+## 2026-11-16: End-to-end test harness, H0
+
+**Done** (owner: "build a test harness for end-to-end testing in all areas of the packages", then answers to the plan's six questions and "Start H0")
+- **Plan and decision:** [test-harness-plan.md](test-harness-plan.md) (gaps, design, milestones H0 to H5) and [ADR 0029](decisions/0029-end-to-end-test-harness.md), accepted: scenarios run by two programs; ASP.NET Core allowed in tests; existing `Integration/` tests unchanged; not in CI for now; paper only in manual mode; mDNS tried in CI on Ubuntu.
+- **`tests/Latiprimere.EndToEnd`:** the scenario model (`Scenario`, `TargetNeeds`, `HarnessTargets`, `ScenarioContext`, `ScenarioRunner`), Markdown and JSON reports (JSON through a source-generated context, so the harness stays AOT-safe), and support: test printer IDs, a job follower that keeps each change of state, PDF inspection through PDFium, and a cross-process lock that shares the Windows integration tests' semaphore names. Public API only.
+- **Six scenarios:** one catalog over every print system lists each test printer once and looks it up again; raw bytes through the CUPS Raw queue; a PDF to CUPS-PDF comes out with three pages; a waiting job cancelled on CUPS and on the Windows test printers, after which a second cancel reports it finished; a PDF to Microsoft Print to PDF through PDFium comes out with three pages.
+- **`tests/Latiprimere.EndToEnd.Tests`:** one xUnit case per scenario, all skipped unless `LATIPRIMERE_TEST_E2E` is set; an assembly fixture writes a report per process.
+- **`tests/Latiprimere.TestHarness`:** `list`, `targets` and `run [filters]`, with progress as it happens and a report in `out/harness`.
+- **`tools/test-harness/run.ps1` and `run.sh`:** start the container (or use a Mac's queues), find the Windows test printers, set the variables for the run only, run, and optionally stop the container.
+- **CONTRIBUTING.md:** where end-to-end scenarios go, `LATIPRIMERE_TEST_E2E`, and the manual-mode exception to "never print on paper".
+- **Results on the Windows dev machine,** with the container and Microsoft Print to PDF: console harness 5 passed, 1 skipped (the Windows test printers aren't installed; installing them needs elevation); xUnit host with both frameworks at once, 10 passed, 2 skipped; without `LATIPRIMERE_TEST_E2E`, all 12 skipped. With CUPS pointed at a closed port, the catalog scenario failed on the four CUPS queues, still listed the Windows printers, and the harness exited 1.
+
+**Learned**
+- CUPS-PDF names its files `<title>-job_<id>.pdf`. Job IDs start again when the container is recreated, while old files stay in `out/cups-output`, so the scenario also requires the file to be newer than the job.
+- `run.ps1` recreated the running container the first time, because compose saw the output path written with backslashes rather than the forward slashes it had been started with.
+
+**Not done**
+- `run.sh` is checked for syntax only; it hasn't run on Linux or a Mac.
+- The Windows cancel scenario hasn't run: it needs the Windows test printers.
+
+**Next**
+- H1: the scripted IPP printer, with scenarios for what printers receive, faults and security.
+
+---
+
 ## 2026-11-16: Automated releases from the release branch
 
 **Done** (owner: "simplify the versioning and release process … including the version numbering"; [ADR 0028](decisions/0028-automated-releases.md), proposed)

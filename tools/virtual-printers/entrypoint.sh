@@ -5,8 +5,11 @@ set -e
 mkdir -p /output/pdf /var/spool/ippeve /run/dbus
 chmod 777 /output /output/pdf
 
+# Files left by the previous run when the container restarts, as it does after the host restarts: a stale CUPS
+# socket would make the wait below pass before cupsd is listening, and lpadmin would then fail
+rm -f /run/dbus/pid /run/avahi-daemon/pid /run/cups/cups.sock
+
 # D-Bus and Avahi, which ippeveprinter needs for DNS-SD
-rm -f /run/dbus/pid
 dbus-daemon --system --fork
 avahi-daemon --daemonize --no-drop-root --no-chroot
 until avahi-daemon --check; do sleep 0.5; done
@@ -23,7 +26,7 @@ ippeveprinter -p 8631 -r off -k -d /var/spool/ippeve -c /bin/true \
 cupsd -f &
 
 # Wait for both servers to answer
-until [ -S /run/cups/cups.sock ]; do sleep 0.5; done
+until lpstat -r 2>/dev/null | grep -q "is running"; do sleep 0.5; done
 until ipptool -q ipp://localhost:8631/ipp/print get-printer-attributes.test; do sleep 0.5; done
 
 # CUPS-PDF: renders jobs to PDF files in /output/pdf

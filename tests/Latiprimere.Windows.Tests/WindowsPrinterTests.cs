@@ -116,6 +116,50 @@ public sealed class WindowsPrinterTests
 		Assert.Null(spool.LastSubmittedBytes);
 	}
 
+	[Theory]
+	[InlineData("Generic / Text Only")]
+	[InlineData("generic / text only")]
+	public async Task GivenTextOnlyDriverWhenPdfSubmittedThenRefusesBeforeRenderingAnything(string driverName)
+	{
+		// Arrange — driverName is the Generic / Text Only driver, in any case (provided by InlineData above)
+		FakeGdiPrinter gdi = new FakeGdiPrinter();
+		FakePdfRasterizer rasterizer = new FakePdfRasterizer();
+
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter
+		(
+			new WindowsPrintContextBuilder().WithSpool(new FakeWinSpool()).WithGdi(gdi).WithPdfRasterizer(rasterizer),
+			driverName
+		);
+
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert — explained with the driver's name; the document is never opened, and nothing reaches GDI
+		NotSupportedException exception = await Assert.ThrowsAsync<NotSupportedException>(submit);
+		Assert.Contains("can't print PDFs", exception.Message, StringComparison.Ordinal);
+		Assert.Contains(driverName, exception.Message, StringComparison.Ordinal);
+		Assert.Null(rasterizer.LastDocument);
+		Assert.Null(gdi.LastRequest);
+	}
+
+	[Fact]
+	public async Task GivenTextOnlyDriverWhenRawSubmittedThenSendsIt()
+	{
+		// Arrange — raw data, such as plain text, is what a text-only driver is for
+		FakeWinSpool spool = new FakeWinSpool();
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool), "Generic / Text Only");
+		byte[] data = "Plain text for a text-only printer\r\n"u8.ToArray();
+		using MemoryStream document = new MemoryStream(data);
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromRaw(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(data, spool.LastSubmittedBytes);
+	}
+
 	[Fact]
 	public async Task GivenDriverThatPassesRawDataThroughWhenRawSubmittedThenSendsIt()
 	{

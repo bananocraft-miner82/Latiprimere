@@ -2,6 +2,7 @@
   <Folder Name="/samples/">
     <Project Path="samples/Latiprimere.Cli/Latiprimere.Cli.csproj" />
     <Project Path="samples/Latiprimere.Examples/Latiprimere.Examples.csproj" />
+    <Project Path="samples/Latiprimere.Examples.Tests/Latiprimere.Examples.Tests.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Latiprimere.Abstractions/Latiprimere.Abstractions.csproj" />
@@ -14,10 +15,14 @@
   <Folder Name="/tests/">
     <Project Path="tests/Latiprimere.Abstractions.Tests/Latiprimere.Abstractions.Tests.csproj" />
     <Project Path="tests/Latiprimere.Cups.Tests/Latiprimere.Cups.Tests.csproj" />
+    <Project Path="tests/Latiprimere.EndToEnd/Latiprimere.EndToEnd.csproj" />
+    <Project Path="tests/Latiprimere.EndToEnd.Tests/Latiprimere.EndToEnd.Tests.csproj" />
+    <Project Path="tests/Latiprimere.FakeIppPrinter/Latiprimere.FakeIppPrinter.csproj" />
     <Project Path="tests/Latiprimere.Ipp.Testing/Latiprimere.Ipp.Testing.csproj" />
     <Project Path="tests/Latiprimere.Ipp.Tests/Latiprimere.Ipp.Tests.csproj" />
     <Project Path="tests/Latiprimere.Rendering.Pdfium.Tests/Latiprimere.Rendering.Pdfium.Tests.csproj" />
     <Project Path="tests/Latiprimere.Testing/Latiprimere.Testing.csproj" />
+    <Project Path="tests/Latiprimere.TestHarness/Latiprimere.TestHarness.csproj" />
     <Project Path="tests/Latiprimere.Tests/Latiprimere.Tests.csproj" />
     <Project Path="tests/Latiprimere.Windows.Tests/Latiprimere.Windows.Tests.csproj" />
   </Folder>

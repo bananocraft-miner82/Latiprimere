@@ -77,7 +77,31 @@ static async Task<PrintOptions> ChooseOptionsAsync(IPrinter printer, int copiesW
 
 ## Paper size, trays and colour
 
-In 0.1.0-preview you can **read** a printer's paper sizes, trays and colour modes, but `PrintOptions` can't choose them yet. Jobs use the printer's defaults, which you can see in `DefaultMediaSize` and `DefaultColorMode`. With raw printing, the printer's own language chooses them: see [Labels and receipts](/docs/guides/labels-and-receipts/).
+Choose them with `PrintOptions.MediaSize`, `PrintOptions.InputTray` and `PrintOptions.ColorMode`, passing values from the capabilities rather than building your own. This asks for A4 and monochrome, each only when the printer reports it:
+
+```csharp
+static async Task<PrintOptions> ChoosePaperAndColourAsync(IPrinter printer)
+{
+	PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync();
+
+	// Take the size from the capabilities, matched by its Name; null leaves the printer's default paper
+	MediaSize? a4 = capabilities.MediaSizes.FirstOrDefault(size => size.Name == "iso_a4_210x297mm");
+
+	ColorMode colorMode = capabilities.ColorModes.Contains(ColorMode.Monochrome)
+		? ColorMode.Monochrome
+		: ColorMode.PrinterDefault;
+
+	return new PrintOptions { MediaSize = a4, ColorMode = colorMode };
+}
+```
+
+A tray works the same way: pick one from `InputTrays` and pass it as `InputTray`. Its `Id` is the print system's own, such as `manual` for IPP or a tray number on Windows, so choose by `Id` only on the print system you read it from. Leaving an option unset, or `PrinterDefault`, uses the printer's default, which you can see in `DefaultMediaSize` and `DefaultColorMode`.
+
+How each print system carries them out:
+
+- **CUPS and network printers** get them as IPP job attributes. A printer that can't do one may print on something close instead, or refuse the job with a `PrintException`.
+- **Windows** checks a size or tray against the driver's own lists, and refuses one the driver doesn't list with `NotSupportedException` before anything is queued, since the driver would otherwise print on its default paper without saying so. Monochrome pages are made grey before the driver gets them, as some drivers, Microsoft Print to PDF among them, ignore the setting.
+- **Raw jobs** don't use them: the data is sent unchanged, so the printer's own language chooses paper and colour. See [Labels and receipts](/docs/guides/labels-and-receipts/).
 
 ## Comparing capabilities
 

@@ -100,8 +100,10 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get install -y --no-install-recommends clang zlib1g-dev
 
-      # Publishes the CLI sample with Native AOT for each target, fails on any trimming or AOT warning, and runs the
-      # native program against this runner's test printers (tools/aot-check/check-aot.sh)
+      # Publishes the CLI sample and the end-to-end harness with Native AOT for each target, fails on any trimming or
+      # AOT warning, and runs four of the native harness's scenarios against this runner's test printers: listing,
+      # options through CUPS and straight to ippeveprinter, and Microsoft Print to PDF (tools/aot-check/check-aot.sh;
+      # ADR 0029). A scenario whose printers the runner doesn't have is skipped.
       - name: Check Native AOT
         shell: bash
         run: |
@@ -136,3 +138,43 @@ jobs:
           cat /tmp/latiprimere-test-printers/capture-server.log || true
           cat /tmp/latiprimere-test-printers/ippeveprinter.log || true
           sudo tail -n 300 /var/log/cups/error_log || true
+
+  # ADR 0029, decision 6: the end-to-end harness's mDNS discovery scenario, on trial. The test container runs on the
+  # runner's own network, so the Avahi announcement of its ippeveprinter reaches the harness. It can't fail the build
+  # while on trial, and is dropped if it proves flaky. The rest of the harness doesn't run in CI (decision 4).
+  mdns:
+    name: mDNS discovery (trial, Ubuntu)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x
+
+      - name: Start the test container on the host network
+        run: docker compose -f tools/virtual-printers/compose.yaml -f tools/virtual-printers/compose.host-network.yaml up -d --build --wait
+
+      - name: Find the virtual printer over mDNS
+        env:
+          LATIPRIMERE_TEST_MDNS_NAME: Virtual IPP Printer
+        run: dotnet run --project tests/Latiprimere.TestHarness --framework net10.0 -- run ipp.discovery.mdns
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdns-report
+          path: out/harness
+          retention-days: 7
+
+      - name: Show the test container's logs
+        if: failure()
+        run: docker logs latiprimere-cups

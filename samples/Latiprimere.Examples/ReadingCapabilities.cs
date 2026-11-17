@@ -48,4 +48,23 @@ internal static class ReadingCapabilities
 
 		return new PrintOptions { Copies = copies, Duplex = duplex };
 	}
+
+	/// <summary>
+	/// Chooses A4 paper and monochrome printing, each only if the printer reports it.
+	/// </summary>
+	/// <param name="printer">The printer.</param>
+	/// <returns>The options to print with.</returns>
+	public static async Task<PrintOptions> ChoosePaperAndColourAsync(IPrinter printer)
+	{
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync();
+
+		// Take the size from the capabilities, matched by its Name; null leaves the printer's default paper
+		MediaSize? a4 = capabilities.MediaSizes.FirstOrDefault(size => size.Name == "iso_a4_210x297mm");
+
+		ColorMode colorMode = capabilities.ColorModes.Contains(ColorMode.Monochrome)
+			? ColorMode.Monochrome
+			: ColorMode.PrinterDefault;
+
+		return new PrintOptions { MediaSize = a4, ColorMode = colorMode };
+	}
 }

@@ -8,7 +8,7 @@ Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` 
 
 ### Added
 
-- **Choose the paper size, colour mode and tray** with `PrintOptions.MediaSize`, `PrintOptions.ColorMode` and `PrintOptions.InputTray`. Pass values from the printer's capabilities. On Windows, a size or tray the printer's driver doesn't list is refused with `NotSupportedException`, rather than printed on the default paper. Raw jobs on Windows don't apply them, as with duplex: the data chooses its own paper.
+- **Choose the paper size, colour mode and tray** with `PrintOptions.MediaSize`, `PrintOptions.ColorMode` and `PrintOptions.InputTray`. Pass values from the printer's capabilities. On Windows, a monochrome PDF job's pages are made grey before the printer's driver gets them, since some drivers, Microsoft Print to PDF among them, ignore the setting. On Windows, a size or tray the printer's driver doesn't list is refused with `NotSupportedException`, rather than printed on the default paper. Raw jobs on Windows don't apply them, as with duplex: the data chooses its own paper.
 - **Limit the resolution Windows renders PDFs at** with `WindowsOptions.MaxRenderDpi`, set through `AddLatiprimereWindows` or `WindowsPrintSystemFactory.Create`. A lower limit makes PDF jobs faster and lighter on memory, with softer small text. By default, pages are still rendered at the printer's own resolution.
 - **Vendor options** with `PrintOptions.VendorOptions`, for settings the other options don't cover, such as print quality or stapling. Keys start with the print system that reads them:
   - `ipp:` sends an IPP attribute to CUPS and network printers, such as `ipp:print-quality` = `5`;
@@ -20,8 +20,13 @@ Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` 
 
 ### Changed
 
+- **PDFs to printers with the Generic / Text Only driver are refused** on Windows with `NotSupportedException`, before anything is queued. That driver can't print the page images a PDF is printed as: the job ended in an error and stopped the printer's queue. Send it raw data, such as plain text, instead. A PDF that goes straight to the queue's IPP printer isn't affected.
 - **`Latiprimere.Windows` now depends on `Latiprimere.Ipp`,** for sending PDFs straight to IPP printers.
 - **Version numbers now follow .NET:** `<.NET major>.0.<build>`, starting at 11.0, the newest .NET the packages target. This release follows 0.1.0-preview. Releases stay previews, ending in `-preview`, until testing with real printers is done. Every package still supports .NET 10 and .NET 11.
+
+### Fixed
+
+- **Finding the Windows default printer no longer fails** with "The data area passed to a system call is too small" when the default changes while it is read. With "Let Windows manage my default printer" on, Windows makes the last printer used the default, so printing from another program at the same moment could cause it.
 
 ## 0.1.0-preview - 2026-11-15
 

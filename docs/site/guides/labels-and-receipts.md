@@ -65,6 +65,7 @@ The example uses plain ASCII. For characters such as `£` or `é`, choose a code
 - **Use a seekable stream,** such as a `MemoryStream` or a file. A network printer that is busy turns the job away, and only a seekable stream can be sent again. On Windows, more than one copy of raw data also needs one, because the data is sent once for each copy.
 - **`PrintOptions` settings may have no effect.** The printer follows the commands in the data, so set paper, darkness and similar settings in the data itself.
 - **Virtual printers refuse raw data.** Microsoft Print to PDF would silently produce nothing, so Latiprimere refuses with `NotSupportedException` before anything is queued.
+- **Text-only printers refuse PDFs.** A Windows printer set up with the Generic / Text Only driver can't print a PDF's pages, and its queue would stop with an error, so Latiprimere refuses with `NotSupportedException`. Send it raw data instead.
 - **Some printers or queues don't accept raw data** at all. The job is then rejected with a `PrintException`.
 
 ## Label printers on the network

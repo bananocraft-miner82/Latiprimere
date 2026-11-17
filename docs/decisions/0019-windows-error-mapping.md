@@ -47,4 +47,10 @@ The Phase 1 checklist item. A new `WindowsErrorMapper` maps the Win32 error of a
   - `DriverQuirks` lists them by driver name, which users can't rename, unlike printer names. It starts with "Microsoft Print To PDF".
   - `WindowsPrinter` throws `NotSupportedException` for a raw job to such a driver before anything is queued, saying to send a PDF instead.
   - Drivers are added only after being seen to drop data.
+
+  **Owner decision, 2026-11-16: refuse PDFs to drivers that print text only** (owner: "Yes, add the check").
+  - The end-to-end harness sent a three-page PDF to a Generic / Text Only queue on a file port. The job went from printing to an error and held every job behind it until it was deleted. That driver can't print the page images a PDF is printed as, and each job also spooled about 400 MB of them.
+  - `DriverQuirks` lists such drivers by name too, starting with "Generic / Text Only". `WindowsPrinter` throws `NotSupportedException` for a PDF to one before anything is rendered or queued, saying to send raw data instead.
+  - Only the spooler's path refuses: a PDF that goes straight to the queue's IPP printer (ADR 0027) never reaches the driver, so it isn't refused.
+  - Unlike Microsoft Print to PDF, this failure isn't silent, but it stops the queue, which is worse for an application printing receipts or labels through it.
 - The CUPS and IPP adapters map IPP status codes separately. If they gain explanations, this table is the pattern.

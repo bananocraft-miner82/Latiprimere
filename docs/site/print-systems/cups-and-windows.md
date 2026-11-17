@@ -61,6 +61,12 @@ A callback that accepts every certificate gives up what encryption is for: anyon
 
 If a server asks for a password that wasn't given, or refuses the one given, requests throw `PrintAuthenticationException`. To ask the user, catch it, then create the print system again with their credentials.
 
+### PDFs keep their own orientation
+
+Latiprimere sends `PrintOptions.Orientation` to CUPS as IPP's `orientation-requested`, but CUPS may not turn a PDF's pages for it. In testing with CUPS 2.4 and its CUPS-PDF printer, a portrait PDF printed with `Landscape` came out portrait: the PDF's own layout won. To print landscape through CUPS, make the PDF's pages landscape when you create it.
+
+In the same tests, the paper size and monochrome came out as chosen.
+
 ## The Windows spooler
 
 ### PDFs need PDFium

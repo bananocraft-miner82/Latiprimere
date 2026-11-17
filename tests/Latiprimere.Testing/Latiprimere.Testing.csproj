@@ -3,8 +3,14 @@
 	<!-- Fixtures shared by the test projects: the shared test documents, the environment variables that switch on the
 	     integration tests, a printer catalog built the way applications build it, and waits for jobs and output files -->
 
-	<ItemGroup>
+	<!-- Latiprimere from its project, or in the end-to-end harness's packaged mode from the packed package
+	     (tests/Directory.Build.props) -->
+	<ItemGroup Condition="'$(LatiprimereFromPackages)' == ''">
 		<ProjectReference Include="..\..\src\Latiprimere\Latiprimere.csproj" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(LatiprimereFromPackages)' != ''">
+		<PackageReference Include="Latiprimere" />
 	</ItemGroup>
 
 	<ItemGroup>

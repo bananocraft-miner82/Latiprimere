@@ -45,7 +45,7 @@ The capability model already settles what these values are called:
 
   Nothing is checked first: a printer that can't do something substitutes or refuses, as with duplex. Checking would cost a Get-Printer-Attributes request for every job.
 - **Windows (PDF jobs):**
-  - Colour sets `dmColor`.
+  - Colour sets `dmColor`. **Monochrome pages are also turned grey before the driver gets them** (owner decision, 2026-11-17: "Yes, render grey"). The end-to-end harness found that Microsoft Print to PDF ignores `dmColor` and kept a colour page in colour; Latiprimere renders every page itself, so it greys each band with ITU-R BT.601 weights instead of depending on the driver. `dmColor` is still set, for drivers that use it to choose ink.
   - The size is looked up in the driver's paper list, by the same PWG name `GetCapabilitiesAsync` gives it, and its DMPAPER number goes in `dmPaperSize`. `DM_PAPERLENGTH`, `DM_PAPERWIDTH` and `DM_FORMNAME` are cleared, since any of them would override it.
   - The tray's ID is the DMBIN number for `dmDefaultSource`.
   - **A size or tray the driver doesn't list is refused** with `NotSupportedException` before anything is queued. A driver given a DMPAPER or DMBIN number it doesn't know drops it during the merge and prints on its default paper, reporting nothing. The driver's lists are already at hand, and only read when a size or tray is chosen.

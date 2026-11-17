@@ -880,8 +880,10 @@ interface signatures. Print dialogs and previews will live in separate, optional
 - Wrap native handles in `SafeHandle` subclasses; never pass raw `IntPtr` handles around managed code.
 - Code must be trim-safe and Native AOT compatible: no reflection-based serialisation, no dynamic code generation.
   `IsAotCompatible` turns on the analyzers for `src/`, but they can't see into dependencies. CI also publishes the CLI
-  sample with Native AOT and runs it (`tools/aot-check/check-aot.sh`); run the script yourself after adding a
-  dependency or a new code path through one. It needs the platform's native toolchain, as the script's header says.
+  sample and the end-to-end harness with Native AOT, and runs four of the native harness's scenarios
+  (`tools/aot-check/check-aot.sh`); run the script yourself after adding a dependency or a new code path through one.
+  It needs the platform's native toolchain, as the script's header says. `tools/test-harness/run.ps1 -Aot` (or
+  `run.sh --aot`) runs every scenario natively.
 - Convert native errors into Latiprimere exceptions at the interop boundary, keeping the native code in the exception.
 
 ---
@@ -1087,7 +1089,11 @@ internal sealed class FakeIppTransport : IIppTransport
   them with `[Trait("Category", "Integration")]` and the target OS, so unit-test runs stay fast and portable.
 - Integration tests target **virtual printers only**: `ippeveprinter` or CUPS-PDF on Linux and macOS, and
   "Microsoft Print to PDF" or a Generic / Text Only file queue on Windows. Setup scripts live in `tools/`.
-- Tests must never send output to a physical printer.
+- Tests must never send output to a physical printer. The one exception is the test harness's manual mode
+  (`manual --printer <id>`, see [docs/manual-tests](docs/manual-tests/README.md)): a person runs it, names the
+  printer on its command line, and confirms each job at a prompt before anything prints
+  ([ADR 0029](docs/decisions/0029-end-to-end-test-harness.md)). Scenarios that need a person declare
+  `TargetNeeds.Person`, and nothing but manual mode provides one.
 - Capture real-printer behaviour as data files (attribute dumps) and test the mapping code against those instead.
 - End-to-end tests of a print system go in an `Integration/` folder of its test project, in a class named after the
   print system with `IntegrationTests` appended (for example `Integration/CupsPrintSystemIntegrationTests.cs`). They
@@ -1104,6 +1110,8 @@ internal sealed class FakeIppTransport : IIppTransport
   | `LATIPRIMERE_TEST_CUPS_SETUP` | `container` (the default) or `macos` | On `macos`, skips the CUPS-PDF and Secure tests |
   | `LATIPRIMERE_TEST_IPP_PRINTER` | `ippeveprinter` in the container or on the Mac, `ipp://127.0.0.1:8631/ipp/print` | Direct IPP |
   | `LATIPRIMERE_TEST_WINDOWS_OUTPUT` | The output directory given to `Install-TestPrinters.ps1` | The Windows spooler test printers |
+  | `LATIPRIMERE_TEST_E2E` | `1` | The end-to-end scenarios under xUnit (`tests/Latiprimere.EndToEnd.Tests`); CI leaves it unset |
+  | `LATIPRIMERE_TEST_MDNS_NAME` | The name a printer announces over mDNS, such as `Virtual IPP Printer` | The end-to-end mDNS discovery scenario |
 
   Use `127.0.0.1` rather than `localhost`: the container publishes on IPv4 only, so each new connection to
   `localhost` first tries IPv6 and starts IPv4 only after the 250 ms Happy Eyeballs delay.
@@ -1118,6 +1126,9 @@ internal sealed class FakeIppTransport : IIppTransport
 
 - On a Mac, which has no Docker in CI, the same queues except CUPS-PDF and Secure can be set up on the Mac's own CUPS
   instead; see `tools/macos-test-printers/README.md`.
+- Checks that span several packages, through the public API only, are **end-to-end scenarios** in
+  `tests/Latiprimere.EndToEnd`, not integration tests. They run from `tools/test-harness/run.ps1` or `run.sh`, which
+  start the virtual printers and write a report; see `tools/test-harness/README.md`. They don't run in CI.
 - `dotnet test` runs each target framework's tests in its own process at the same time, so two processes print to
   the same virtual printer at once. Tests must allow for that: give each job distinct data, and on Windows hold a
   `PrinterLock` around jobs to printers that can't share (Microsoft Print to PDF, and file ports, which overwrite one
