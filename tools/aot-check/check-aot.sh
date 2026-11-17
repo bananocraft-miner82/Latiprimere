@@ -67,6 +67,32 @@ publish tests/Latiprimere.TestHarness "$harness_directory"
 harness="$harness_directory/Latiprimere.TestHarness"
 [[ -f "$harness.exe" ]] && harness="$harness.exe"
 
+# On macOS, launchd starts CUPS on demand, and it exits after about a minute with nothing to do. Only its local
+# socket starts it again, not the TCP port Latiprimere connects to, and the publishes above leave it idle for
+# minutes. lpstat goes through that socket, so it wakes the scheduler; then wait for the port to answer.
+wake_macos_cups() {
+	local server="$LATIPRIMERE_TEST_CUPS_SERVER"
+	local host="${server%:*}"
+	local port="${server##*:}"
+	[[ "$server" == *:* ]] || port=631
+	local attempts=0
+
+	until lpstat -r 2> /dev/null | grep -q "scheduler is running" && nc -z "$host" "$port" 2> /dev/null; do
+		attempts=$((attempts + 1))
+
+		if [[ "$attempts" -ge 60 ]]; then
+			echo "The CUPS scheduler did not answer on $host:$port." >&2
+			exit 1
+		fi
+
+		sleep 0.5
+	done
+}
+
+if [[ "$(uname -s)" == "Darwin" && -n "${LATIPRIMERE_TEST_CUPS_SERVER:-}" ]]; then
+	wake_macos_cups
+fi
+
 echo "== Running the native harness's scenarios"
 "$harness" targets
 "$harness" run "${scenarios[@]}"
