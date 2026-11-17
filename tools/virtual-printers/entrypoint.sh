@@ -17,7 +17,9 @@ until avahi-daemon --check; do sleep 0.5; done
 # Virtual IPP Everywhere printer on port 8631. Keeps received documents in /var/spool/ippeve.
 # "-c /bin/true" finishes each job at once: without a print command, ippeveprinter pretends to print for a random
 # 5-15 s, and since it takes one job at a time, parallel test runs queued behind each other for most of a minute.
-ippeveprinter -p 8631 -r off -k -d /var/spool/ippeve -c /bin/true \
+# It announces itself through Avahi as "Virtual IPP Printer", which the harness's mDNS scenario finds when the
+# container runs on the host's network (compose.host-network.yaml). No "-r off": that turns the announcement off.
+ippeveprinter -p 8631 -k -d /var/spool/ippeve -c /bin/true \
 	-f application/pdf,image/pwg-raster,image/jpeg \
 	-M Latiprimere -m "Virtual IPP Printer" \
 	"Virtual IPP Printer" &
