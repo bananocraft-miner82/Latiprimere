@@ -28,4 +28,13 @@
 		<PackageVersion Include="xunit.v3" Version="4.0.2" />
 	</ItemGroup>
 
+	<!-- Latiprimere's own packages, for the end-to-end harness's packaged mode only (tests/Directory.Build.props) -->
+	<ItemGroup Condition="'$(LatiprimereFromPackages)' != '' and '$(LatiprimerePackageVersion)' != ''">
+		<PackageVersion Include="Latiprimere" Version="$(LatiprimerePackageVersion)" />
+		<PackageVersion Include="Latiprimere.Cups" Version="$(LatiprimerePackageVersion)" />
+		<PackageVersion Include="Latiprimere.Ipp" Version="$(LatiprimerePackageVersion)" />
+		<PackageVersion Include="Latiprimere.Rendering.Pdfium" Version="$(LatiprimerePackageVersion)" />
+		<PackageVersion Include="Latiprimere.Windows" Version="$(LatiprimerePackageVersion)" />
+	</ItemGroup>
+
 </Project>

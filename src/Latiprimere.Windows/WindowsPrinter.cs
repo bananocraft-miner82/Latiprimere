@@ -18,7 +18,8 @@ namespace Latiprimere.Windows;
 /// PDF documents are rasterised (which needs an <see cref="IPdfRasterizer"/>, such as the
 /// Latiprimere.Rendering.Pdfium package) and drawn through GDI, with the options applied through the printer driver.
 /// A paper size or tray the driver doesn't list is refused, since the driver would print on its default instead.
-/// Raw data is refused for drivers known to drop it silently (see <see cref="DriverQuirks"/>).
+/// Raw data is refused for drivers known to drop it silently, and PDFs for drivers that print text only (see
+/// <see cref="DriverQuirks"/>), unless the PDF goes straight to the queue's IPP printer.
 /// With <see cref="WindowsOptions.PrintPdfOverIpp"/> on, a PDF job for a queue whose IPP printer is known and accepts
 /// PDF goes straight to the printer instead (ADR 0027).
 /// </remarks>
@@ -286,8 +287,8 @@ internal sealed class WindowsPrinter : IPrinter
 	/// <param name="outputFile">A file to print to instead of the device, or <see langword="null"/>.</param>
 	/// <param name="cancellationToken">A token to abandon spooling.</param>
 	/// <returns>The spooler's job ID.</returns>
-	/// <exception cref="NotSupportedException">No PDF rasteriser is registered, or the driver doesn't list the
-	/// chosen paper size or tray.</exception>
+	/// <exception cref="NotSupportedException">The driver prints text only, no PDF rasteriser is registered, or the
+	/// driver doesn't list the chosen paper size or tray.</exception>
 	private Task<int> SubmitPdfAsync
 	(
 		PrintContent      content,
@@ -298,6 +299,14 @@ internal sealed class WindowsPrinter : IPrinter
 		CancellationToken cancellationToken
 	)
 	{
+		// The driver would take the page images and then stop the queue with an error, so refuse before rendering
+		if (DriverQuirks.PrintsTextOnly(this.driverName))
+		{
+			string message = ExceptionMessages.FormatDriverPrintsTextOnly(this.printerName, this.driverName);
+
+			throw new NotSupportedException(message);
+		}
+
 		IPdfRasterizer rasterizer = this.context.PdfRasterizer
 										?? throw new NotSupportedException(ExceptionMessages.PdfNeedsRasterizer);
 

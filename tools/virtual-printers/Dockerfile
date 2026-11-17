@@ -3,7 +3,8 @@
 FROM debian:bookworm-slim
 
 # CUPS 2.4, the IPP tools (ippeveprinter, ipptool), CUPS-PDF, and ICU so self-contained .NET apps can run inside.
-# ippeveprinter in CUPS 2.4 will not start without DNS-SD, so D-Bus and Avahi are included too.
+# ippeveprinter in CUPS 2.4 will not start without DNS-SD, and announces itself through it, so D-Bus and Avahi are
+# included too.
 RUN apt-get update \
 	&& DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 		cups \

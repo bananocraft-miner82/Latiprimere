@@ -22,6 +22,16 @@ internal sealed unsafe class WinSpoolApi : IWinSpool
 	/// <returns><see langword="true"/> on success.</returns>
 	private delegate bool BufferCall(byte* buffer, uint bufferSize, out uint bytesNeeded);
 
+	/// <summary>
+	/// The GetDefaultPrinter call, which counts in characters rather than bytes.
+	/// </summary>
+	/// <param name="buffer">The buffer; empty to ask for the length needed.</param>
+	/// <param name="length">The buffer's length in characters; on return, the length needed, including the
+	/// terminating null.</param>
+	/// <param name="error">The Win32 error when the call fails.</param>
+	/// <returns><see langword="true"/> on success.</returns>
+	internal delegate bool DefaultPrinterCall(Span<char> buffer, ref uint length, out int error);
+
 	/// <inheritdoc/>
 	public IReadOnlyList<WindowsPrinterRecord> EnumeratePrinters()
 	{
@@ -142,27 +152,63 @@ internal sealed unsafe class WinSpoolApi : IWinSpool
 	/// <inheritdoc/>
 	public string? GetDefaultPrinterName()
 	{
-		// Ask for the length first; ERROR_FILE_NOT_FOUND means no default is set
-		uint length = 0;
-
-		if (!WinSpoolNative.GetDefaultPrinter(null, ref length)
-			&& Marshal.GetLastPInvokeError() == Win32ErrorCodes.FileNotFound)
-		{
-			return null;
-		}
-
-		char[] buffer = new char[length];
-
-		fixed (char* data = buffer)
-		{
-			if (!WinSpoolNative.GetDefaultPrinter(data, ref length))
+		return WinSpoolApi.ReadDefaultPrinterName
+		(
+			static (Span<char> buffer, ref uint length, out int error) =>
 			{
-				throw SpoolerErrors.Create(nameof(WinSpoolNative.GetDefaultPrinter), string.Empty);
+				fixed (char* data = buffer)
+				{
+					bool isSuccess = WinSpoolNative.GetDefaultPrinter(buffer.IsEmpty ? null : data, ref length);
+					error = isSuccess ? Win32ErrorCodes.Success : Marshal.GetLastPInvokeError();
+
+					return isSuccess;
+				}
+			}
+		);
+	}
+
+	/// <summary>
+	/// Reads the default printer's name: first its length, then the name, asking again if the name grew in between.
+	/// </summary>
+	/// <param name="call">Calls GetDefaultPrinter.</param>
+	/// <returns>The name, or <see langword="null"/> if there is no default printer.</returns>
+	/// <exception cref="PrintException">The call failed, or the name kept growing.</exception>
+	/// <remarks>
+	/// The default can change between the two calls: with "Let Windows manage my default printer" on, Windows makes
+	/// the last printer used the default, so printing from another process can make the name longer, or remove the
+	/// default (seen 2026-11-16, while two test processes printed).
+	/// </remarks>
+	internal static string? ReadDefaultPrinterName(DefaultPrinterCall call)
+	{
+		char[] buffer = [];
+
+		for (int attempt = 0; attempt < WinSpoolApi.MaxBufferAttempts; attempt++)
+		{
+			uint length = (uint)buffer.Length;
+
+			if (call(buffer, ref length, out int error))
+			{
+				// The name ends at the terminating null
+				int end = Array.IndexOf(buffer, '\0');
+
+				return buffer.Length == 0 ? null : new string(buffer, 0, end < 0 ? buffer.Length : end);
 			}
 
-			// The length includes the terminating null
-			return new string(data, 0, (int)length - 1);
+			// ERROR_FILE_NOT_FOUND means no default is set, or it was removed since the length was read
+			if (error == Win32ErrorCodes.FileNotFound)
+			{
+				return null;
+			}
+
+			if (error != Win32ErrorCodes.InsufficientBuffer)
+			{
+				throw SpoolerErrors.Create(nameof(WinSpoolNative.GetDefaultPrinter), string.Empty, error);
+			}
+
+			buffer = new char[length];
 		}
+
+		throw SpoolerErrors.Create(nameof(WinSpoolNative.GetDefaultPrinter), string.Empty, Win32ErrorCodes.InsufficientBuffer);
 	}
 
 	/// <inheritdoc/>

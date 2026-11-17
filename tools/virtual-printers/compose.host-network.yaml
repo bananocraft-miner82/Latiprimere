@@ -1,0 +1,10 @@
+# Runs the test container on the host's network instead of publishing ports, so the Avahi announcement of its
+# ippeveprinter ("Virtual IPP Printer") reaches programs on the host, for the end-to-end harness's mDNS discovery
+# scenario. Linux only: Docker Desktop doesn't pass multicast through to Windows or macOS. CUPS and ippeveprinter then
+# take the host's ports 631 and 8631 directly, so a host that runs its own CUPS can't use it.
+#
+#   docker compose -f tools/virtual-printers/compose.yaml -f tools/virtual-printers/compose.host-network.yaml up -d --build --wait
+services:
+  cups:
+    network_mode: host
+    ports: !reset []

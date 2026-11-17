@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- The console harness: lists the end-to-end scenarios and the test printers found, runs scenarios and writes a
+	     report (docs/test-harness-plan.md, ADR 0029). Kept trim-safe and Native AOT compatible, so it can later run
+	     every scenario as a native program. Not packed: nothing under tests/ is. -->
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<IsAotCompatible>true</IsAotCompatible>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Latiprimere.EndToEnd\Latiprimere.EndToEnd.csproj" />
+	</ItemGroup>
+
+</Project>

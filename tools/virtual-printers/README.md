@@ -13,6 +13,16 @@ docker compose -f tools/virtual-printers/compose.yaml down
 
 Job output goes to `/output`, which is a Docker volume of its own (`latiprimere-output`, removed by `down -v`). To read it from the host, set `LATIPRIMERE_TEST_CUPS_OUTPUT` to a host directory before `up`, and it is mounted there instead.
 
+### On the host network
+
+On Linux, `compose.host-network.yaml` runs the container on the host's network instead of publishing ports, so the mDNS announcement of its `ippeveprinter` ("Virtual IPP Printer") reaches the host:
+
+```bash
+docker compose -f tools/virtual-printers/compose.yaml -f tools/virtual-printers/compose.host-network.yaml up -d --build --wait
+```
+
+CUPS then takes the host's port 631, so a host running its own CUPS can't use it. Docker Desktop doesn't pass multicast through to Windows or macOS. The end-to-end harness's mDNS scenario uses it, in CI's `mdns` job and through `tools/test-harness/run.sh --host-network`.
+
 ## Integration tests
 
 The integration tests in `tests/` run against this container when environment variables say where it is; see "Integration Tests and Real Printers" in [CONTRIBUTING.md](../../CONTRIBUTING.md). CI starts it on the Ubuntu runner. The macOS runner has no Docker, so it gets the same queues, except CUPS-PDF and Secure, on its own CUPS instead: see [macos-test-printers](../macos-test-printers/README.md).
@@ -60,7 +70,7 @@ Inspect results with, for example, `docker exec latiprimere-cups ls /output` or 
 - `ServerAlias *` is needed because requests arrive through Docker's network from a non-local address while naming `localhost`; CUPS otherwise rejects them with HTTP 400 (DNS-rebinding protection).
 - The `capture` backend exists because CUPS writes nothing for raw jobs on a `file:` device: with no filters to run, the output file is never opened. Its device URI names the output folder: `capture:/` means `/output`.
 - The backend sets umask 022, so its files are readable by everyone. CUPS runs backends as `lp` with umask 077, and on a Linux host, where permissions on the bind mount are real, the tests (running as the host user) couldn't read the files. Docker Desktop on Windows ignores those permissions, which hid this until the first Ubuntu CI run.
-- D-Bus and Avahi are included only because `ippeveprinter` in CUPS 2.4 refuses to start without DNS-SD.
+- D-Bus and Avahi are included because `ippeveprinter` in CUPS 2.4 refuses to start without DNS-SD. It announces itself through Avahi as `Virtual IPP Printer`, which is visible from the host only when the container runs on the host's network (`compose.host-network.yaml`, Linux only), as the end-to-end harness's mDNS scenario does in CI. Don't pass it `-r off`: that turns the announcement off entirely, not just its subtype.
 - `ippeveprinter` runs with `-c /bin/true`, so each job completes as soon as it arrives. Without a print command it pretends to print for a random 5–15 s per job, and it takes one job at a time, answering others with `server-error-busy`. With the test processes for both target frameworks printing to it, plus the Virtual-IPP queue, jobs queued for most of a minute.
 - Ports are published on IPv4 only. `localhost` resolves to IPv6 first, so each new connection to it waits 250 ms before Latiprimere tries IPv4 (Happy Eyeballs; it was about 2 s on Windows before that), and tests use `127.0.0.1`.
 - `tools/test-documents/` holds the test PDFs (see its README); `three-pages.pdf` was generated in this container with `cupsfilter`.

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- A scripted IPP printer for the end-to-end scenarios: a Kestrel server that answers like a printer, records
+	     every request, and misbehaves on request (docs/test-harness-plan.md, ADR 0029). It deliberately references no
+	     Latiprimere project, so it can't share code paths with what it tests. -->
+
+	<PropertyGroup>
+		<IsAotCompatible>true</IsAotCompatible>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="SharpIppNext" />
+	</ItemGroup>
+
+	<!-- Printer profiles: captured Get-Printer-Attributes responses (see tests/Latiprimere.Ipp.Tests/Data/README.md) -->
+	<ItemGroup>
+		<EmbeddedResource Include="..\Latiprimere.Ipp.Tests\Data\ippeveprinter-printer-attributes.ipp" LogicalName="Profiles.ippeveprinter.ipp" Link="Profiles\ippeveprinter-printer-attributes.ipp" />
+		<EmbeddedResource Include="..\Latiprimere.Ipp.Tests\Data\hp-envy-5640-printer-attributes.ipp" LogicalName="Profiles.hp-envy-5640.ipp" Link="Profiles\hp-envy-5640-printer-attributes.ipp" />
+	</ItemGroup>
+
+</Project>
