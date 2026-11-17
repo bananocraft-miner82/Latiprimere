@@ -58,6 +58,41 @@ public sealed class WindowsPrinterIppRoutingTests : IDisposable
 	}
 
 	[Fact]
+	public async Task GivenTextOnlyDriverWhosePrinterTakesPdfWhenPdfSubmittedThenSendsItOverIpp()
+	{
+		// Arrange — the driver couldn't print the PDF, but the printer behind the queue can
+		this.AddPrinter("application/pdf");
+		WindowsPrinter printer = this.CreatePrinter(driverName: "Generic / Text Only");
+		using MemoryStream document = WindowsPrinterIppRoutingTests.CreatePdf();
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal("77", job.Id);
+		Assert.NotNull(this.client.LastPrintJobRequest);
+		Assert.Null(this.gdi.LastRequest);
+	}
+
+	[Fact]
+	public async Task GivenTextOnlyDriverWhosePrinterDoesNotTakePdfWhenPdfSubmittedThenRefusesIt()
+	{
+		// Arrange — the spooler would be next, and its driver prints text only
+		this.AddPrinter("image/urf");
+		WindowsPrinter printer = this.CreatePrinter(driverName: "Generic / Text Only");
+		using MemoryStream document = WindowsPrinterIppRoutingTests.CreatePdf();
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		NotSupportedException exception = await Assert.ThrowsAsync<NotSupportedException>(submit);
+		Assert.Contains("Generic / Text Only", exception.Message, StringComparison.Ordinal);
+		Assert.Null(this.client.LastPrintJobRequest);
+		Assert.Null(this.gdi.LastRequest);
+	}
+
+	[Fact]
 	public async Task GivenPrinterThatDoesNotTakePdfWhenPdfSubmittedThenPrintsThroughTheSpooler()
 	{
 		// Arrange
@@ -274,13 +309,15 @@ public sealed class WindowsPrinterIppRoutingTests : IDisposable
 	/// <param name="portName">The queue's port.</param>
 	/// <param name="withRoute">Whether sending PDFs over IPP is on.</param>
 	/// <param name="spool">The spooler, or <see langword="null"/> for a new fake.</param>
+	/// <param name="driverName">The queue's driver, or <see langword="null"/> if not known.</param>
 	/// <returns>The printer.</returns>
 	private WindowsPrinter CreatePrinter
 	(
 		string        printerName = PrinterName,
 		string        portName = PortName,
 		bool          withRoute = true,
-		FakeWinSpool? spool = null
+		FakeWinSpool? spool = null,
+		string?       driverName = null
 	)
 	{
 		WindowsPrintContextBuilder builder = new WindowsPrintContextBuilder()
@@ -295,6 +332,6 @@ public sealed class WindowsPrinterIppRoutingTests : IDisposable
 
 		PrinterInfo info = new PrinterInfo { Id = "windows:" + printerName, Name = printerName };
 
-		return new WindowsPrinter(builder.Build(), printerName, driverName: null, portName, info);
+		return new WindowsPrinter(builder.Build(), printerName, driverName, portName, info);
 	}
 }

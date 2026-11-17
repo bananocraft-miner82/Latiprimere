@@ -15,7 +15,7 @@ Every Latiprimere exception derives from `PrintException`, so one `catch` handle
 | `PrintAuthenticationException`    | A print server needs a user name and password, or refused the ones given.    | Ask for credentials and create the print system again. |
 | `PrintSystemUnavailableException` | No registered print system works on this machine, or its service isn't running. | Register the right print system, or start its service. |
 | `PrintException`                  | Anything else the print system reports: a rejected job, a printer that can't be reached, a timeout. | Show the message; `NativeErrorCode` helps diagnose it. |
-| `NotSupportedException`           | The printer can't take the document or option, such as raw data on a virtual printer. | Change what you send.                           |
+| `NotSupportedException`           | The printer can't take the document or option, such as raw data on a virtual printer, or a PDF on a text-only printer. | Change what you send.                           |
 
 `NotSupportedException` is .NET's own, not a `PrintException`, because it means the request itself can't work, rather than that printing failed.
 

@@ -18,4 +18,16 @@
 		<PackageReference Include="xunit.v3" />
 	</ItemGroup>
 
+	<!-- Packaged mode (docs/test-harness-plan.md): LatiprimereFromPackages names a folder of packed .nupkg files, with
+	     the nuget.config that tools/test-harness writes beside them, and LatiprimerePackageVersion their version. The
+	     end-to-end scenarios then use those packages instead of the projects, building into out/packaged, outside the
+	     projects, so a normal build isn't disturbed and neither build compiles the other's generated files. -->
+	<PropertyGroup Condition="'$(LatiprimereFromPackages)' != ''">
+		<BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)..\out\packaged\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+		<BaseOutputPath>$(MSBuildThisFileDirectory)..\out\packaged\bin\$(MSBuildProjectName)\</BaseOutputPath>
+		<DefaultItemExcludes>$(DefaultItemExcludes);bin\**;obj\**</DefaultItemExcludes>
+		<RestoreConfigFile>$([MSBuild]::EnsureTrailingSlash('$(LatiprimereFromPackages)'))nuget.config</RestoreConfigFile>
+		<LatiprimerePackageVersion Condition="'$(LatiprimerePackageVersion)' == ''">$(VersionPrefix)-$(VersionSuffix)</LatiprimerePackageVersion>
+	</PropertyGroup>
+
 </Project>

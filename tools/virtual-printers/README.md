@@ -13,6 +13,16 @@ docker compose -f tools/virtual-printers/compose.yaml down
 
 Job output goes to `/output`, which is a Docker volume of its own (`latiprimere-output`, removed by `down -v`). To read it from the host, set `LATIPRIMERE_TEST_CUPS_OUTPUT` to a host directory before `up`, and it is mounted there instead.
 
+### On the host network
+
+On Linux, `compose.host-network.yaml` runs the container on the host's network instead of publishing ports, so the mDNS announcement of its `ippeveprinter` ("Virtual IPP Printer") reaches the host:
+
+```bash
+docker compose -f tools/virtual-printers/compose.yaml -f tools/virtual-printers/compose.host-network.yaml up -d --build --wait
+```
+
+CUPS then takes the host's port 631, so a host running its own CUPS can't use it. Docker Desktop doesn't pass multicast through to Windows or macOS. The end-to-end harness's mDNS scenario uses it, in CI's `mdns` job and through `tools/test-harness/run.sh --host-network`.
+
 ## Integration tests
 
 The integration tests in `tests/` run against this container when environment variables say where it is; see "Integration Tests and Real Printers" in [CONTRIBUTING.md](../../CONTRIBUTING.md). CI starts it on the Ubuntu runner. The macOS runner has no Docker, so it gets the same queues, except CUPS-PDF and Secure, on its own CUPS instead: see [macos-test-printers](../macos-test-printers/README.md).

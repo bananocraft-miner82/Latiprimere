@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- The code from "Testing code that prints" (docs/site/guides/testing-code-that-prints.md): a class that prints
+	     invoices, fakes of the Latiprimere interfaces, and the xUnit tests that use them. It is built and tested with
+	     everything else, so the page's code keeps working as the API changes. -->
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<IsTestProject>true</IsTestProject>
+		<!-- Every using is written out, so the code in the docs can be copied as it stands -->
+		<ImplicitUsings>disable</ImplicitUsings>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Latiprimere\Latiprimere.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="xunit.v3" />
+	</ItemGroup>
+
+</Project>

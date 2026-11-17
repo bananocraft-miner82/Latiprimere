@@ -23,4 +23,23 @@ public sealed class DriverQuirksTests
 		// Assert
 		Assert.Equal(expected, dropsRawData);
 	}
+
+	[Theory]
+	[InlineData("Generic / Text Only", true)]
+	[InlineData("GENERIC / TEXT ONLY", true)]
+	[InlineData("Microsoft Print To PDF", false)]
+	[InlineData("Microsoft XPS Document Writer v4", false)]
+	[InlineData(null, false)]
+	public void GivenDriverNameWhenPrintsTextOnlyCheckedThenOnlyTextOnlyDriversAreRefusedPdfs(string? driverName, bool expected)
+	{
+		// Arrange — driverName is a driver, or none known, and expected whether it prints text only (provided by
+		// InlineData above)
+		string? name = driverName;
+
+		// Act
+		bool printsTextOnly = DriverQuirks.PrintsTextOnly(name);
+
+		// Assert
+		Assert.Equal(expected, printsTextOnly);
+	}
 }

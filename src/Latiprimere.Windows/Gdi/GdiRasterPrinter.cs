@@ -8,6 +8,10 @@ namespace Latiprimere.Windows.Gdi;
 /// <summary>
 /// Prints rendered documents by drawing each page, band by band, onto a printer device context.
 /// </summary>
+/// <remarks>
+/// For a monochrome job, each band is turned grey (<see cref="GreyscaleConverter"/>) before it is drawn, as well as
+/// the DEVMODE asking the driver for monochrome: some drivers ignore that setting.
+/// </remarks>
 [SupportedOSPlatform("windows")]
 internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 {
@@ -141,6 +145,13 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 		{
 			RasterBand band = RasterBand.Create(layout.RenderWidth, layout.RenderHeight, top, Math.Min(rowsPerBand, layout.RenderHeight - top));
 			request.Document.RenderBand(pageIndex, band, pixels);
+
+			// Grey before the driver sees it, since drivers may ignore the DEVMODE's colour setting
+			if (request.Options.ColorMode == ColorMode.Monochrome)
+			{
+				GreyscaleConverter.ToGrey(pixels.AsSpan(0, (int)band.ByteCount));
+			}
+
 			GdiRasterPrinter.DrawBand(deviceContext, request.PrinterName, layout, band, pixels);
 			top += band.Height;
 		}

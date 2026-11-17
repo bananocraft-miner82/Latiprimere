@@ -1,0 +1,17 @@
+# Test-project overrides, the same as tests/.editorconfig. See "Unit Tests" in CONTRIBUTING.md.
+
+[*.cs]
+
+# Inline expected-value arrays in assertions keep tests readable; their allocation cost doesn't matter here
+dotnet_diagnostic.CA1861.severity = none
+
+# Test methods are named GivenWhenThen, without an Async suffix
+dotnet_naming_rule.async_methods_end_with_async.severity = none
+
+# Test classes and methods are documented by their GivenWhenThen names
+dotnet_diagnostic.SA1600.severity = none
+dotnet_diagnostic.CS1591.severity = none
+
+# The code under test and the fakes are documented like production code
+[{InvoicePrinter.cs,Fakes/**.cs}]
+dotnet_diagnostic.SA1600.severity = error

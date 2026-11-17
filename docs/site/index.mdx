@@ -6,7 +6,7 @@ description: Find printers, read their capabilities, submit jobs and follow them
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 <Aside type="caution" title="Preview">
-  These pages describe 0.1.0-preview. The API may still change before 1.0.
+  These pages describe the newest preview release. The API may still change before 1.0.
 </Aside>
 
 Latiprimere is a cross-platform printing library for .NET. It finds printers, reads what they can do, sends them PDFs or raw printer data, and follows each job until it finishes. It has no user interface, so it works in console apps, services, containers and web back ends.
@@ -17,6 +17,7 @@ Latiprimere is a cross-platform printing library for .NET. It finds printers, re
   <LinkCard title="Installation" href="/docs/getting-started/installation/" description="Choose the packages for your platforms and set Latiprimere up." />
   <LinkCard title="Your first print job" href="/docs/getting-started/first-print-job/" description="A complete program that prints a PDF on the default printer." />
   <LinkCard title="Finding printers" href="/docs/getting-started/finding-printers/" description="List printers, understand printer IDs, and find a saved printer again." />
+  <LinkCard title="How Latiprimere works" href="/docs/getting-started/how-it-works/" description="Print systems and the catalog, what happens to a document, and how a job moves through its states." />
 </CardGrid>
 
 ## Guides
@@ -27,6 +28,7 @@ Latiprimere is a cross-platform printing library for .NET. It finds printers, re
   <LinkCard title="Labels and receipts" href="/docs/guides/labels-and-receipts/" description="Send ZPL to label printers and ESC/POS to receipt printers." />
   <LinkCard title="Errors and troubleshooting" href="/docs/guides/errors-and-troubleshooting/" description="What each exception means, logging, and fixes for common problems." />
   <LinkCard title="Printing from a web app or background service" href="/docs/guides/web-app-and-background-service/" description="Queue print requests from ASP.NET Core and print them in a background service." />
+  <LinkCard title="Testing code that prints" href="/docs/guides/testing-code-that-prints/" description="Unit-test your printing code without a printer, using fakes of the catalog, printers and jobs." />
 </CardGrid>
 
 ## Print systems
@@ -44,4 +46,4 @@ Every example in these pages is in [`samples/Latiprimere.Examples`](https://gith
 dotnet run --project samples/Latiprimere.Examples -f net10.0 -- list
 ```
 
-Run it with no name to see them all.
+Run it with no name to see them all. The code from [Testing code that prints](/docs/guides/testing-code-that-prints/) is a test project of its own, [`samples/Latiprimere.Examples.Tests`](https://github.com/bananocraft-miner82/Latiprimere/tree/main/samples/Latiprimere.Examples.Tests).

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Runs the end-to-end scenarios of Latiprimere.EndToEnd under xUnit, one test case each. Every case skips unless
+	     LATIPRIMERE_TEST_E2E is set (ADR 0029), so CI builds this project but doesn't run the scenarios. -->
+
+	<ItemGroup>
+		<ProjectReference Include="..\Latiprimere.EndToEnd\Latiprimere.EndToEnd.csproj" />
+	</ItemGroup>
+
+</Project>
