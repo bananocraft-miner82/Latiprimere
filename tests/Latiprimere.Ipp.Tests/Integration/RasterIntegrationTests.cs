@@ -18,6 +18,13 @@ namespace Latiprimere.Ipp.Tests.Integration;
 [Trait("OS", "Any")]
 public sealed class RasterIntegrationTests
 {
+	/// <summary>How long to resend a job the printer turns away as busy: CI runs each target framework's tests at
+	/// once against the one ippeveprinter, which takes one job at a time.</summary>
+	private static readonly TimeSpan BusyRetryDuration = IppNetworkOptions.DefaultBusyRetryDuration;
+
+	/// <summary>The wait between resends of a job turned away as busy.</summary>
+	private static readonly TimeSpan BusyRetryDelay = TimeSpan.FromSeconds(1);
+
 	private static readonly MediaSize A4 = new MediaSize { Name = "iso_a4_210x297mm", DisplayName = "A4", WidthMillimetres = 210, HeightMillimetres = 297 };
 
 	[Theory]
@@ -62,7 +69,7 @@ public sealed class RasterIntegrationTests
 		};
 
 		// Act
-		PrintJobResponse response = await client.PrintJobAsync(request, IppVendorAttributes.None, TestContext.Current.CancellationToken);
+		PrintJobResponse response = await RasterIntegrationTests.PrintJobWhenNotBusyAsync(client, request, raster);
 		int jobId = response.JobAttributes?.JobId ?? 0;
 		IppPrintJob job = new IppPrintJob(context, printerUri!, "ipp:" + printerUri!.AbsoluteUri, jobId);
 		PrintJobStatus status = await PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken);
@@ -86,7 +93,8 @@ public sealed class RasterIntegrationTests
 			.WithDocumentFormats(IppDocumentFormats.Standard)
 			.WithPdfRasterizer(new PdfiumRasterizer())
 			.WithValidateJobs(true)
-			.Build();
+			.WithBusyRetryDuration(RasterIntegrationTests.BusyRetryDuration)
+			.Build() with { BusyRetryFirstDelay = RasterIntegrationTests.BusyRetryDelay, BusyRetryMaxDelay = RasterIntegrationTests.BusyRetryDelay };
 
 		IppPrinter printer = new IppPrinter
 		(
@@ -106,5 +114,32 @@ public sealed class RasterIntegrationTests
 
 		// Assert — Aborted would mean it couldn't read the raster
 		Assert.Equal(PrintJobState.Completed, status.State);
+	}
+
+	/// <summary>
+	/// Sends Print-Job, sending it again from the start of the document while the printer is busy with another job,
+	/// as <see cref="IppPrinter"/> does.
+	/// </summary>
+	/// <param name="client">The client.</param>
+	/// <param name="request">The request, with its document.</param>
+	/// <param name="document">The request's document, rewound before each resend.</param>
+	/// <returns>The printer's response.</returns>
+	private static async Task<PrintJobResponse> PrintJobWhenNotBusyAsync(SharpIppClientAdapter client, PrintJobRequest request, MemoryStream document)
+	{
+		const int serverErrorBusy = 0x0507;
+		DateTime deadline = DateTime.UtcNow + RasterIntegrationTests.BusyRetryDuration;
+
+		while (true)
+		{
+			try
+			{
+				return await client.PrintJobAsync(request, IppVendorAttributes.None, TestContext.Current.CancellationToken);
+			}
+			catch (PrintException exception) when (exception.NativeErrorCode == serverErrorBusy && DateTime.UtcNow < deadline)
+			{
+				await Task.Delay(RasterIntegrationTests.BusyRetryDelay, TestContext.Current.CancellationToken);
+				document.Position = 0;
+			}
+		}
 	}
 }
