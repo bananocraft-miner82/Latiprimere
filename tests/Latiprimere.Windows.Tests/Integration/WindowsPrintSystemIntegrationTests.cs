@@ -341,6 +341,175 @@ public sealed class WindowsPrintSystemIntegrationTests
 	}
 
 	[Fact]
+	public async Task GivenPrintTicketForA5WhenPdfPrintedToMicrosoftPrintToPdfThenOutputPagesAreA5()
+	{
+		// Arrange — a delta ticket naming only the paper size; the driver fills in the rest
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The Windows spooler is only available on Windows.");
+
+		Assert.SkipWhen
+		(
+			new WinSpoolApi().GetPrinter(PrinterLock.MicrosoftPrintToPdf) is null,
+			"Microsoft Print to PDF is not installed."
+		);
+
+		await using CatalogFixture fixture = WindowsPrintSystemIntegrationTests.CreateCatalog();
+		IPrinter printer = await WindowsPrintSystemIntegrationTests.GetPrinterAsync(fixture, PrinterLock.MicrosoftPrintToPdf);
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+		string outputFile = Path.Combine(Path.GetTempPath(), $"latiprimere-test-{Guid.NewGuid():N}.pdf");
+
+		PrintOptions options = new PrintOptions
+		{
+			JobName       = "Latiprimere Print Ticket test",
+			OutputFile    = outputFile,
+			VendorOptions = new Dictionary<string, string>
+			{
+				["windows:print-ticket"] = Latiprimere.Windows.Tests.Spooler.WindowsVendorOptionsTests.CreatePrintTicket("psk:ISOA5")
+			}
+		};
+
+		using PrinterLock printerLock = new PrinterLock(PrinterLock.MicrosoftPrintToPdf);
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+		PrintJobStatus status = await PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken);
+		byte[]? written = await OutputFileWaiter.WaitForAnyContentAsync(outputFile, TestContext.Current.CancellationToken);
+
+		// Assert — A5 is 419.5 × 595.3 points; the driver's default would be A4 or Letter
+		Assert.Equal(PrintJobState.Completed, status.State);
+		Assert.NotNull(written);
+
+		using (MemoryStream output = new MemoryStream(written))
+		using (Latiprimere.Rendering.IRasterDocument printed = new Latiprimere.Rendering.Pdfium.PdfiumRasterizer().Open(output))
+		{
+			Latiprimere.Rendering.PageSize size = printed.GetPageSize(0);
+			Assert.Equal(419.5, Math.Min(size.WidthPoints, size.HeightPoints), 1.5);
+			Assert.Equal(595.3, Math.Max(size.WidthPoints, size.HeightPoints), 1.5);
+		}
+
+		File.Delete(outputFile);
+	}
+
+	[Fact]
+	public void GivenPrintTicketForA5WhenMergedForMicrosoftPrintToPdfThenDevModeAsksForA5()
+	{
+		// Arrange — straight through the Print Ticket API, from the driver's defaults
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The Windows spooler is only available on Windows.");
+
+		Assert.SkipWhen
+		(
+			new WinSpoolApi().GetPrinter(PrinterLock.MicrosoftPrintToPdf) is null,
+			"Microsoft Print to PDF is not installed."
+		);
+
+		byte[] defaults = WindowsCapabilityReader.ReadDefaultDevMode(PrinterLock.MicrosoftPrintToPdf);
+		byte[] ticket = Encoding.UTF8.GetBytes(Latiprimere.Windows.Tests.Spooler.WindowsVendorOptionsTests.CreatePrintTicket("psk:ISOA5"));
+
+		// Act
+		byte[] merged = Latiprimere.Windows.PrintTickets.PrintTicketMerger.Merge(PrinterLock.MicrosoftPrintToPdf, defaults, [ticket]);
+
+		// Assert — DMPAPER_A5 is 11, or the driver names the form instead
+		short paperSize = BinaryPrimitives.ReadInt16LittleEndian(merged.AsSpan(Marshal.OffsetOf<DevMode>(nameof(DevMode.PaperSize)).ToInt32()));
+		uint fields = BinaryPrimitives.ReadUInt32LittleEndian(merged.AsSpan(Marshal.OffsetOf<DevMode>(nameof(DevMode.Fields)).ToInt32()));
+		Assert.True((fields & DevModeConstants.FieldPaperSize) != 0, "The DEVMODE sets a paper size");
+		Assert.Equal(11, paperSize);
+	}
+
+	[Fact]
+	public async Task GivenVendorFeatureFromCapabilitiesWhenMergedForXpsDocumentWriterThenDevModeKeepsTheChoice()
+	{
+		// Arrange — the driver's own feature, as GetCapabilitiesAsync lists it, chosen as a job would
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The Windows spooler is only available on Windows.");
+		const string xpsWriter = "Microsoft XPS Document Writer";
+		Assert.SkipWhen(new WinSpoolApi().GetPrinter(xpsWriter) is null, "Microsoft XPS Document Writer is not installed.");
+
+		await using CatalogFixture fixture = WindowsPrintSystemIntegrationTests.CreateCatalog();
+		IPrinter printer = await WindowsPrintSystemIntegrationTests.GetPrinterAsync(fixture, xpsWriter);
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+		VendorOption images = Assert.Single(capabilities.VendorOptions, option => option.Key.EndsWith(":JobImageType", StringComparison.Ordinal));
+		VendorOptionChoice chosen = Assert.Single(images.Choices, choice => choice.Value.EndsWith(":PNG", StringComparison.Ordinal));
+		Assert.NotEqual(chosen.Value, images.DefaultValue);
+
+		WinSpoolApi spool = new WinSpoolApi();
+		Dictionary<string, string> vendorOptions = new Dictionary<string, string> { [images.Key] = chosen.Value };
+		byte[]? ticket = Latiprimere.Windows.PrintTickets.PrintCapabilitiesDocument
+			.Parse(spool.GetPrintCapabilities(xpsWriter, null, []))
+			.CreateTicket(xpsWriter, vendorOptions, new PrintOptions());
+
+		byte[] defaults = WindowsCapabilityReader.ReadDefaultDevMode(xpsWriter);
+
+		// Act
+		byte[] merged = Latiprimere.Windows.PrintTickets.PrintTicketMerger.Merge(xpsWriter, defaults, [ticket!]);
+
+		// Assert — read back through the driver, the DEVMODE asks for PNG images
+		string mergedTicket;
+
+		using (Latiprimere.Windows.PrintTickets.PrintTicketSession session = Latiprimere.Windows.PrintTickets.PrintTicketSession.Open(xpsWriter))
+		{
+			mergedTicket = Encoding.UTF8.GetString(session.ConvertDevModeToTicket(merged));
+		}
+
+		Assert.Contains(":PNG\"", mergedTicket, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public void GivenPrintTicketSessionDisposedTwiceWhenAnotherIsOpenedOnTheSameThreadThenItWorks()
+	{
+		// Arrange — a second Dispose mustn't uninitialise COM again on a thread still in use
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The Windows spooler is only available on Windows.");
+
+		Assert.SkipWhen
+		(
+			new WinSpoolApi().GetPrinter(PrinterLock.MicrosoftPrintToPdf) is null,
+			"Microsoft Print to PDF is not installed."
+		);
+
+		byte[] defaults = WindowsCapabilityReader.ReadDefaultDevMode(PrinterLock.MicrosoftPrintToPdf);
+		Latiprimere.Windows.PrintTickets.PrintTicketSession first = Latiprimere.Windows.PrintTickets.PrintTicketSession.Open(PrinterLock.MicrosoftPrintToPdf);
+
+		// Act
+		first.Dispose();
+		first.Dispose();
+		byte[] ticket;
+
+		using (Latiprimere.Windows.PrintTickets.PrintTicketSession second = Latiprimere.Windows.PrintTickets.PrintTicketSession.Open(PrinterLock.MicrosoftPrintToPdf))
+		{
+			ticket = second.ConvertDevModeToTicket(defaults);
+		}
+
+		// Assert
+		Assert.Contains("PrintTicket", Encoding.UTF8.GetString(ticket), StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public void GivenPrintTicketTheDriverFindsMalformedWhenMergedForMicrosoftPrintToPdfThenThrowsArgumentException()
+	{
+		// Arrange — well-formed XML, but a Feature without a name isn't a valid Print Ticket
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The Windows spooler is only available on Windows.");
+
+		Assert.SkipWhen
+		(
+			new WinSpoolApi().GetPrinter(PrinterLock.MicrosoftPrintToPdf) is null,
+			"Microsoft Print to PDF is not installed."
+		);
+
+		byte[] defaults = WindowsCapabilityReader.ReadDefaultDevMode(PrinterLock.MicrosoftPrintToPdf);
+
+		byte[] ticket = Encoding.UTF8.GetBytes
+		(
+			"<psf:PrintTicket xmlns:psf=\"http://schemas.microsoft.com/windows/2003/08/printing/printschemaframework\" version=\"1\">"
+			+ "<psf:Feature><psf:Option /></psf:Feature></psf:PrintTicket>"
+		);
+
+		// Act
+		Action merge = () => Latiprimere.Windows.PrintTickets.PrintTicketMerger.Merge(PrinterLock.MicrosoftPrintToPdf, defaults, [ticket]);
+
+		// Assert
+		ArgumentException exception = Assert.Throws<ArgumentException>(merge);
+		Assert.Contains(PrinterLock.MicrosoftPrintToPdf, exception.Message, StringComparison.Ordinal);
+		Assert.Contains("windows:print-ticket", exception.Message, StringComparison.Ordinal);
+	}
+
+	[Fact]
 	public async Task GivenPaperSizeFromCapabilitiesWhenPdfPrintedToMicrosoftPrintToPdfThenOutputPagesHaveThatSize()
 	{
 		// Arrange — A5 is neither the A4 nor the Letter default, so a size that wasn't applied shows

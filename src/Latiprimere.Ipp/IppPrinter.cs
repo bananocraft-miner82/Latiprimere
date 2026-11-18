@@ -15,6 +15,7 @@ internal sealed class IppPrinter : IPrinter
 	private readonly IppPrintContext context;                     // Client and settings shared with the print system
 	private readonly Uri printerUri;                              // The printer's IPP URI
 	private readonly IReadOnlyCollection<string>? supportedFormats; // MIME types it accepts; null when not checked
+	private bool refusesVendorOptions;                            // Whether it refused the vendor option request
 
 	/// <summary>
 	/// Initialises a new instance of the <see cref="IppPrinter"/> class.
@@ -103,14 +104,67 @@ internal sealed class IppPrinter : IPrinter
 			throw new PrintException(message);
 		}
 
+		PrinterCapabilities capabilities;
+
 		try
 		{
-			return IppCapabilitiesMapper.ToCapabilities(attributes);
+			capabilities = IppCapabilitiesMapper.ToCapabilities(attributes);
 		}
 		catch (Exception exception) when (IppResponseErrors.IsUnreadableData(exception))
 		{
 			throw IppResponseErrors.CreateUnreadable(this.printerUri, exception);
 		}
+
+		// Afterwards, not at the same time: some printers take one connection at a time (ADR 0032)
+		IReadOnlyList<VendorOption> vendorOptions = await this.ReadVendorOptionsAsync(cancellationToken).ConfigureAwait(false);
+
+		return capabilities with { VendorOptions = vendorOptions };
+	}
+
+	/// <summary>
+	/// Reads every job attribute the printer accepts, with its supported values, as vendor options. They are an extra:
+	/// a printer that refuses the request, or answers it with something unreadable, lists none, and that is logged.
+	/// A printer that refuses it, with an IPP client error or an unreadable answer, isn't asked again, so it costs
+	/// one round trip and one log entry, not one per read. A failure to connect may pass, so it is tried again.
+	/// </summary>
+	/// <param name="cancellationToken">A token to cancel the request.</param>
+	/// <returns>The vendor options; empty if they couldn't be read.</returns>
+	/// <exception cref="OperationCanceledException">The request was cancelled.</exception>
+	private async Task<IReadOnlyList<VendorOption>> ReadVendorOptionsAsync(CancellationToken cancellationToken)
+	{
+		if (this.refusesVendorOptions)
+		{
+			return Array.Empty<VendorOption>();
+		}
+
+		try
+		{
+			IReadOnlyList<IppAttribute>? attributeList = await IppPrinterQueries
+				.GetAttributeListAsync(this.context, this.printerUri, IppRequestedAttributes.VendorOptionAttributes, cancellationToken)
+				.ConfigureAwait(false);
+
+			return attributeList is null ? Array.Empty<VendorOption>() : IppVendorOptionMapper.ToVendorOptions(attributeList);
+		}
+		catch (Exception exception) when (exception is PrintException || IppResponseErrors.IsUnreadableData(exception))
+		{
+			this.refusesVendorOptions = IppPrinter.IsRefusal(exception);
+			IppLog.VendorOptionsUnreadable(this.context.Logger, this.printerUri, exception);
+
+			return Array.Empty<VendorOption>();
+		}
+	}
+
+	/// <summary>
+	/// Checks whether a failure is the printer's answer, which asking again would only repeat: an IPP client error,
+	/// such as client-error-attributes-or-values-not-supported, or an answer that can't be read.
+	/// </summary>
+	/// <param name="exception">The failure.</param>
+	/// <returns><see langword="true"/> for a refusal; <see langword="false"/> for one that may pass, such as a
+	/// failure to connect.</returns>
+	private static bool IsRefusal(Exception exception)
+	{
+		return IppResponseErrors.IsUnreadableData(exception)
+			   || exception is PrintException { NativeErrorCode: >= (int)IppStatusCode.ClientErrorBadRequest and < (int)IppStatusCode.ServerErrorInternalError };
 	}
 
 	/// <summary>

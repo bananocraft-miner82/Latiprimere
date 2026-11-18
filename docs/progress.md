@@ -6,11 +6,155 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 | Item | Value |
 |---|---|
-| Phase | 2: PDF and capabilities, begun; Phase 1's open items remain (Phase 0 decided: **Go**, 2026-11-12) |
-| Released | `0.1.0-preview` on nuget.org, 2026-11-15 |
-| State | Phase 1 under way. The public API for 0.1 is settled and applied ([ADR 0018](decisions/0018-api-review-0-1.md)), guarded by the public API analyzer. Windows errors now map to explained exceptions ([ADR 0019](decisions/0019-windows-error-mapping.md), proposed), and raw data to Microsoft Print to PDF is refused. CUPS servers that need a password can be used, over TLS ([ADR 0020](decisions/0020-cups-authentication.md), proposed). Integration tests against the virtual printers are wired into CI on all three runners: the CUPS container on Ubuntu, the runner's own CUPS on macOS, and the spooler test printers on Windows. The first Ubuntu run found a permissions bug in the test container, now fixed; none has passed in CI yet. Direct IPP resends jobs a busy printer turns away; IPP connections give up after 10 s and try IPv6 and IPv4 together. Still open from Phase 0: the Mac checks (Spikes 1 and 4). |
-| Next step | Owner: review `feature/print-media-options`: [ADR 0025](decisions/0025-choose-paper-colour-and-tray.md) (choosing paper, colour and tray), `WindowsOptions.MaxRenderDpi`, [ADR 0026](decisions/0026-vendor-options-in-detail.md) (vendor options), the Native AOT check in CI, and direct IPP for Windows queues ([ADR 0027](decisions/0027-direct-ipp-for-windows-queues.md), accepted); then push for CI. Phase 2's checklist is done. If anyone has a Windows 11 PC with a driverless IPP queue, its `Get-Printer` and `Get-PrinterPort` output would settle ADR 0027's last open point. Still proposed and waiting for review: ADRs [0011](decisions/0011-capability-model.md), [0019](decisions/0019-windows-error-mapping.md), [0020](decisions/0020-cups-authentication.md), [0022](decisions/0022-release-process.md) and [0024](decisions/0024-known-ipp-printer-uris.md). |
+| Phase | 2: PDF and capabilities, done; Phase 3 next. Phase 1's open items: the end-to-end harness's mDNS trial in CI. Phase 0's: the Mac checks (Spikes 1 and 4) |
+| Released | `11.0.5-preview` on nuget.org, 2026-11-17. The next release is `11.0.6-preview` ([ADR 0030](decisions/0030-release-numbering.md)) |
+| State | Every Phase 2 item is done. Windows PDF jobs take a Print Ticket in `windows:print-ticket` ([ADR 0031](decisions/0031-windows-print-tickets.md)). `PrinterCapabilities.VendorOptions` lists every IPP job attribute and Windows driver feature a printer offers, ready to set, and `IWindowsPrinter` reads a driver's Print Capabilities ([ADR 0032](decisions/0032-vendor-options-in-capabilities.md)). CI was green on all three runners on 2026-11-17 (owner). Releases are numbered after the latest one, and a merge with nothing new releases nothing. Every ADR is accepted (owner, 2026-11-18). |
+| Next step | Owner: review `feature/pdf-capability` (ADRs [0030](decisions/0030-release-numbering.md), [0031](decisions/0031-windows-print-tickets.md) and [0032](decisions/0032-vendor-options-in-capabilities.md)), then push for CI. Delete the leftover branch `post-release/v11.0.4-preview`. Then Phase 3: printing PDFs to printers that don't take PDF, such as the HP ENVY, by rendering to Apple raster, PCLm or PWG raster, with routing for WSD queues by printer UUID (ADR 0027, "Follow-up"). Still unexamined: a queue on Microsoft's IPP Class Driver; [tools/windows-queue-report](../tools/windows-queue-report/README.md) records one. |
 | Blockers | None |
+
+---
+
+## 2026-11-18: Second review's fixes
+
+**Done** (owner: "Let's run another sweep through", then "Fix all seven")
+- **The CLI** reports `ArgumentException`s (a vendor option the printer lacks, a ticket that isn't one) and files it can't read as messages, exiting with code 64, instead of crashing; `print-capabilities --ticket` with no file says so.
+- **Remembered refusals:**
+  - an IPP printer that refuses the vendor option request, with a client error or an unreadable answer, isn't asked again by the same `IPrinter`;
+  - a Windows driver without Print Ticket support isn't tried again;
+  - so each costs one round trip and one log entry, not one per capabilities read;
+  - looking up a job's paper and tray no longer opens a Print Ticket session.
+- **The queue report:**
+  - lists queues with a plain `Get-Printer`, which doesn't ask print servers;
+  - reads each queue's details in its own try, so one that fails is recorded with its error rather than stopping the report;
+  - matches `-PrinterName` exactly, warning about names it doesn't find.
+- **IPP text values** aren't offered as choices, since they'd go back as names.
+- **`PrintTicketSession.Dispose`** runs once, however often it is called.
+- **Tests:**
+  - each of the three AddLatiprimere… methods passes DI's logger factory on, and logs nothing without one;
+  - a refusal is remembered and a connection failure isn't;
+  - a double Dispose leaves COM working, checked with Microsoft Print to PDF.
+- **Docs:** the guide's example shows limits that aren't reported as "any", and the guide says what isn't listed and what's refused.
+- **Results:** 1,830 tests, 0 failed, 188 skipped. The Native AOT harness publishes without warnings and passes the vendor option scenarios.
+
+---
+
+## 2026-11-18: Review fixes for the vendor option work
+
+**Done** (owner: "Let's run a sweep for bugs, potential performance, security issues etc.", then "Fix all ten")
+- **IPP:**
+  - resolution values are inferred only for attributes ending in `-resolution`, so `cups:resolution` = `600dpi` is sent as a name, as before;
+  - the vendor option request runs after the typed one, not alongside it, since some printers take one connection at a time; if it fails, the capabilities list no vendor options and the failure is logged, instead of the whole capabilities read failing.
+- **Windows:**
+  - a missing `prntvpt.dll` is a `PrintException` at the interop boundary, so capabilities still work without it;
+  - parameters the driver expects encrypted, such as Print to PDF's PDF passwords, aren't listed;
+  - options the device or an administrator rules out are refused, as they aren't listed;
+  - feature keys are checked against the Print Capabilities for the job's saved `windows:devmode`;
+  - copied features carry namespace declarations made below the document's root;
+  - the default DEVMODE is read once per capabilities read.
+- **Logging:** `Latiprimere.Ipp`, `Latiprimere.Cups` and `Latiprimere.Windows` now reference `Microsoft.Extensions.Logging.Abstractions`. Their contexts carry a logger from DI's `ILoggerFactory`; the public factories log nothing. What used to be swallowed is now logged.
+- **Conventions:** messages come from resources, literals are named constants, the XML reader settings and the keyword naming are each written once (`PrintSchemaText.CreateReaderSettings`, `IppKeywords.Describe`), and the tests share one `RecordingLogger` in Latiprimere.Testing.
+- **CONTRIBUTING.md:** the dependency rule now names `Latiprimere.Ipp` as the one adapter the others may reference (ADRs 0006 and 0027), and the AOT note points to the scenario list in `check-aot.sh`.
+- **Tests:** 1,808, 0 failed, 188 skipped. The Native AOT publishes for both targets have no trimming or AOT warnings, and the vendor option scenarios pass natively.
+
+**Learned**
+- **`cups:Resolution`, as first reported, was never accepted:** vendor option names must be lowercase IPP keywords, so CUPS's capitalised PPD option names can't be set through `cups:`. That's an existing limit of ADR 0026, worth knowing for drivers whose options are all PPD-named.
+
+**Not done**
+- A Windows capabilities read still opens a Print Ticket session, which for a queue shared from a print server may go to the server. It isn't cached, since the driver's settings can change between reads.
+
+---
+
+## 2026-11-18: Vendor options in the capabilities, Windows Print Capabilities, and the queue report
+
+**Done** (owner: "Build both, but also include 2B and 2C rather than waiting for someone to ask for it. Let's go as fully featured as we can.")
+- **The queue report** ([tools/windows-queue-report](../tools/windows-queue-report/README.md)): a read-only PowerShell script that records each Windows queue as JSON, in about 15 seconds:
+  - `Get-Printer`, `Get-PrinterPort` and `Get-PrinterDriver`, every property;
+  - the spooler and port monitor registry keys;
+  - the queue's Plug and Play device and the other devices of the same printer.
+
+  The first version looked each device's container up one at a time and took minutes; one batched call fixed it.
+- **What it found** (ADR 0027, "Follow-up"):
+  - Windows had set up a queue for the HP itself, `HPA495A2 (HP ENVY 5540 series)`, on a WSD port with HP's inbox class driver, not Microsoft's IPP Class Driver;
+  - the WSD port's registry key records `Printer UUID = 1c852a4d-…`;
+  - asked over IPP, the printer's `printer-uuid` is `urn:uuid:` and the same value.
+
+  So WSD queues can be matched exactly to IPP printers found over mDNS. That's left for Phase 3, since this printer doesn't take PDF over IPP.
+- **Vendor options in `PrinterCapabilities`** ([ADR 0032](decisions/0032-vendor-options-in-capabilities.md)): `VendorOption` and `VendorOptionChoice` records and a `VendorOptionKind` enum in Latiprimere.Abstractions. Every key and value listed can be set in `PrintOptions.VendorOptions` as it is.
+  - **IPP:**
+    - a raw Get-Printer-Attributes request for the `job-template` group, alongside the typed one, through the new `IIppClient.GetPrinterAttributeListAsync`;
+    - attributes from `job-creation-attributes-supported`, minus what the typed options send;
+    - collections skipped by their nesting, since the flattened encoding names a member's values after the member (`media-type` turned up from `media-col-database`);
+    - resolutions written `600dpi`, which the vendor option encoder now sends as `resolution`.
+  - **Windows:**
+    - the driver's Print Capabilities and default ticket read in one Print Ticket session, with features as `windows:feature:` keys and parameters as `windows:parameter:` keys, under the document's own prefixes;
+    - options without names identified by their scored properties (`psk:PagesPerSheet=4`);
+    - at print time the keys are checked against the Print Capabilities and copied into a second delta ticket, merged after `windows:print-ticket`.
+- **`IWindowsPrinter`** (public, in Latiprimere.Windows): `QueueName`, `GetPrintCapabilitiesAsync(printTicket)` and `GetDefaultPrintTicketAsync()`.
+  - The Print Ticket code moved into a `PrintTicketSession` class: one provider and one COM initialisation, used on one thread.
+  - `SafeComStreamHandle` gained `Read`, through the vtable as before.
+- **Tools:**
+  - the CLI's `caps` lists vendor options; `print-capabilities` writes the driver's documents; `print --ticket FILE` sends a ticket file;
+  - the harness gained `ipp.vendor-options.listed-and-sent` and `windows.vendor-options.listed-and-sent`, both in CI's Native AOT check;
+  - manual mode saves the vendor options and, on Windows, the driver's documents;
+  - the docs' capabilities guide gained vendor option and Print Capabilities sections, with examples that run in the examples sample.
+- **Tests:**
+  - the solution: 1,790 tests, 0 failed, 188 skipped (no spooler test printers or CUPS container on this PC);
+  - IPP vendor options against four captured responses (HP ENVY 5640, `ippeveprinter`, two CUPS 2.4 queues), each listed value sent back with the tag it was listed with;
+  - Windows Print Capabilities against a document modelled on the HP and XPS drivers;
+  - the five related harness scenarios, normally and as Native AOT builds for both targets, with no trimming or AOT warnings.
+
+**Learned**
+- **Microsoft Print to PDF's vendor namespace includes its driver version** (`…/Microsoft_Print To PDF/10.0.26100.9974/`), while the Print Ticket API's prefix for it is `ns0000`. Keys use prefixes, so a driver update doesn't break saved settings.
+- **Through the HP's own driver,** pages per sheet 4, Best quality and HP Premium Plus Photo paper were merged and read back from the DEVMODE; nothing was printed.
+- **XPS Document Writer keeps an image compression choice in its DEVMODE,** but its output files held the same images either way: page images drawn through GDI aren't recompressed. It's a poor printer for checking that a feature takes effect.
+- **`print-quality` on IPP printers** came out as Draft, Normal and High for every capture. CUPS queues add `job-priority` (1 to 100), `job-sheets`, `number-up` and `job-hold-until`.
+
+**Not done**
+- Nothing committed or pushed.
+- No vendor option has been printed on paper.
+- Nested Print Schema features and IPP collections aren't listed; `windows:print-ticket` still reaches nested features.
+- A queue on Microsoft's IPP Class Driver hasn't been examined.
+
+---
+
+## 2026-11-18: Print Tickets on Windows, and release numbering
+
+**Done** (owner: "Let's continue with phase 2", "the release process is incrementing the version number twice rather than once … Can you also investigate that", and "Consider those ADRs accepted")
+- **Why 11.0.4 was skipped:**
+  - the build number was the Release workflow's run number;
+  - pull request #6 merged `main` into `release` when `main` had nothing new but 11.0.3's post-release commit, so the merged commit had exactly `v11.0.3-preview`'s files;
+  - that push started run 4, which pushed `post-release/v11.0.4-preview` and was then cancelled;
+  - the next real release was run 5, so 11.0.5.
+- **Fixed** ([ADR 0030](decisions/0030-release-numbering.md)):
+  - [next-version.sh](../tools/releasing/next-version.sh) numbers a release one after the highest build number on nuget.org or in the tags, so failed and cancelled runs leave no gap; it prints `11.0.6-preview` now;
+  - a new first job, `check`, stops a release whose files are exactly the latest release tag's ([anything-to-release.sh](../tools/releasing/anything-to-release.sh));
+  - [published-versions.sh](../tools/releasing/published-versions.sh) reads nuget.org once for all three scripts.
+- **A second gap, in the changelog:**
+  - 11.0.5's notes had been added under the released `## 11.0.3-preview` heading, so 11.0.5 had no entry;
+  - the next release would have refused to start: prepare-release.sh looked for a dated heading for the previous version, while a release without notes is allowed;
+  - now prepare-release.sh checks that the previous release's tag is in the merged commit's history;
+  - it refuses a changelog that changed since that tag without a `## Unreleased` heading;
+  - the three 11.0.5 notes have their own entry.
+
+  A dry run in a scratch worktree on main's tip prepared 11.0.6-preview. On the commit before 11.0.5's post-release merge, it stopped as it should.
+- **ADRs accepted:** 0011, 0019, 0020, 0022, 0024, 0025, 0026 and 0028 (0028's build number now superseded by 0030).
+- **Phase 2's last items:**
+  - the capability model and Windows PDF printing via PDFium were already done: reading in Spike 5, choosing on 2026-11-16, real paper on 2026-11-17; ticked;
+  - `windows:print-ticket` is built ([ADR 0031](decisions/0031-windows-print-tickets.md)). The value must be XML with a `psf:PrintTicket` root, and is re-encoded as UTF-8. PDF jobs merge it onto the driver's defaults, or onto `windows:devmode`, through `prntvpt.dll`, and the typed options are applied after it.
+- **Tests:**
+  - 12 new unit test cases;
+  - 3 integration tests with Microsoft Print to PDF: a merged A5 ticket gives a DEVMODE with paper 11, the driver refuses a malformed ticket with `ArgumentException`, and a PDF printed with the ticket comes out A5;
+  - the end-to-end scenario `windows.output.print-ticket`, which the Native AOT check now runs as well.
+  - The whole solution: 1,686 tests, 0 failed, 182 skipped (no spooler test printers or CUPS container on this PC).
+  - The CLI sample and the harness published with Native AOT without trimming or AOT warnings. The native harness passed `windows.output.print-ticket` and `windows.output.paper-and-orientation`.
+
+**Learned**
+- **COM without COM interop:** the Print Ticket API wants `IStream`s. Streams from `CreateStreamOnHGlobal`, with `Write`, `Seek` and `Release` called through unmanaged function pointers on the vtable, need no generated COM wrappers, and work under Native AOT.
+- **A delta ticket can be tiny:** naming `psk:ISOA5` alone was enough. Microsoft Print to PDF's driver filled in the size's properties.
+
+**Not done**
+- Nothing pushed or committed; the leftover remote branch `post-release/v11.0.4-preview` is still there.
+- The Print Ticket hasn't been tried with a vendor driver's own features, or on real paper.
 
 ---
 

@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Latiprimere.Windows.Interop;
+using Latiprimere.Windows.PrintTickets;
 
 namespace Latiprimere.Windows.Spooler;
 
@@ -311,12 +312,38 @@ internal sealed unsafe class WinSpoolApi : IWinSpool
 	}
 
 	/// <inheritdoc/>
-	public WindowsCapabilitiesRecord? GetCapabilities(string printerName)
+	public WindowsCapabilitiesRecord? GetCapabilities(string printerName, bool includePrintSchema)
 	{
 		// The port comes from the printer's details; some drivers need it to answer
 		WindowsPrinterRecord? printer = this.GetPrinter(printerName);
 
-		return printer is null ? null : WindowsCapabilityReader.Read(printerName, printer.PortName);
+		return printer is null ? null : WindowsCapabilityReader.Read(printerName, printer.PortName, includePrintSchema);
+	}
+
+	/// <inheritdoc/>
+	public byte[] GetDefaultPrintTicket(string printerName)
+	{
+		byte[] devMode = WindowsCapabilityReader.ReadDefaultDevMode(printerName);
+		using PrintTicketSession session = PrintTicketSession.Open(printerName);
+
+		return session.ConvertDevModeToTicket(devMode);
+	}
+
+	/// <inheritdoc/>
+	public byte[] GetPrintCapabilities(string printerName, byte[]? baseDevMode, IReadOnlyList<byte[]> printTickets)
+	{
+		ArgumentNullException.ThrowIfNull(printTickets);
+
+		byte[] devMode = baseDevMode ?? WindowsCapabilityReader.ReadDefaultDevMode(printerName);
+		using PrintTicketSession session = PrintTicketSession.Open(printerName);
+		byte[] ticket = session.ConvertDevModeToTicket(devMode);
+
+		foreach (byte[] delta in printTickets)
+		{
+			ticket = session.Merge(ticket, delta);
+		}
+
+		return session.GetPrintCapabilities(ticket);
 	}
 
 	/// <summary>

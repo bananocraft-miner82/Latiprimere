@@ -2,6 +2,7 @@ using Latiprimere.Cups.Resources;
 using Latiprimere.Ipp;
 using SharpIpp.Models.Requests;
 using SharpIpp.Models.Responses;
+using SharpIpp.Protocol.Models;
 
 namespace Latiprimere.Cups;
 
@@ -42,6 +43,12 @@ internal sealed class InvalidServerIppClient : IIppClient
 	public Task<GetPrinterAttributesResponse> GetPrinterAttributesAsync(GetPrinterAttributesRequest request, CancellationToken cancellationToken)
 	{
 		return Task.FromException<GetPrinterAttributesResponse>(this.CreateException());
+	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<IppAttribute>> GetPrinterAttributeListAsync(GetPrinterAttributesRequest request, CancellationToken cancellationToken)
+	{
+		return Task.FromException<IReadOnlyList<IppAttribute>>(this.CreateException());
 	}
 
 	/// <inheritdoc/>

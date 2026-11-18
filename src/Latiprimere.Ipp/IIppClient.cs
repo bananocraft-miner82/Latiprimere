@@ -1,5 +1,6 @@
 using SharpIpp.Models.Requests;
 using SharpIpp.Models.Responses;
+using SharpIpp.Protocol.Models;
 
 namespace Latiprimere.Ipp;
 
@@ -39,6 +40,16 @@ internal interface IIppClient
 	/// <returns>The response.</returns>
 	/// <exception cref="PrintException">The request failed or was rejected.</exception>
 	Task<GetPrinterAttributesResponse> GetPrinterAttributesAsync(GetPrinterAttributesRequest request, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Sends a Get-Printer-Attributes request and returns every printer attribute as it was encoded, with its tag:
+	/// including those the typed response leaves out, such as vendor and job template attributes (ADR 0032).
+	/// </summary>
+	/// <param name="request">The request.</param>
+	/// <param name="cancellationToken">A token to cancel the operation.</param>
+	/// <returns>The attributes in the order received; each value of a set is its own entry.</returns>
+	/// <exception cref="PrintException">The request failed or was rejected.</exception>
+	Task<IReadOnlyList<IppAttribute>> GetPrinterAttributeListAsync(GetPrinterAttributesRequest request, CancellationToken cancellationToken);
 
 	/// <summary>
 	/// Sends a Print-Job request.

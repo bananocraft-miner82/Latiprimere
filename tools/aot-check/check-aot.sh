@@ -8,10 +8,16 @@
 #   - ipp.submission.virtual-printer-options: a PDF straight to that printer with paper, tray, colour and vendor
 #     options, and a vendor value it must refuse, with LATIPRIMERE_TEST_IPP_PRINTER set;
 #   - windows.output.paper-and-orientation: Microsoft Print to PDF on A4, A5 and landscape, on Windows with that
-#     printer, its pages measured.
+#     printer, its pages measured;
+#   - windows.output.print-ticket: the same printer on A5 from a Print Ticket, which goes through prntvpt.dll by
+#     function pointers into COM, so it is worth checking natively (ADR 0031);
+#   - windows.vendor-options.listed-and-sent: that printer's Print Capabilities read, parsed and printed with
+#     (ADR 0032);
+#   - ipp.vendor-options.listed-and-sent: vendor options read from raw IPP attributes and sent back, against the
+#     scripted IPP printer, so on every runner (ADR 0032).
 #
-# A scenario whose test printers this machine doesn't have is skipped; one that runs must pass. These are the checks
-# this script made with the CLI sample before the harness existed: CI runs only these (ADR 0029). Run every scenario
+# A scenario whose test printers this machine doesn't have is skipped; one that runs must pass. The first four are
+# the checks this script made with the CLI sample before the harness existed: CI runs only these (ADR 0029). Run every scenario
 # natively with tools/test-harness/run.ps1 -Aot or run.sh --aot.
 #
 # Usage: tools/aot-check/check-aot.sh [target-framework]   (default net10.0)
@@ -28,6 +34,9 @@ scenarios=(
 	cups.submission.vendor-options
 	ipp.submission.virtual-printer-options
 	windows.output.paper-and-orientation
+	windows.output.print-ticket
+	windows.vendor-options.listed-and-sent
+	ipp.vendor-options.listed-and-sent
 )
 
 # The ILCompiler finds the Windows linker through vswhere, which Git Bash may not have on its path

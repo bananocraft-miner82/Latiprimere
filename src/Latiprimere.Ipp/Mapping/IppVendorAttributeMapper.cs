@@ -12,7 +12,9 @@ namespace Latiprimere.Ipp.Mapping;
 /// <remarks>
 /// The name after the prefix is the attribute name. Values separated by commas are several values. Each value's type
 /// is inferred: an integer is an <c>integer</c>, or an <c>enum</c> for attributes IPP defines as enums; <c>true</c>
-/// and <c>false</c> are a <c>boolean</c>; keyword syntax is a <c>keyword</c>; anything else is a <c>name</c>.
+/// and <c>false</c> are a <c>boolean</c>; <c>600dpi</c>, <c>600x1200dpi</c> or <c>118dpcm</c> is a
+/// <c>resolution</c> for an attribute whose name ends in <c>-resolution</c>; keyword syntax is a <c>keyword</c>;
+/// anything else is a <c>name</c>.
 /// </remarks>
 internal static partial class IppVendorAttributeMapper
 {
@@ -51,6 +53,10 @@ internal static partial class IppVendorAttributeMapper
 		"job-mandatory-attributes",
 		"job-media-sheets",
 	};
+
+	/// <summary>The end of the names of IPP's resolution attributes, such as <c>printer-resolution</c> and
+	/// <c>pclm-source-resolution</c>, whose values are resolutions.</summary>
+	private const string ResolutionSuffix = "-resolution";
 
 	/// <summary>Operation attributes every Print-Job request carries.</summary>
 	private static readonly string[] AlwaysSent =
@@ -152,6 +158,21 @@ internal static partial class IppVendorAttributeMapper
 			return new IppAttribute(Tag.Boolean, name, value == "true");
 		}
 
+		// A resolution, as printer-resolution takes: 600dpi, 600x1200dpi or 118dpcm (ADR 0032). Only for IPP's
+		// resolution attributes: elsewhere, such as CUPS's resolution option, "600dpi" is a name.
+		Match resolution = name.EndsWith(IppVendorAttributeMapper.ResolutionSuffix, StringComparison.Ordinal)
+			? IppVendorAttributeMapper.ResolutionPattern().Match(value)
+			: Match.Empty;
+
+		if (resolution.Success
+			&& int.TryParse(resolution.Groups["width"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out int width)
+			&& int.TryParse(resolution.Groups["height"].Success ? resolution.Groups["height"].Value : resolution.Groups["width"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out int height))
+		{
+			ResolutionUnit units = resolution.Groups["units"].Value == "dpcm" ? ResolutionUnit.DotsPerCm : ResolutionUnit.DotsPerInch;
+
+			return new IppAttribute(Tag.Resolution, name, new Resolution(width, height, units));
+		}
+
 		return IppVendorAttributeMapper.KeywordPattern().IsMatch(value)
 			? new IppAttribute(Tag.Keyword, name, value)
 			: new IppAttribute(Tag.NameWithoutLanguage, name, value);
@@ -230,4 +251,11 @@ internal static partial class IppVendorAttributeMapper
 	/// <returns>The pattern.</returns>
 	[GeneratedRegex("^[a-z][a-z0-9._-]*$", RegexOptions.CultureInvariant)]
 	private static partial Regex KeywordPattern();
+
+	/// <summary>
+	/// A resolution: dots across, optionally <c>x</c> and dots down, then <c>dpi</c> or <c>dpcm</c>.
+	/// </summary>
+	/// <returns>The pattern.</returns>
+	[GeneratedRegex("^(?<width>[0-9]{1,6})(x(?<height>[0-9]{1,6}))?(?<units>dpi|dpcm)$", RegexOptions.CultureInvariant)]
+	private static partial Regex ResolutionPattern();
 }

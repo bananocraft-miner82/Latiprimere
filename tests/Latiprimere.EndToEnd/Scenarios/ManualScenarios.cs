@@ -124,6 +124,25 @@ public static class ManualScenarios
 		context.Person.Tell(string.Join(Environment.NewLine, lines));
 		await context.AskPersonAsync("the capabilities match the printer", "Do the paper sizes, sides, colour and trays match what the printer can do?");
 
+		// Everything else the printer offers, and on Windows the driver's own description of it (ADR 0032)
+		await VendorOptionScenarios.SaveAsync(context, "vendor-options.txt", capabilities.VendorOptions);
+		context.Note($"{capabilities.VendorOptions.Count} vendor options listed.");
+
+		if (printer is Latiprimere.Windows.IWindowsPrinter windowsPrinter)
+		{
+			try
+			{
+				string printCapabilities = await windowsPrinter.GetPrintCapabilitiesAsync(cancellationToken: context.CancellationToken);
+				string defaultTicket = await windowsPrinter.GetDefaultPrintTicketAsync(context.CancellationToken);
+				await context.SaveEvidenceAsync("print-capabilities.xml", [printCapabilities], "The driver's Print Capabilities");
+				await context.SaveEvidenceAsync("default-print-ticket.xml", [defaultTicket], "The driver's default Print Ticket");
+			}
+			catch (PrintException exception)
+			{
+				context.Note($"The driver's Print Capabilities couldn't be read: {exception.Message}");
+			}
+		}
+
 		Uri? ippUri = ManualPrinting.FindIppUri(info.Id);
 
 		if (ippUri is null)

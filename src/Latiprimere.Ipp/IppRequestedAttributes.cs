@@ -124,6 +124,16 @@ internal static class IppRequestedAttributes
 	};
 
 	/// <summary>
+	/// The attributes read for <see cref="PrinterCapabilities.VendorOptions"/>: every job template attribute, through
+	/// the group keyword, and the list of attributes a job may set (ADR 0032).
+	/// </summary>
+	internal static readonly string[] VendorOptionAttributes = new string[]
+	{
+		"job-template",
+		"job-creation-attributes-supported",
+	};
+
+	/// <summary>
 	/// The job attributes Latiprimere reads to build a <c>PrintJobStatus</c>.
 	/// </summary>
 	internal static readonly string[] JobStatusAttributes = new string[]

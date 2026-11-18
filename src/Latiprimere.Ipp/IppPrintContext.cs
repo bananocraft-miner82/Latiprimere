@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace Latiprimere.Ipp;
 
 /// <summary>
@@ -30,6 +33,9 @@ internal sealed record IppPrintContext
 	/// Gets the clock used to timestamp job statuses and to time retries.
 	/// </summary>
 	public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
+	/// <summary>Gets where to log what the caller isn't told, such as vendor options that couldn't be read.</summary>
+	public ILogger Logger { get; init; } = NullLogger.Instance;
 
 	/// <summary>
 	/// Gets how long to keep resending a job that the printer turns away with <c>server-error-busy</c>.

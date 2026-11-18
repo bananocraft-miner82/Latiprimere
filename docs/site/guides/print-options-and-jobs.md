@@ -16,6 +16,7 @@ sidebar:
 | `Duplex`      | `OneSided`, `LongEdge` or `ShortEdge`                      | `PrinterDefault`               |
 | `Orientation` | `Portrait` or `Landscape`                                  | `PrinterDefault`               |
 | `OutputFile`  | A file to print to instead of the printer (Windows only)   | `null`: print normally         |
+| `VendorOptions` | Anything else the printer offers, by key: see below      | Empty                          |
 
 For two-sided printing, `LongEdge` turns pages like a book, and `ShortEdge` flips them like a notepad, which suits landscape pages. `OutputFile` is for virtual printers such as Microsoft Print to PDF: see [CUPS servers and the Windows spooler](/docs/print-systems/cups-and-windows/).
 
@@ -24,6 +25,21 @@ CUPS may not turn a PDF's pages for `Landscape`: in testing with CUPS 2.4, a por
 :::
 
 Setting `Copies` below 1 throws `ArgumentOutOfRangeException`. A printer that doesn't support a setting may ignore it or reject the job, depending on the print system: [Reading printer capabilities](/docs/guides/printer-capabilities/) shows how to check first.
+
+### Vendor options
+
+`VendorOptions` sets what the typed options don't cover, such as print quality, stapling or a driver's own settings. Each key starts with the print system that reads it, and each print system ignores the others' keys:
+
+| Key                                  | Read by                         | Example                                              |
+| ------------------------------------ | ------------------------------- | ---------------------------------------------------- |
+| `ipp:<attribute>`                    | CUPS and network printers       | `ipp:print-quality` = `5`, `ipp:printer-resolution` = `1200dpi` |
+| `cups:<option>`                      | CUPS                            | `cups:fit-to-page` = `true`                          |
+| `windows:feature:<feature>`          | Windows                         | `windows:feature:psk:PageOutputQuality` = `psk:High` |
+| `windows:parameter:<parameter>`      | Windows                         | `windows:parameter:ns0000:JobDarkness` = `2`         |
+| `windows:print-ticket`               | Windows                         | A Print Ticket, as XML                               |
+| `windows:devmode`                    | Windows                         | A DEVMODE saved from the driver, in base64           |
+
+The printer's capabilities list the keys and values it takes: see [Vendor options](/docs/guides/printer-capabilities/#vendor-options-everything-else-the-printer-offers). A key that sets something a typed option sets for the same job, such as `ipp:copies` with `Copies`, is refused with `ArgumentException`. On Windows, raw jobs don't use the `windows:` keys, since the data goes to the printer unchanged.
 
 `PrintOptions` is a record, so you can start from the defaults and change one thing:
 

@@ -253,6 +253,85 @@ public sealed class IppPrinterTests
 	}
 
 	[Fact]
+	public async Task GivenPrinterWithJobAttributesWhenGetCapabilitiesThenListsThemAsVendorOptions()
+	{
+		// Arrange — the raw attributes are asked for alongside the typed ones
+		FakeIppClient client = new FakeIppClient();
+		client.AddPrinter(IppPrinterTests.PrinterUri, new PrinterAttributesBuilder().Build());
+
+		client.SetAttributeList
+		(
+			IppPrinterTests.PrinterUri,
+			[
+				new IppAttribute(Tag.Keyword, "job-creation-attributes-supported", "print-quality"),
+				new IppAttribute(Tag.Enum, "print-quality-supported", 4),
+				new IppAttribute(Tag.Enum, "print-quality-supported", 5),
+				new IppAttribute(Tag.Enum, "print-quality-default", 4),
+			]
+		);
+
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+
+		// Act
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(1, client.AttributeListRequestCount);
+		VendorOption quality = Assert.Single(capabilities.VendorOptions);
+		Assert.Equal("ipp:print-quality", quality.Key);
+		Assert.Equal(["4", "5"], quality.Choices.Select(choice => choice.Value));
+		Assert.Equal("4", quality.DefaultValue);
+	}
+
+	[Fact]
+	public async Task GivenPrinterThatRefusesTheVendorOptionRequestWhenGetCapabilitiesThenReturnsTheRestAndLogsIt()
+	{
+		// Arrange — some printers turn away the job-template group; the typed capabilities don't depend on it
+		FakeIppClient client = new FakeIppClient
+		{
+			AttributeListFailureToThrow = new PrintException("client-error-attributes-or-values-not-supported")
+		};
+
+		client.AddPrinter(IppPrinterTests.PrinterUri, new PrinterAttributesBuilder().Build());
+		RecordingLogger logger = new RecordingLogger();
+		IppPrintContext context = new IppPrintContextBuilder().WithClient(client).WithLogger(logger).Build();
+		IppPrinter printer = new IppPrinter(context, IppPrinterTests.PrinterUri, new PrinterInfo { Id = "cups:Office", Name = "Office" }, null);
+
+		// Act
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Empty(capabilities.VendorOptions);
+		Assert.Single(client.GetPrinterAttributesRequests);
+		(Microsoft.Extensions.Logging.LogLevel level, string message, Exception? exception) = Assert.Single(logger.Entries);
+		Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Warning, level);
+		Assert.Contains(IppPrinterTests.PrinterUri.ToString(), message, StringComparison.Ordinal);
+		Assert.IsType<PrintException>(exception);
+	}
+
+	[Theory]
+	[InlineData(0x040B, 1)]
+	[InlineData(null, 2)]
+	public async Task GivenVendorOptionRequestFailingWhenGetCapabilitiesTwiceThenAsksAgainOnlyIfItMayPass(int? status, int expectedRequests)
+	{
+		// Arrange — client-error-attributes-or-values-not-supported is the printer's answer; a failure to connect, with
+		// no IPP status, may pass (provided by InlineData above)
+		FakeIppClient client = new FakeIppClient { AttributeListFailureToThrow = new PrintException("Refused.") { NativeErrorCode = status } };
+		client.AddPrinter(IppPrinterTests.PrinterUri, new PrinterAttributesBuilder().Build());
+		RecordingLogger logger = new RecordingLogger();
+		IppPrintContext context = new IppPrintContextBuilder().WithClient(client).WithLogger(logger).Build();
+		IppPrinter printer = new IppPrinter(context, IppPrinterTests.PrinterUri, new PrinterInfo { Id = "cups:Office", Name = "Office" }, null);
+
+		// Act
+		await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+		await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(expectedRequests, client.AttributeListRequestCount);
+		Assert.Equal(expectedRequests, logger.Entries.Count);
+	}
+
+	[Fact]
 	public async Task GivenPrinterThatHasGoneWhenGetCapabilitiesThenThrowsPrintException()
 	{
 		// Arrange — the fake client answers not-found for a URI with no printer

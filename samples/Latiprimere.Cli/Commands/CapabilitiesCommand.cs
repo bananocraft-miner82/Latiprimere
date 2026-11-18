@@ -86,7 +86,54 @@ internal static class CapabilitiesCommand
 			capabilities.InputTrays.Select(tray => CliMessages.FormatTrayValue(tray.Name, tray.Id))
 		);
 
+		CapabilitiesCommand.WriteVendorOptions(capabilities.VendorOptions);
+
 		return ExitCodes.Success;
+	}
+
+	/// <summary>
+	/// Writes the vendor options, one per line, with the values each takes; the default is marked.
+	/// </summary>
+	/// <param name="options">The vendor options.</param>
+	private static void WriteVendorOptions(IReadOnlyList<VendorOption> options)
+	{
+		if (options.Count == 0)
+		{
+			ConsoleOutput.Write(CliMessages.CapabilityLine, CliMessages.CapabilityVendorOptions, CliMessages.NotReported);
+
+			return;
+		}
+
+		ConsoleOutput.Write(CliMessages.CapabilityLine, CliMessages.CapabilityVendorOptions, string.Empty);
+
+		foreach (VendorOption option in options)
+		{
+			string values = option.Kind switch
+			{
+				VendorOptionKind.Choice => string.Join
+				(
+					", ",
+					option.Choices.Select(choice => CapabilitiesCommand.Mark
+					(
+						CliMessages.FormatVendorChoiceValue(choice.Value, choice.DisplayName),
+						choice.Value == option.DefaultValue
+					))
+				) + (option.AllowsSeveralValues ? CliMessages.VendorSeveralValues : string.Empty),
+				VendorOptionKind.Number => CliMessages.FormatVendorNumberValue
+				(
+					option.MinimumValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "…",
+					option.MaximumValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "…"
+				),
+				_ => CliMessages.VendorTextValue,
+			};
+
+			if (option.Kind != VendorOptionKind.Choice && option.DefaultValue is not null)
+			{
+				values += CliMessages.DefaultMarker + " " + option.DefaultValue;
+			}
+
+			ConsoleOutput.Write(CliMessages.VendorOptionLine, option.Key, option.DisplayName, values);
+		}
 	}
 
 	/// <summary>

@@ -32,4 +32,9 @@ internal sealed record GdiPrintRequest
 	/// <summary>Gets a DEVMODE saved from the driver (<c>windows:devmode</c>), with its private data, to start from
 	/// instead of the driver's defaults; or <see langword="null"/>.</summary>
 	public byte[]? SavedDevMode { get; init; }
+
+	/// <summary>Gets Print Tickets, as UTF-8 XML, to merge in order onto the saved or default DEVMODE through the
+	/// driver before the options are applied: the one from <c>windows:print-ticket</c>, then one made from the
+	/// <c>windows:feature:</c> and <c>windows:parameter:</c> keys. Empty if there are none.</summary>
+	public IReadOnlyList<byte[]> PrintTickets { get; init; } = Array.Empty<byte[]>();
 }
