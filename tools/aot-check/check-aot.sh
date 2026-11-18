@@ -80,20 +80,28 @@ harness="$harness_directory/Latiprimere.TestHarness"
 [[ -f "$harness.exe" ]] && harness="$harness.exe"
 
 # On macOS, launchd starts CUPS on demand, and it exits after about a minute with nothing to do. Only its local
-# socket starts it again, not the TCP port Latiprimere connects to, and the publishes above leave it idle for
-# minutes. lpstat goes through that socket, so it wakes the scheduler; then wait for the port to answer.
+# socket starts it again, not the TCP port, and the publishes above leave it idle for minutes. lpstat goes through
+# that socket, so it wakes the scheduler. A server given as the socket's path (CI's, /private/var/run/cupsd) needs
+# nothing more, as Latiprimere connects through it too; one given as host:port also has to answer on that port.
 wake_macos_cups() {
 	local server="$LATIPRIMERE_TEST_CUPS_SERVER"
-	local host="${server%:*}"
-	local port="${server##*:}"
-	[[ "$server" == *:* ]] || port=631
+	local host=""
+	local port=""
+	local target="$server" # As shown if it never answers
 	local attempts=0
 
-	until lpstat -r 2> /dev/null | grep -q "scheduler is running" && nc -z "$host" "$port" 2> /dev/null; do
+	if [[ "$server" != /* ]]; then
+		host="${server%:*}"
+		port="${server##*:}"
+		[[ "$server" == *:* ]] || port=631
+		target="$host:$port"
+	fi
+
+	until lpstat -r 2> /dev/null | grep -q "scheduler is running" && { [[ -z "$host" ]] || nc -z "$host" "$port" 2> /dev/null; }; do
 		attempts=$((attempts + 1))
 
 		if [[ "$attempts" -ge 60 ]]; then
-			echo "The CUPS scheduler did not answer on $host:$port." >&2
+			echo "The CUPS scheduler did not answer on $target." >&2
 			exit 1
 		fi
 

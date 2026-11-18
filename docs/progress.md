@@ -24,6 +24,7 @@ Newest entries first. Each entry records what was done, what was learned, and wh
   - the build took longer than that minute, so the tests found nothing listening.
 
   The tests now reach a Mac's CUPS through the socket: CI, `tools/test-harness/run.sh`, the macOS printers README and CONTRIBUTING. That's what Latiprimere does on a Mac by default, so applications aren't affected; only the test settings forced TCP.
+- **The Native AOT check then failed on macOS:** `check-aot.sh` wakes cupsd before the native harness runs, and also waited for the server to answer on its port. It read `/private/var/run/cupsd` as a host and port and waited for `/private/var/run/cupsd:631`. A socket path now needs only the scheduler to answer through it; a `host:port` server is still checked on its port. Checked locally with stand-ins for `lpstat` and `nc`.
 
 **Not done**
 - **Not run on a Mac here;** the next CI run checks it.
