@@ -104,7 +104,8 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 								&& band.PageHeight > 0
 								&& band.Top >= 0
 								&& band.Height > 0
-								&& band.Top + band.Height <= band.PageHeight;
+								&& band.Top + band.Height <= band.PageHeight
+								&& band.Rotation is >= RasterRotation.None and <= RasterRotation.Anticlockwise90;
 
 		if (!isInsidePage)
 		{
@@ -142,9 +143,10 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 			// The result is ignored: filling a valid bitmap can't fail
 			_ = PdfiumNative.FillRect(bitmap, 0, 0, band.PageWidth, band.Height, PdfiumConstants.White);
 
+			// PDFium turns the page itself, in quarter turns clockwise, into the band's (turned) page size
 			PdfiumNative.RenderPageBitmap
 			(
-				bitmap, page, 0, -band.Top, band.PageWidth, band.PageHeight, 0,
+				bitmap, page, 0, -band.Top, band.PageWidth, band.PageHeight, (int)band.Rotation,
 				PdfiumConstants.RenderAnnotations | PdfiumConstants.RenderPrinting
 			);
 		}

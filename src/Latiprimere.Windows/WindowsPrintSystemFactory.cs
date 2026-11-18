@@ -105,6 +105,8 @@ public static class WindowsPrintSystemFactory
 			BusyRetryDuration  = IppNetworkOptions.DefaultBusyRetryDuration,
 			// ipp: keys reach routed jobs, as they would reach the printer printed to directly (ADR 0027)
 			VendorOptionPrefixes = IppVendorAttributeMapper.NetworkPrefixes,
+			// As for a printer printed to directly: a refusal comes before the upload (ADR 0033)
+			ValidateJobs         = true,
 			Logger               = IppLog.CreateLogger(loggerFactory)
 		};
 

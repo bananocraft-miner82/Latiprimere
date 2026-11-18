@@ -6,11 +6,85 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 | Item | Value |
 |---|---|
-| Phase | 2: PDF and capabilities, done; Phase 3 next. Phase 1's open items: the end-to-end harness's mDNS trial in CI. Phase 0's: the Mac checks (Spikes 1 and 4) |
+| Phase | 3: Direct IPP and v1.0, begun ([phase-3-plan.md](phase-3-plan.md), accepted 2026-11-18); P3-1 and P3-2 done, P3-3 built (its check on the HP's paper waits). Phase 1's open item: the end-to-end harness's mDNS trial in CI. Phase 0's: the Mac checks (Spikes 1 and 4) |
 | Released | `11.0.5-preview` on nuget.org, 2026-11-17. The next release is `11.0.6-preview` ([ADR 0030](decisions/0030-release-numbering.md)) |
 | State | Every Phase 2 item is done. Windows PDF jobs take a Print Ticket in `windows:print-ticket` ([ADR 0031](decisions/0031-windows-print-tickets.md)). `PrinterCapabilities.VendorOptions` lists every IPP job attribute and Windows driver feature a printer offers, ready to set, and `IWindowsPrinter` reads a driver's Print Capabilities ([ADR 0032](decisions/0032-vendor-options-in-capabilities.md)). CI was green on all three runners on 2026-11-17 (owner). Releases are numbered after the latest one, and a merge with nothing new releases nothing. Every ADR is accepted (owner, 2026-11-18). |
-| Next step | Owner: review `feature/pdf-capability` (ADRs [0030](decisions/0030-release-numbering.md), [0031](decisions/0031-windows-print-tickets.md) and [0032](decisions/0032-vendor-options-in-capabilities.md)), then push for CI. Delete the leftover branch `post-release/v11.0.4-preview`. Then Phase 3: printing PDFs to printers that don't take PDF, such as the HP ENVY, by rendering to Apple raster, PCLm or PWG raster, with routing for WSD queues by printer UUID (ADR 0027, "Follow-up"). Still unexamined: a queue on Microsoft's IPP Class Driver; [tools/windows-queue-report](../tools/windows-queue-report/README.md) records one. |
+| Next step | P3-2: raster encoders (PWG raster and Apple raster), then P3-3: printing PDFs as raster to printers without PDF, such as the HP ENVY. When the HP is on: check Validate-Job against it (prints nothing). Owner: delete the leftover branch `post-release/v11.0.4-preview`. |
 | Blockers | None |
+
+---
+
+## 2026-11-18: P3-3, printing PDFs as raster
+
+**Done** (owner: "Yes, start P3-3")
+- **PDFs to direct IPP printers that can't take PDF** go as PWG raster, or else Apple raster, when a PDF rasteriser is registered ([ADR 0035](decisions/0035-printing-pdfs-as-raster.md)):
+  - settings come from the job's options and the printer's raster attributes, read when the job is submitted: resolution (the printer's default, limited by the new `IppNetworkOptions.MaxRenderDpi`), colour space, paper, sides and back-side turns;
+  - `orientation-requested` isn't sent, as the pages are already turned;
+  - pages render on a worker thread into a pipe that is Print-Job's document, uploaded chunked and gzipped when the printer offers it;
+  - a busy printer gets the pages rendered again; a rendering failure is thrown as itself.
+- **Public API:** `IppNetworkOptions.MaxRenderDpi`, and `IppNetworkPrintSystemFactory.Create(IPdfRasterizer?, IppNetworkOptions?)`. `AddLatiprimereIpp()` uses a rasteriser registered with `AddLatiprimerePdfium()`. Without one, the job is refused, naming Latiprimere.Rendering.Pdfium.
+- **Page sizes as libcups makes them:** pixels and points are worked out from hundredths of a millimetre, rounded down, so A4 at 600 dpi is 4,960 × 7,015. The first harness run caught the encoder making it 4,961 wide, a pixel more than CUPS and Apple send; P3-2's encoder and tests are corrected.
+- **Tests:**
+  - planning, with the HP's real `urf-supported` and `ippeveprinter`'s attributes;
+  - the printer with a fake client, decoding what arrives page by page;
+  - four harness scenarios on the scripted printer, over real HTTP: `ipp.raster.pwg-pages`, `ipp.raster.apple-raster-two-sided`, `ipp.raster.busy-renders-again` and `ipp.raster.no-rasterizer-refused`;
+  - an integration test through the real client that the real `ippeveprinter` must read. It passes here against the scripted printer, standing in, and runs against `ippeveprinter` in CI.
+- **Docs:** [network-printers.md](site/print-systems/network-printers.md) has a section on printers that don't take PDF, and the example registers PDFium.
+- **Native AOT:** CI's check now also runs `ipp.raster.apple-raster-two-sided` natively, on every runner.
+
+**Not done**
+- **The HP on paper** (the plan's "done when"): a test page, colour and grey, A4, two-sided. Not printed: it needs the printer on and your go-ahead (D9).
+- **`ippeveprinter` reading the streamed raster** wasn't checked here, because Docker wasn't running. CI runs it.
+- **Windows queues** in front of raster-only printers still print through their driver, until P3-4.
+
+---
+
+## 2026-11-18: P3-2, raster encoders
+
+**Done** (owner: "Yes, start P3-2")
+- **PWG raster and Apple raster encoders** ([ADR 0034](decisions/0034-raster-encoders.md)), internal in `Latiprimere.Ipp/Raster`:
+  - `RasterDocumentEncoder` streams an `IRasterDocument` to either format in 1-bit black (PWG raster only, Bayer-dithered), 8-bit grey or sRGB, at any square resolution;
+  - each page is fitted, centred and never enlarged, onto the paper, and turned a quarter for landscape;
+  - two-sided jobs' back sides are flipped or rotated as the printer's `pwg-raster-document-sheet-back` or `DM1` to `DM4` asks;
+  - bands are capped at 16 MiB and repeated lines are folded, so a blank A4 page at 600 dpi is under 4 KB.
+- **Public API:** `RasterBand.Rotation` and the `RasterRotation` enum. PDFium renders the page turned, with no extra memory.
+- **Tests:**
+  - `RasterDocumentReader` in Latiprimere.Testing decodes both formats, written apart from the encoder;
+  - line encoding with known bytes and 200 random lines;
+  - a synthetic four-quadrant document for every turn, fit, back side, band split and colour space;
+  - three real PDFs through PDFium in both formats, grey and colour, matching PDFium's own render pixel for pixel;
+  - `ippeveprinter` integration tests print PWG raster from a three-page PDF in grey at 300 dpi and black at 600 dpi, and expect the job to complete.
+- **Results:**
+  - 1,910 tests, 0 failed, 192 skipped;
+  - the Native AOT check publishes without warnings and passes 5 scenarios (2 skipped: no CUPS or `ippeveprinter` container here). Nothing public reaches the encoders until P3-3, so for now the trimming analysers at build vouch for them, not the published harness.
+
+**Not done**
+- **The `ippeveprinter` tests** didn't run here: Docker wasn't running. They run in CI.
+- **Paper:** no real printer has printed the encoders' output yet; P3-3 prints Apple raster to the HP.
+
+---
+
+## 2026-11-18: Phase 3 planned; P3-1, Validate-Job
+
+**Done** (owner: "Let's make a start on phase three. Put together a plan for the work first", then "Yes, start P3-1")
+- **[phase-3-plan.md](phase-3-plan.md):**
+  - work packages P3-1 to P3-9, with what already exists for each, an order, risks, and decisions D1 to D9, all accepted as recommended;
+  - recorded on the way: the HP takes Apple raster (`urf-supported`: `RS300-600`, `W8`, `SRGB24`, `DM3`) and PCLm but not PDF, and `ippeveprinter` takes PWG raster (`black_1`, `sgray_8`);
+  - `IRasterDocument.RenderBand` already gives what the raster encoders need.
+- **Validate-Job** ([ADR 0033](decisions/0033-validate-job.md)):
+  - `IppPrinter` sends Validate-Job, vendor attributes included, before Print-Job when the context asks for it and the printer lists the operation, which is now read at lookup (`operations-supported`);
+  - an IPP client error refuses the job before the upload; a server error such as busy skips the check, logged at Debug;
+  - `IppNetworkOptions.ValidateJobs` (default `true`); Windows queues routed to IPP always validate; CUPS never does;
+  - `IIppClient.ValidateJobAsync` sends it raw, as Print-Job with vendor attributes is.
+- **The harness's `ipp.submission.unsupported-value-refused`** now checks that the refusal comes from Validate-Job and that no Print-Job is sent.
+- **Fixed in passing, in the harness:** two CUPS-only example scenarios ran without a CUPS server and failed. `DescribeMissing` reported the missing container only when a CUPS server was set; it now says there's no CUPS test server.
+- **Results:**
+  - 1,842 tests, 0 failed, 188 skipped;
+  - every harness scenario this PC can run passes;
+  - the Native AOT harness publishes without warnings and passes the Validate-Job, busy and Windows-route scenarios.
+
+**Not done**
+- **The real HP:** not checked, because it was off: neither its link-local address nor mDNS answered. Validate-Job alone prints nothing, so the check is safe whenever it's on.
 
 ---
 

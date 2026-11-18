@@ -332,6 +332,103 @@ public sealed class IppPrinterTests
 	}
 
 	[Fact]
+	public async Task GivenPrinterThatRefusesAtValidateJobWhenSubmitThenThrowsItsStatusWithoutSendingTheDocument()
+	{
+		// Arrange — client-error-attributes-or-values-not-supported, before anything is uploaded (ADR 0033)
+		FakeIppClient client = new FakeIppClient
+		{
+			ValidateJobFailureToThrow = new PrintException("Refused.") { NativeErrorCode = 0x040B }
+		};
+
+		IppPrinter printer = IppPrinterTests.CreateValidatingPrinter(client, [IppOperation.PrintJob, IppOperation.ValidateJob]);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		PrintOptions options = new PrintOptions
+		{
+			JobName       = "Report",
+			Duplex        = DuplexMode.LongEdge,
+			VendorOptions = new Dictionary<string, string> { ["ipp:print-quality"] = "5" }
+		};
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert — Validate-Job carried what Print-Job would have
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(submit);
+		Assert.Equal(0x040B, exception.NativeErrorCode);
+		Assert.Null(client.LastPrintJobRequest);
+
+		ValidateJobRequest validation = Assert.Single(client.ValidateJobRequests);
+		Assert.Equal(IppPrinterTests.PrinterUri, validation.OperationAttributes?.PrinterUri?.Value);
+		Assert.Equal("Report", validation.OperationAttributes?.JobName?.Value);
+		Assert.Equal("application/pdf", validation.OperationAttributes?.DocumentFormat?.Value.Value);
+		Assert.Equal(Sides.TwoSidedLongEdge, validation.JobTemplateAttributes?.Sides?.Value);
+		Assert.Contains(client.LastValidateJobVendorAttributes!.Job, attribute => attribute.Name == "print-quality");
+	}
+
+	[Fact]
+	public async Task GivenPrinterThatAcceptsAtValidateJobWhenSubmitThenSendsTheJob()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient();
+		IppPrinter printer = IppPrinterTests.CreateValidatingPrinter(client, [IppOperation.PrintJob, IppOperation.ValidateJob]);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Single(client.ValidateJobRequests);
+		Assert.NotNull(client.LastPrintJobRequest);
+	}
+
+	[Fact]
+	public async Task GivenPrinterTooBusyToValidateWhenSubmitThenSendsTheJobAnywayAndLogsIt()
+	{
+		// Arrange — server-error-busy isn't a judgement of the job; Print-Job meets the same check
+		FakeIppClient client = new FakeIppClient
+		{
+			ValidateJobFailureToThrow = new PrintException("Busy.") { NativeErrorCode = (int)IppStatusCode.ServerErrorBusy }
+		};
+
+		RecordingLogger logger = new RecordingLogger();
+		IppPrinter printer = IppPrinterTests.CreateValidatingPrinter(client, [IppOperation.PrintJob, IppOperation.ValidateJob], logger);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.NotNull(client.LastPrintJobRequest);
+		Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Debug, Assert.Single(logger.Entries).Level);
+	}
+
+	[Theory]
+	[InlineData(true, false, true)]
+	[InlineData(false, true, true)]
+	[InlineData(true, true, false)]
+	public async Task GivenValidationOffOrNotListedWhenSubmitThenSendsNoValidateJob(bool validateJobs, bool listsValidateJob, bool operationsKnown)
+	{
+		// Arrange — validation off, a printer that doesn't list the operation, or one whose operations weren't read
+		// (provided by InlineData above)
+		FakeIppClient client = new FakeIppClient();
+		IppOperation[]? operations = !operationsKnown ? null
+			: listsValidateJob ? [IppOperation.PrintJob, IppOperation.ValidateJob]
+			: [IppOperation.PrintJob];
+
+		IppPrintContext context = new IppPrintContextBuilder().WithClient(client).WithValidateJobs(validateJobs).Build();
+		IppPrinter printer = new IppPrinter(context, IppPrinterTests.PrinterUri, new PrinterInfo { Id = "ipp:x", Name = "x" }, null, operations);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Empty(client.ValidateJobRequests);
+		Assert.NotNull(client.LastPrintJobRequest);
+	}
+
+	[Fact]
 	public async Task GivenPrinterThatHasGoneWhenGetCapabilitiesThenThrowsPrintException()
 	{
 		// Arrange — the fake client answers not-found for a URI with no printer
@@ -490,6 +587,22 @@ public sealed class IppPrinterTests
 		PrinterInfo info = new PrinterInfo { Id = "ipp:ipp://printer.local/ipp/print", Name = "Office" };
 
 		return new IppPrinter(context, IppPrinterTests.PrinterUri, info);
+	}
+
+	/// <summary>
+	/// Creates a direct IPP printer that validates jobs, listing the given operations.
+	/// </summary>
+	/// <param name="client">The client.</param>
+	/// <param name="operations">The operations the printer lists.</param>
+	/// <param name="logger">Where to log, or nowhere.</param>
+	/// <returns>The printer.</returns>
+	private static IppPrinter CreateValidatingPrinter(FakeIppClient client, IppOperation[] operations, RecordingLogger? logger = null)
+	{
+		IppPrintContextBuilder builder = new IppPrintContextBuilder().WithClient(client).WithValidateJobs(true);
+		IppPrintContext context = (logger is null ? builder : builder.WithLogger(logger)).Build();
+		PrinterInfo info = new PrinterInfo { Id = "ipp:ipp://printer/ipp/print", Name = "Office" };
+
+		return new IppPrinter(context, IppPrinterTests.PrinterUri, info, null, operations);
 	}
 
 	/// <summary>

@@ -1,3 +1,4 @@
+using Latiprimere.Rendering;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -33,6 +34,19 @@ internal sealed record IppPrintContext
 	/// Gets the clock used to timestamp job statuses and to time retries.
 	/// </summary>
 	public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
+	/// <summary>Gets whether to send Validate-Job before each Print-Job, to printers that list it, so attributes the
+	/// printer refuses fail before the document is uploaded (ADR 0033). CUPS accepts a job and cancels it later, so
+	/// only direct IPP turns this on.</summary>
+	public bool ValidateJobs { get; init; }
+
+	/// <summary>Gets the rasteriser that renders PDFs for printers that can't take PDF, or <see langword="null"/> to
+	/// refuse such jobs (ADR 0035).</summary>
+	public IPdfRasterizer? PdfRasterizer { get; init; }
+
+	/// <summary>Gets the highest resolution a PDF is rendered at for a raster job, or <see langword="null"/> for no
+	/// limit.</summary>
+	public int? MaxRenderDpi { get; init; }
 
 	/// <summary>Gets where to log what the caller isn't told, such as vendor options that couldn't be read.</summary>
 	public ILogger Logger { get; init; } = NullLogger.Instance;
