@@ -1,5 +1,6 @@
 using System.Runtime.Versioning;
 using Latiprimere.Windows.Interop;
+using Latiprimere.Windows.PrintTickets;
 
 namespace Latiprimere.Windows.Spooler;
 
@@ -14,12 +15,18 @@ internal static unsafe class WindowsCapabilityReader
 	/// </summary>
 	/// <param name="printerName">The printer name.</param>
 	/// <param name="portName">The printer's port, which some drivers need, or <see langword="null"/>.</param>
+	/// <param name="includePrintSchema">Whether to read the Print Capabilities and default Print Ticket too.</param>
 	/// <returns>The capabilities.</returns>
 	/// <exception cref="PrintException">The printer couldn't be opened or its DEVMODE read.</exception>
-	internal static WindowsCapabilitiesRecord Read(string printerName, string? portName)
+	internal static WindowsCapabilitiesRecord Read(string printerName, string? portName, bool includePrintSchema = true)
 	{
-		DefaultSettings defaults = WindowsCapabilityReader.ReadDefaults(printerName);
+		// The default DEVMODE is read once, for the defaults and as the starting point of the Print Capabilities
+		byte[] defaultDevMode = WindowsCapabilityReader.ReadDefaultDevMode(printerName);
+		DefaultSettings defaults = WindowsCapabilityReader.ReadDefaults(defaultDevMode);
 		int copies = WinSpoolNative.DeviceCapabilities(printerName, portName, DeviceCapabilityConstants.Copies, null, null);
+		PrintSchemaRead printSchema = includePrintSchema
+			? WindowsCapabilityReader.ReadPrintSchema(printerName, defaultDevMode)
+			: new PrintSchemaRead(null, null, null);
 
 		return new WindowsCapabilitiesRecord
 		{
@@ -44,8 +51,33 @@ internal static unsafe class WindowsCapabilityReader
 			) > 0,
 			DefaultPaperId    = defaults.PaperId,
 			DefaultDuplex     = defaults.Duplex,
-			DefaultColor      = defaults.Color
+			DefaultColor      = defaults.Color,
+			PrintCapabilities = printSchema.PrintCapabilities,
+			DefaultPrintTicket = printSchema.DefaultTicket,
+			PrintSchemaFailure = printSchema.Failure
 		};
+	}
+
+	/// <summary>
+	/// Reads the driver's Print Capabilities and default Print Ticket, in one Print Ticket session (ADR 0032).
+	/// </summary>
+	/// <param name="printerName">The printer name.</param>
+	/// <param name="defaultDevMode">The driver's default DEVMODE, already read.</param>
+	/// <returns>Both documents, as UTF-8 XML; or, for a driver without Print Ticket support, neither but the reason,
+	/// for the caller to log, since the other capabilities are still read.</returns>
+	private static PrintSchemaRead ReadPrintSchema(string printerName, byte[] defaultDevMode)
+	{
+		try
+		{
+			using PrintTicketSession session = PrintTicketSession.Open(printerName);
+			byte[] ticket = session.ConvertDevModeToTicket(defaultDevMode);
+
+			return new PrintSchemaRead(session.GetPrintCapabilities(ticket), ticket, null);
+		}
+		catch (Exception exception) when (exception is PrintException or ArgumentException)
+		{
+			return new PrintSchemaRead(null, null, exception);
+		}
 	}
 
 	/// <summary>
@@ -242,13 +274,10 @@ internal static unsafe class WindowsCapabilityReader
 	/// <summary>
 	/// Reads the paper size, duplex and colour from the driver's default DEVMODE.
 	/// </summary>
-	/// <param name="printerName">The printer name.</param>
+	/// <param name="buffer">The default DEVMODE.</param>
 	/// <returns>The defaults the DEVMODE sets.</returns>
-	/// <exception cref="PrintException">The printer couldn't be opened or its DEVMODE read.</exception>
-	private static DefaultSettings ReadDefaults(string printerName)
+	private static DefaultSettings ReadDefaults(byte[] buffer)
 	{
-		byte[] buffer = WindowsCapabilityReader.ReadDefaultDevMode(printerName);
-
 		fixed (byte* data = buffer)
 		{
 			DevMode* devMode = (DevMode*)data;

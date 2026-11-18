@@ -2,6 +2,7 @@ using Latiprimere;
 using Latiprimere.Rendering;
 using Latiprimere.Windows;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -33,7 +34,8 @@ public static class LatiprimereWindowsServiceCollectionExtensions
 			serviceProvider => (WindowsPrintSystem)WindowsPrintSystemFactory.Create
 			(
 				serviceProvider.GetService<IPdfRasterizer>(),
-				options
+				options,
+				serviceProvider.GetService<ILoggerFactory>()
 			))
 		);
 

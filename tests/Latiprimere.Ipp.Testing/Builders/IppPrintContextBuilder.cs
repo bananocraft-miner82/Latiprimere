@@ -11,6 +11,7 @@ internal sealed class IppPrintContextBuilder
 	private IppDocumentFormats documentFormats = IppDocumentFormats.Cups;    // The MIME types documents are sent as
 	private TimeSpan busyRetryDuration = TimeSpan.Zero;                      // How long jobs turned away as busy are resent
 	private IReadOnlyList<string> vendorOptionPrefixes = Mapping.IppVendorAttributeMapper.NetworkPrefixes; // Keys read
+	private Microsoft.Extensions.Logging.ILogger logger = Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance; // Where to log
 
 	/// <summary>Sets how long to resend jobs turned away as busy, with millisecond waits between attempts.</summary>
 	/// <param name="busyRetryDuration">How long to keep resending.</param>
@@ -52,6 +53,16 @@ internal sealed class IppPrintContextBuilder
 		return this;
 	}
 
+	/// <summary>Sets the logger.</summary>
+	/// <param name="logger">The logger.</param>
+	/// <returns>This builder, for chaining.</returns>
+	public IppPrintContextBuilder WithLogger(Microsoft.Extensions.Logging.ILogger logger)
+	{
+		this.logger = logger;
+
+		return this;
+	}
+
 	/// <summary>
 	/// Builds the context, with "tester" as the requesting user, and waits of a few milliseconds between resends of
 	/// busy jobs so tests stay fast.
@@ -67,7 +78,8 @@ internal sealed class IppPrintContextBuilder
 			BusyRetryDuration    = this.busyRetryDuration,
 			VendorOptionPrefixes = this.vendorOptionPrefixes,
 			BusyRetryFirstDelay  = TimeSpan.FromMilliseconds(1),
-			BusyRetryMaxDelay    = TimeSpan.FromMilliseconds(4)
+			BusyRetryMaxDelay    = TimeSpan.FromMilliseconds(4),
+			Logger               = this.logger
 		};
 	}
 }

@@ -44,6 +44,17 @@ internal sealed class WindowsPrintSystem : IPrintSystem
 	public bool IsSupported { get; }
 
 	/// <summary>
+	/// Gets where the print system logs, from the application's logger factory when dependency injection has one.
+	/// </summary>
+	internal Microsoft.Extensions.Logging.ILogger Logger
+	{
+		get
+		{
+			return this.context.Logger;
+		}
+	}
+
+	/// <summary>
 	/// Gets a value indicating whether a printer name may name any printer (<see cref="WindowsOptions.AllowAnyPrinterName"/>).
 	/// </summary>
 	internal bool AllowsAnyPrinterName

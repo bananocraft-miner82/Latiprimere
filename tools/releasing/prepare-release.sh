@@ -16,7 +16,6 @@
 set -eu
 
 VERSION="${1:-}"
-NUGET_INDEX=https://api.nuget.org/v3-flatcontainer/latiprimere/index.json
 
 if ! printf '%s\n' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$'; then
 	echo "Give the version to release, such as 11.0.42: '$VERSION' isn't one." >&2
@@ -34,12 +33,7 @@ if git rev-parse -q --verify "refs/tags/v$VERSION" > /dev/null; then
 fi
 
 # Every version of the Latiprimere package on nuget.org, oldest first, unlisted ones included
-if ! INDEX=$(curl --fail --silent --show-error --max-time 30 --retry 3 "$NUGET_INDEX"); then
-	echo "Couldn't read the published versions from $NUGET_INDEX." >&2
-	exit 1
-fi
-
-PUBLISHED=$(printf '%s' "$INDEX" | tr -d ' \r\n' | sed -n 's/.*"versions":\[\([^]]*\)\].*/\1/p' | tr ',' '\n' | tr -d '"')
+PUBLISHED=$(sh "$(dirname "$0")/published-versions.sh")
 
 if printf '%s\n' "$PUBLISHED" | grep -qxF "$VERSION"; then
 	echo "$VERSION is already on nuget.org, and a published version can't be published again." >&2
@@ -57,11 +51,29 @@ esac
 # version that was tagged but never published can't be the baseline.
 PREVIOUS_VERSION=$(printf '%s\n' "$PUBLISHED" | sed '/^$/d' | tail -n 1)
 
-# The previous release's post-release pull request must be merged first. Otherwise its notes would still be under
-# "## Unreleased", and would be dated again as this version's.
-if [ -n "$PREVIOUS_VERSION" ] && ! tr -d '\r' < CHANGELOG.md | grep -q "^## $PREVIOUS_VERSION - "; then
-	echo "CHANGELOG.md has no '## $PREVIOUS_VERSION - <date>' heading. Merge the pull request 'Post-release $PREVIOUS_VERSION' into main, then main into release." >&2
-	exit 1
+# The previous release's post-release pull request must be merged first, so its release commit, the one tagged, is
+# in this one's history. Otherwise its changelog notes would still be under "## Unreleased", and would be dated
+# again as this version's, and its public API would be unshipped still. The tag is checked, not the changelog: a
+# release without notes has no heading of its own (11.0.5-preview didn't).
+if [ -n "$PREVIOUS_VERSION" ]; then
+	if ! git rev-parse -q --verify "refs/tags/v$PREVIOUS_VERSION" > /dev/null; then
+		echo "$PREVIOUS_VERSION is on nuget.org but not tagged v$PREVIOUS_VERSION here. If its Release run failed after publishing, re-run its failed jobs, which tag it; otherwise fetch the tags." >&2
+		exit 1
+	fi
+
+	if ! git merge-base --is-ancestor "v$PREVIOUS_VERSION" HEAD; then
+		echo "v$PREVIOUS_VERSION isn't in this commit's history. Merge the pull request 'Post-release $PREVIOUS_VERSION' into main, then main into release." >&2
+		exit 1
+	fi
+
+	# If the changelog changed since the previous release but has no "## Unreleased", the new notes went under a
+	# released version's heading, as 11.0.5's did under 11.0.3's. Stop, rather than publish a changelog that
+	# credits them to the wrong release. (Corrections to earlier entries can go out with the next release's notes.)
+	if ! tr -d '\r' < CHANGELOG.md | grep -qx '## Unreleased' \
+		&& ! git diff --quiet "v$PREVIOUS_VERSION" -- CHANGELOG.md; then
+		echo "CHANGELOG.md changed since v$PREVIOUS_VERSION but has no '## Unreleased' heading. Put this release's notes under '## Unreleased', above '## $PREVIOUS_VERSION', on main." >&2
+		exit 1
+	fi
 fi
 
 # Writes standard input to a file, with CRLF line endings if the second argument is "crlf"
@@ -157,7 +169,7 @@ read_file README.md \
 	| write_file README.md "$endings"
 
 # Changelog: the notes written under "## Unreleased" become this version's. Without them the release still goes
-# ahead, with a warning, and the website shows no entry for it.
+# ahead, with a warning, and the website shows no entry for it. (Notes under a released heading stopped it above.)
 if read_file CHANGELOG.md | grep -qx '## Unreleased'; then
 	endings=$(line_endings CHANGELOG.md)
 	read_file CHANGELOG.md \

@@ -4,12 +4,12 @@ How Latiprimere's packages get to nuget.org. Merging `main` into the `release` b
 
 ## Versions
 
-Every release is `<.NET major>.0.<build number>`, such as `11.0.42`, for all six packages ([ADR 0028](decisions/0028-automated-releases.md)):
+Every release is `<.NET major>.0.<build number>`, such as `11.0.42`, for all six packages ([ADR 0028](decisions/0028-automated-releases.md), with the build number from [ADR 0030](decisions/0030-release-numbering.md)):
 
 - **The .NET major** is the newest .NET the packages target, from `<TargetFrameworks>` in [Directory.Build.props](../Directory.Build.props). Today that's `net11.0`, so 11. Adding `net12.0` makes the next release `12.0.<build number>`.
-- **The build number** is the Release workflow's run number, which only grows. A run that fails uses up its number, so the numbers can have gaps. Renaming `release.yml` would start the count again at 1, and it also names the trusted publishing policy, so leave its name alone.
+- **The build number** is one more than the latest release's, counting the versions on nuget.org and the `v<version>` tags: after `11.0.5-preview` comes `11.0.6-preview`. A run that fails or is cancelled before publishing uses up nothing, so the numbers have no gaps. It keeps counting across .NET majors: after `11.0.42` would come `12.0.43`. `release.yml` names the trusted publishing policy, so leave its name alone.
 
-[tools/releasing/next-version.sh](../tools/releasing/next-version.sh) works it out: `sh tools/releasing/next-version.sh 42` prints `11.0.42`, and with `--preview` it prints `11.0.42-preview`.
+[tools/releasing/next-version.sh](../tools/releasing/next-version.sh) works it out from the repository root, with the tags fetched: after `11.0.5-preview`, `sh tools/releasing/next-version.sh` prints `11.0.6`, and with `--preview` it prints `11.0.6-preview`. It needs to reach nuget.org.
 
 ### Preview releases
 
@@ -65,6 +65,7 @@ Anything else stops the release before it starts. The change applies from the ne
 
    Its build runs on all three runners.
 3. **Merge it** with **Create a merge commit**, once the build passes. Hold other merges into `main` until step 5: a change to `CHANGELOG.md` or a `PublicAPI.Unshipped.txt` in the meantime makes the post-release pull request conflict. Merging starts the Release workflow, which:
+   0. **check:** stops, publishing nothing, if the merged commit has exactly the latest release's files ([anything-to-release.sh](../tools/releasing/anything-to-release.sh)). That's what merging only a post-release pull request's commit into `release` gives: there's no need to bring `release` up to date with `main` after a release, since the next release's merge brings that commit along.
    1. **prepare:** chooses the version and runs [tools/releasing/prepare-release.sh](../tools/releasing/prepare-release.sh), which:
       - sets the version in [Directory.Build.props](../Directory.Build.props);
       - marks the public API as shipped: each `PublicAPI.Unshipped.txt` moves into `PublicAPI.Shipped.txt`, and `*REMOVED*` entries take their lines out of it;
@@ -72,7 +73,7 @@ Anything else stops the release before it starts. The change applies from the ne
       - updates the version in the status line of [README.md](../README.md);
       - turns `## Unreleased` in [CHANGELOG.md](../CHANGELOG.md) into `## <version> - <date>`.
 
-      It commits that as "Release \<version\>" on the branch `post-release/v<version>`. It refuses a version that is already tagged or on nuget.org, and stops if the previous release's post-release pull request hasn't been merged yet (step 5).
+      It commits that as "Release \<version\>" on the branch `post-release/v<version>`. It refuses a version that is already tagged or on nuget.org, and stops if the previous release's post-release pull request hasn't been merged yet (step 5), or if `CHANGELOG.md` changed since the previous release without a `## Unreleased` heading: notes written under a released version's heading would be credited to it.
    2. **build:** [build.yml](../.github/workflows/build.yml) builds, tests and packs the release commit on all three runners.
    3. **publish:** pushes those packages to nuget.org, under the `release` environment. If it requires a reviewer, approve the run in the **Actions** tab.
    4. **finish:** tags the release commit `v<version>`, and opens the pull request "Post-release \<version\>" into `main`.
@@ -82,7 +83,7 @@ Anything else stops the release before it starts. The change applies from the ne
 
 The script also runs locally from the repository root, for example to see what a release would change: `sh tools/releasing/prepare-release.sh 11.0.99`. It only changes files; it never commits.
 
-**If a run fails before publish,** nothing is published: fix the cause on `main` and release again, which takes the next number. **If it fails during publish or finish,** use **Re-run failed jobs**, which keeps the version; packages that already arrived are skipped. Don't use **Re-run all jobs** once anything is published: it would make a new release commit and stop, because the version is already on nuget.org. Approve a waiting publish within 7 days, while build.yml's packages are kept. Delete the leftover `post-release/v<version>` branch of a release that never published.
+**If a run fails or is cancelled before publish,** nothing is published: fix the cause on `main` and release again, which takes the same number. **If it fails during publish or finish,** use **Re-run failed jobs**, which keeps the version; packages that already arrived are skipped. Don't use **Re-run all jobs** once anything is published: it would make a new release commit and stop, because the version is already on nuget.org. Approve a waiting publish within 7 days, while build.yml's packages are kept. Delete the leftover `post-release/v<version>` branch of a release that never published.
 
 A published version can't be deleted from nuget.org, only unlisted. Its version number is used for good, and it keeps its licence.
 

@@ -41,6 +41,12 @@ internal sealed record PrintArguments
 	/// <summary>Option: a vendor option, KEY=VALUE; may be repeated.</summary>
 	private const string VendorOption = "--option";
 
+	/// <summary>Option: a Print Ticket file, sent as the vendor option <c>windows:print-ticket</c>.</summary>
+	private const string TicketOption = "--ticket";
+
+	/// <summary>The vendor option a Print Ticket file is sent as.</summary>
+	private const string PrintTicketKey = "windows:print-ticket";
+
 	/// <summary>Gets the ID of the printer to print to.</summary>
 	public required string PrinterId { get; init; }
 
@@ -125,6 +131,7 @@ internal sealed record PrintArguments
 			PrintArguments.OutputOption    => PrintArguments.ApplyOutput(parsed, value, index),
 			PrintArguments.ColorOption     => PrintArguments.ApplyColor(parsed, value, index),
 			PrintArguments.VendorOption    => PrintArguments.ApplyVendorOption(parsed, value, index),
+			PrintArguments.TicketOption    => PrintArguments.ApplyTicket(parsed, value, index),
 			PrintArguments.PaperOption when !string.IsNullOrWhiteSpace(value) => (parsed with { PaperName = value }, index + 2, null),
 			PrintArguments.TrayOption when !string.IsNullOrWhiteSpace(value)  => (parsed with { TrayId = value }, index + 2, null),
 			PrintArguments.PaperOption or PrintArguments.TrayOption =>
@@ -253,6 +260,28 @@ internal sealed record PrintArguments
 			// The key has no ipp:, cups: or windows: prefix
 			return (null, index, exception.Message);
 		}
+	}
+
+	/// <summary>
+	/// Applies a <c>--ticket FILE</c> option: the file's text becomes the vendor option <c>windows:print-ticket</c>.
+	/// </summary>
+	/// <param name="parsed">The arguments parsed so far.</param>
+	/// <param name="value">The file's path.</param>
+	/// <param name="index">The position of the option.</param>
+	/// <returns>The updated arguments (or <see langword="null"/> on error), the next position, and any error.</returns>
+	private static (PrintArguments? Parsed, int NextIndex, string? Error) ApplyTicket(PrintArguments parsed, string? value, int index)
+	{
+		if (string.IsNullOrWhiteSpace(value) || !File.Exists(value))
+		{
+			return (null, index, PrintArguments.Format(CliMessages.InvalidOptionValue, value, PrintArguments.TicketOption));
+		}
+
+		Dictionary<string, string> vendorOptions = new Dictionary<string, string>(parsed.Options.VendorOptions, StringComparer.Ordinal)
+		{
+			[PrintArguments.PrintTicketKey] = File.ReadAllText(value)
+		};
+
+		return (parsed with { Options = parsed.Options with { VendorOptions = vendorOptions } }, index + 2, null);
 	}
 
 	/// <summary>

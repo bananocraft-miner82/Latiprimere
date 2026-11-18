@@ -3,6 +3,7 @@ using Latiprimere.Cups.Resources;
 using Latiprimere.Ipp;
 using Latiprimere.Ipp.Connections;
 using Latiprimere.Ipp.Mapping;
+using Microsoft.Extensions.Logging;
 
 namespace Latiprimere.Cups;
 
@@ -36,12 +37,15 @@ public static class CupsPrintSystemFactory
 	/// </summary>
 	/// <param name="options">How to connect to CUPS.</param>
 	/// <param name="environmentServer">The value of <c>CUPS_SERVER</c>, if set.</param>
+	/// <param name="loggerFactory">The application's logger factory, or <see langword="null"/> to log nothing.</param>
 	/// <returns>The print system.</returns>
 	/// <exception cref="ArgumentException">The configured server is not valid; or the credentials have no user name,
 	/// or one containing a colon.</exception>
 	/// <remarks>Tests pass the environment value in, as setting the variable would affect every test in the process.</remarks>
-	internal static IPrintSystem Create(CupsOptions options, string? environmentServer)
+	internal static IPrintSystem Create(CupsOptions options, string? environmentServer, ILoggerFactory? loggerFactory = null)
 	{
+		ILogger logger = IppLog.CreateLogger(loggerFactory);
+
 		// Work out where CUPS is, as libcups would
 		CupsPlatform platform = CupsPrintSystemFactory.GetCurrentPlatform();
 		CupsEndpoint endpoint = CupsEndpoint.Resolve(options.Server, environmentServer, File.Exists, platform);
@@ -55,7 +59,8 @@ public static class CupsPrintSystemFactory
 				Client             = new InvalidServerIppClient(endpoint.InvalidEnvironmentServer),
 				RequestingUserName   = CupsPrintSystemFactory.GetRequestingUserName(options),
 				DocumentFormats      = IppDocumentFormats.Cups,
-				VendorOptionPrefixes = IppVendorAttributeMapper.CupsPrefixes
+				VendorOptionPrefixes = IppVendorAttributeMapper.CupsPrefixes,
+				Logger               = logger
 			};
 
 			return new CupsPrintSystem(failingContext, endpoint, isSupported: true, ownedClient: null);
@@ -75,7 +80,8 @@ public static class CupsPrintSystemFactory
 			Client               = client,
 			RequestingUserName   = CupsPrintSystemFactory.GetRequestingUserName(options),
 			DocumentFormats      = IppDocumentFormats.Cups,
-			VendorOptionPrefixes = IppVendorAttributeMapper.CupsPrefixes
+			VendorOptionPrefixes = IppVendorAttributeMapper.CupsPrefixes,
+			Logger               = logger
 		};
 
 		bool isSupported = endpoint.IsExplicit || platform != CupsPlatform.Other;

@@ -1,6 +1,6 @@
 # 0022: Release process and package contents
 
-- Status: Proposed; its versions and release steps superseded by [0028](0028-automated-releases.md)
+- Status: Accepted; its versions and release steps superseded by [0028](0028-automated-releases.md)
 - Date: 2026-11-13
 
 ## Context

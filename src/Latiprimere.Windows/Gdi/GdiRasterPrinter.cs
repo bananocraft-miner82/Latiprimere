@@ -1,6 +1,7 @@
 using System.Runtime.Versioning;
 using Latiprimere.Rendering;
 using Latiprimere.Windows.Interop;
+using Latiprimere.Windows.PrintTickets;
 using Latiprimere.Windows.Spooler;
 
 namespace Latiprimere.Windows.Gdi;
@@ -246,10 +247,11 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 	}
 
 	/// <summary>
-	/// Starts from a saved DEVMODE or the printer's default one, applies the options, and lets the driver validate
-	/// the result.
+	/// Starts from a saved DEVMODE or the printer's default one, merges any Print Ticket onto it, applies the
+	/// options, and lets the driver validate the result.
 	/// </summary>
-	/// <param name="request">The printer, the print options, the paper and tray chosen, and any saved DEVMODE.</param>
+	/// <param name="request">The printer, the print options, the paper and tray chosen, and any saved DEVMODE and
+	/// Print Ticket.</param>
 	/// <param name="isFirstPageLandscape">Whether the first page is landscape.</param>
 	/// <returns>A buffer holding the DEVMODE and the driver's private data.</returns>
 	private static byte[] CreateDevMode(GdiPrintRequest request, bool isFirstPageLandscape)
@@ -259,30 +261,22 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 		int size = WinSpoolNative.DocumentProperties(IntPtr.Zero, printerHandle, printerName, null, null, 0);
 		SpoolerErrors.ThrowIfFailed(size > 0, nameof(WinSpoolNative.DocumentProperties), printerName);
 
-		// A saved DEVMODE may be larger than this driver's, so the buffer holds whichever is bigger
-		byte[] requested = new byte[Math.Max(size, request.SavedDevMode?.Length ?? 0)];
+		// Start from the saved DEVMODE, or the driver's defaults
+		byte[] start = request.SavedDevMode ?? GdiRasterPrinter.ReadDefaultDevMode(printerHandle, printerName, size);
+
+		// Then the Print Tickets, so the typed options still win, as they do over a saved DEVMODE (ADR 0031)
+		start = PrintTicketMerger.Merge(printerName, start, request.PrintTickets);
+
+		// A saved or merged DEVMODE may be larger than this driver's, so the buffer holds whichever is bigger
+		byte[] requested = new byte[Math.Max(size, start.Length)];
 		byte[] merged = new byte[size];
+		start.CopyTo(requested, 0);
 		int result;
 
 		fixed (byte* requestedData = requested)
 		fixed (byte* mergedData = merged)
 		{
 			DevMode* requestedMode = (DevMode*)requestedData;
-
-			// Start from the saved DEVMODE, or the driver's defaults
-			if (request.SavedDevMode is not null)
-			{
-				request.SavedDevMode.CopyTo(requested, 0);
-			}
-			else
-			{
-				result = WinSpoolNative.DocumentProperties
-				(
-					IntPtr.Zero, printerHandle, printerName, requestedMode, null, DevModeConstants.ModeOutBuffer
-				);
-
-				SpoolerErrors.ThrowIfFailed(result > 0, nameof(WinSpoolNative.DocumentProperties), printerName);
-			}
 
 			// Merge the changes through the driver, which drops or adjusts anything it can't do
 			DevModeEditor.Apply(ref *requestedMode, request.Options, request.PaperId, request.BinId, isFirstPageLandscape);
@@ -297,5 +291,29 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 		}
 
 		return merged;
+	}
+
+	/// <summary>
+	/// Reads the driver's default DEVMODE.
+	/// </summary>
+	/// <param name="printerHandle">The open printer.</param>
+	/// <param name="printerName">The printer name.</param>
+	/// <param name="size">The driver's DEVMODE size, with its private data.</param>
+	/// <returns>The DEVMODE.</returns>
+	private static byte[] ReadDefaultDevMode(SafePrinterHandle printerHandle, string printerName, int size)
+	{
+		byte[] defaults = new byte[size];
+
+		fixed (byte* data = defaults)
+		{
+			int result = WinSpoolNative.DocumentProperties
+			(
+				IntPtr.Zero, printerHandle, printerName, (DevMode*)data, null, DevModeConstants.ModeOutBuffer
+			);
+
+			SpoolerErrors.ThrowIfFailed(result > 0, nameof(WinSpoolNative.DocumentProperties), printerName);
+		}
+
+		return defaults;
 	}
 }

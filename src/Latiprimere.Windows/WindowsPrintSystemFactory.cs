@@ -4,6 +4,8 @@ using Latiprimere.Rendering;
 using Latiprimere.Windows.DirectIpp;
 using Latiprimere.Windows.Gdi;
 using Latiprimere.Windows.Spooler;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Latiprimere.Windows;
 
@@ -12,6 +14,9 @@ namespace Latiprimere.Windows;
 /// </summary>
 public static class WindowsPrintSystemFactory
 {
+	/// <summary>The category the Windows print system logs under.</summary>
+	private const string LoggerCategory = "Latiprimere.Windows";
+
 	/// <summary>
 	/// Creates the Windows print system.
 	/// </summary>
@@ -28,7 +33,22 @@ public static class WindowsPrintSystemFactory
 	/// <c>ipp</c>, <c>ipps</c>, <c>http</c> or <c>https</c> URI.</exception>
 	public static IPrintSystem Create(IPdfRasterizer? pdfRasterizer = null, WindowsOptions? options = null)
 	{
+		return WindowsPrintSystemFactory.Create(pdfRasterizer, options, loggerFactory: null);
+	}
+
+	/// <summary>
+	/// Creates the Windows print system, logging through a logger factory when there is one.
+	/// </summary>
+	/// <param name="pdfRasterizer">The PDF rasteriser, or <see langword="null"/> for raw data only.</param>
+	/// <param name="options">How to print, or <see langword="null"/> for the defaults.</param>
+	/// <param name="loggerFactory">The application's logger factory, or <see langword="null"/> to log nothing.</param>
+	/// <returns>The print system.</returns>
+	/// <exception cref="ArgumentException">A URI in <see cref="WindowsOptions.IppPrinterUris"/> isn't one IPP can
+	/// use.</exception>
+	internal static IPrintSystem Create(IPdfRasterizer? pdfRasterizer, WindowsOptions? options, ILoggerFactory? loggerFactory)
+	{
 		options ??= new WindowsOptions();
+		ILogger logger = loggerFactory?.CreateLogger(WindowsPrintSystemFactory.LoggerCategory) ?? NullLogger.Instance;
 
 		// The analyzer checks this guard: the Win32 implementations are only constructed on Windows
 		if (OperatingSystem.IsWindows())
@@ -39,7 +59,8 @@ public static class WindowsPrintSystemFactory
 				Gdi                  = new GdiRasterPrinter(options.MaxRenderDpi ?? GdiRenderSettings.UnlimitedRenderDpi),
 				PdfRasterizer        = pdfRasterizer,
 				AllowsAnyPrinterName = options.AllowAnyPrinterName,
-				IppRoute             = options.PrintPdfOverIpp ? WindowsPrintSystemFactory.CreateIppRoute(options) : null
+				IppRoute             = options.PrintPdfOverIpp ? WindowsPrintSystemFactory.CreateIppRoute(options, loggerFactory) : null,
+				Logger               = logger
 			};
 
 			return new WindowsPrintSystem(windowsContext, isSupported: true);
@@ -49,7 +70,8 @@ public static class WindowsPrintSystemFactory
 		{
 			Spool                = new UnavailableWinSpool(),
 			Gdi                  = new UnavailableGdiPrinter(),
-			AllowsAnyPrinterName = options.AllowAnyPrinterName
+			AllowsAnyPrinterName = options.AllowAnyPrinterName,
+			Logger               = logger
 		};
 
 		return new WindowsPrintSystem(unavailableContext, isSupported: false);
@@ -59,9 +81,10 @@ public static class WindowsPrintSystemFactory
 	/// Creates the route for PDF jobs straight to IPP printers, with the same settings as direct IPP printing.
 	/// </summary>
 	/// <param name="options">The options, with the configured URIs.</param>
+	/// <param name="loggerFactory">The application's logger factory, or <see langword="null"/>.</param>
 	/// <returns>The route, which owns its HTTP connections.</returns>
 	/// <exception cref="ArgumentException">A configured URI isn't one IPP can use.</exception>
-	private static WindowsIppRoute CreateIppRoute(WindowsOptions options)
+	private static WindowsIppRoute CreateIppRoute(WindowsOptions options, ILoggerFactory? loggerFactory)
 	{
 		// Checked before the connection pool exists, so a bad URI leaves nothing to dispose
 		foreach (KeyValuePair<string, Uri> configured in options.IppPrinterUris)
@@ -81,7 +104,8 @@ public static class WindowsPrintSystemFactory
 			DocumentFormats    = IppDocumentFormats.Standard,
 			BusyRetryDuration  = IppNetworkOptions.DefaultBusyRetryDuration,
 			// ipp: keys reach routed jobs, as they would reach the printer printed to directly (ADR 0027)
-			VendorOptionPrefixes = IppVendorAttributeMapper.NetworkPrefixes
+			VendorOptionPrefixes = IppVendorAttributeMapper.NetworkPrefixes,
+			Logger               = IppLog.CreateLogger(loggerFactory)
 		};
 
 		return new WindowsIppRoute(ippContext, options.IppPrinterUris);

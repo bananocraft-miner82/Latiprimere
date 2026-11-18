@@ -60,4 +60,15 @@ public sealed record PrinterCapabilities
 	/// Gets the printer's paper sources.
 	/// </summary>
 	public IReadOnlyList<InputTray> InputTrays { get; init; } = Array.Empty<InputTray>();
+
+	/// <summary>
+	/// Gets the printer's other settings, such as print quality, finishing or a driver's own settings, with the keys
+	/// and values to set them through <see cref="PrintOptions.VendorOptions"/>.
+	/// </summary>
+	/// <remarks>
+	/// IPP printers and CUPS queues list the job attributes they accept with their supported values, under
+	/// <c>ipp:</c> keys. Windows printers list their driver's Print Capabilities features and parameters, under
+	/// <c>windows:feature:</c> and <c>windows:parameter:</c> keys. Settings the typed options cover aren't listed.
+	/// </remarks>
+	public IReadOnlyList<VendorOption> VendorOptions { get; init; } = Array.Empty<VendorOption>();
 }

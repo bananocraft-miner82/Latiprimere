@@ -1,6 +1,6 @@
 # 0026: Vendor options in detail
 
-- Status: Proposed
+- Status: Accepted; `windows:print-ticket`, left for later here, is decided in [0031](0031-windows-print-tickets.md)
 - Date: 2026-11-16
 
 ## Context

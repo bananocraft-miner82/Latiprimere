@@ -90,7 +90,7 @@ public sealed class WinSpoolApiTests
 		);
 
 		// Act
-		WindowsCapabilitiesRecord? capabilities = spool.GetCapabilities("Microsoft Print to PDF");
+		WindowsCapabilitiesRecord? capabilities = spool.GetCapabilities("Microsoft Print to PDF", includePrintSchema: true);
 
 		// Assert — the driver offers A4 (DMPAPER_A4 = 9) and Letter (1), and sets a default paper
 		Assert.NotNull(capabilities);
@@ -109,7 +109,7 @@ public sealed class WinSpoolApiTests
 		WinSpoolApi spool = new WinSpoolApi();
 
 		// Act
-		WindowsCapabilitiesRecord? capabilities = spool.GetCapabilities("Latiprimere No Such Printer");
+		WindowsCapabilitiesRecord? capabilities = spool.GetCapabilities("Latiprimere No Such Printer", includePrintSchema: true);
 
 		// Assert
 		Assert.Null(capabilities);

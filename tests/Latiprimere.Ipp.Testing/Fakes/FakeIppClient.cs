@@ -9,6 +9,9 @@ namespace Latiprimere.Ipp.Testing.Fakes;
 /// </summary>
 internal sealed class FakeIppClient : IIppClient, IDisposable
 {
+	private int attributeListRequestCount; // Raw Get-Printer-Attributes requests made
+	private readonly Dictionary<string, IReadOnlyList<IppAttribute>> attributeListsByUri =
+		new Dictionary<string, IReadOnlyList<IppAttribute>>(StringComparer.Ordinal); // Raw attributes, by URI
 	private readonly Dictionary<string, PrinterDescriptionAttributes> printersByUri =
 		new Dictionary<string, PrinterDescriptionAttributes>(); // Printer attributes, by printer URI
 	private readonly List<CUPSGetPrintersRequest> cupsGetPrintersRequests =
@@ -201,6 +204,71 @@ internal sealed class FakeIppClient : IIppClient, IDisposable
 		}
 
 		return new GetPrinterAttributesResponse { PrinterAttributes = attributes };
+	}
+
+	/// <summary>Gets or sets an exception the raw Get-Printer-Attributes request alone throws, as from a printer
+	/// that refuses the job-template group.</summary>
+	public PrintException? AttributeListFailureToThrow { get; set; }
+
+	/// <summary>Gets how many raw Get-Printer-Attributes requests were made.</summary>
+	public int AttributeListRequestCount
+	{
+		get
+		{
+			return this.attributeListRequestCount;
+		}
+	}
+
+	/// <summary>
+	/// Sets the raw printer attributes a printer reports, for its vendor options.
+	/// </summary>
+	/// <param name="printerUri">The printer's URI.</param>
+	/// <param name="attributes">The attributes.</param>
+	public void SetAttributeList(Uri printerUri, IReadOnlyList<IppAttribute> attributes)
+	{
+		this.attributeListsByUri[printerUri.ToString()] = attributes;
+	}
+
+	/// <summary>
+	/// Returns the raw attributes set for the printer, or none, failing as <see cref="GetPrinterAttributesAsync"/>
+	/// does.
+	/// </summary>
+	/// <param name="request">The request, which is recorded.</param>
+	/// <param name="cancellationToken">Ends the wait for an unresponsive URI.</param>
+	/// <returns>The attributes.</returns>
+	public async Task<IReadOnlyList<IppAttribute>> GetPrinterAttributeListAsync
+	(
+		GetPrinterAttributesRequest request,
+		CancellationToken cancellationToken
+	)
+	{
+		// Fails as the typed call does, but is recorded apart, so tests counting typed requests are unaffected
+		this.ThrowIfFailing();
+		this.attributeListRequestCount++;
+
+		if (this.AttributeListFailureToThrow is not null)
+		{
+			throw this.AttributeListFailureToThrow;
+		}
+
+		string printerUri = request.OperationAttributes?.PrinterUri?.Value?.ToString() ?? string.Empty;
+
+		if (this.unresponsiveUris.Contains(printerUri))
+		{
+			await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+		}
+
+		if (this.unreachableUris.Contains(printerUri))
+		{
+			throw new PrintException("Could not connect.");
+		}
+
+		if (!this.printersByUri.ContainsKey(printerUri))
+		{
+			throw new PrintException("Not found.") { NativeErrorCode = (int)IppStatusCode.ClientErrorNotFound };
+		}
+
+		return this.attributeListsByUri.GetValueOrDefault(printerUri) ?? Array.Empty<IppAttribute>();
 	}
 
 	/// <summary>

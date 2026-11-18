@@ -66,7 +66,19 @@ internal sealed class UnavailableWinSpool : IWinSpool
 	}
 
 	/// <inheritdoc/>
-	public WindowsCapabilitiesRecord? GetCapabilities(string printerName)
+	public WindowsCapabilitiesRecord? GetCapabilities(string printerName, bool includePrintSchema)
+	{
+		throw UnavailableWinSpool.CreateException();
+	}
+
+	/// <inheritdoc/>
+	public byte[] GetDefaultPrintTicket(string printerName)
+	{
+		throw UnavailableWinSpool.CreateException();
+	}
+
+	/// <inheritdoc/>
+	public byte[] GetPrintCapabilities(string printerName, byte[]? baseDevMode, IReadOnlyList<byte[]> printTickets)
 	{
 		throw UnavailableWinSpool.CreateException();
 	}

@@ -14,6 +14,7 @@ internal sealed class WindowsPrintContextBuilder
 	private IGdiPrinter gdi = new FakeGdiPrinter();         // The GDI printer
 	private IPdfRasterizer? pdfRasterizer = null;           // The PDF rasteriser, if any
 	private Latiprimere.Windows.DirectIpp.WindowsIppRoute? ippRoute = null; // The route to IPP printers, if on
+	private Microsoft.Extensions.Logging.ILogger logger = Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance; // Where to log
 
 	/// <summary>Sets the spooler.</summary>
 	/// <param name="spool">The spooler.</param>
@@ -55,6 +56,16 @@ internal sealed class WindowsPrintContextBuilder
 		return this;
 	}
 
+	/// <summary>Sets the logger.</summary>
+	/// <param name="logger">The logger.</param>
+	/// <returns>This builder, for chaining.</returns>
+	public WindowsPrintContextBuilder WithLogger(Microsoft.Extensions.Logging.ILogger logger)
+	{
+		this.logger = logger;
+
+		return this;
+	}
+
 	/// <summary>Builds the context.</summary>
 	/// <returns>The context.</returns>
 	public WindowsPrintContext Build()
@@ -64,7 +75,8 @@ internal sealed class WindowsPrintContextBuilder
 			Spool         = this.spool,
 			Gdi           = this.gdi,
 			PdfRasterizer = this.pdfRasterizer,
-			IppRoute      = this.ippRoute
+			IppRoute      = this.ippRoute,
+			Logger        = this.logger
 		};
 	}
 }

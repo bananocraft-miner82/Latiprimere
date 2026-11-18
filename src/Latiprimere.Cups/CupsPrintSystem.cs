@@ -39,6 +39,17 @@ internal sealed class CupsPrintSystem : IPrintSystem
 		this.ownedClient = ownedClient;
 	}
 
+	/// <summary>
+	/// Gets where the print system logs, from the application's logger factory when dependency injection has one.
+	/// </summary>
+	internal Microsoft.Extensions.Logging.ILogger Logger
+	{
+		get
+		{
+			return this.context.Logger;
+		}
+	}
+
 	/// <inheritdoc/>
 	public string Name
 	{
