@@ -70,7 +70,8 @@ public static class WindowsPrintSystemFactory
 		{
 			Spool                = new UnavailableWinSpool(),
 			Gdi                  = new UnavailableGdiPrinter(),
-			AllowsAnyPrinterName = options.AllowAnyPrinterName
+			AllowsAnyPrinterName = options.AllowAnyPrinterName,
+			Logger               = logger
 		};
 
 		return new WindowsPrintSystem(unavailableContext, isSupported: false);
