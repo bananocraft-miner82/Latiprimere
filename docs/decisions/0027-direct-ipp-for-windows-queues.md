@@ -111,6 +111,6 @@ Queues examined with [tools/windows-queue-report](../../tools/windows-queue-repo
   - the port is named `WSD-<GUID>`, on the WSD Port Monitor, and its registry key records the printer's UUID (`Printer UUID`);
   - **that UUID is the printer's IPP `printer-uuid`:** the printer answered Get-Printer-Attributes over IPP with `urn:uuid:` followed by the same value, and announces itself over mDNS too.
 
-  So a WSD queue can be matched exactly to an IPP printer found over mDNS, by UUID: the "revisit" this ADR allowed for. The match would contact only a printer that announced itself, and only after its UUID matched, so ADR 0024's rule against guessing still holds. Building it is left for later: this printer doesn't accept PDF over IPP, so routing would only pay off once Phase 3 renders PDFs to the raster formats it does accept.
+  So a WSD queue can be matched exactly to an IPP printer found over mDNS, by UUID: the "revisit" this ADR allowed for. The match would contact only a printer that announced itself, and only after its UUID matched, so ADR 0024's rule against guessing still holds. Built 2026-11-18, with raster for printers that don't take PDF: [ADR 0036](0036-wsd-queues-over-ipp.md).
 - **Still unexamined: a queue on Microsoft's IPP Class Driver.** Windows 11 uses that driver for printers that only offer IPP, and for every printer under Windows protected print mode. Until one has been examined, such queues need `IppPrinterUris`.
 

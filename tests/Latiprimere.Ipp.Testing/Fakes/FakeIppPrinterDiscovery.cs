@@ -65,6 +65,31 @@ public sealed class FakeIppPrinterDiscovery : IIppPrinterDiscovery
 	/// <summary>Gets the names looked up with <c>ResolveAsync</c>, in order.</summary>
 	public List<string> ResolvedNames { get; } = new List<string>();
 
+	/// <summary>Gets the UUIDs searched for, in order.</summary>
+	public List<string> SearchedUuids { get; } = new List<string>();
+
+	/// <summary>Gets or sets what searching by UUID throws, if anything.</summary>
+	public Exception? UuidSearchFailure { get; set; }
+
+	/// <inheritdoc/>
+	Task<DiscoveredIppPrinter?> IIppPrinterDiscovery.FindByUuidAsync
+	(
+		string            uuid,
+		TimeSpan          timeout,
+		CancellationToken cancellationToken
+	)
+	{
+		this.SearchedUuids.Add(uuid);
+
+		if (this.UuidSearchFailure is not null)
+		{
+			return Task.FromException<DiscoveredIppPrinter?>(this.UuidSearchFailure);
+		}
+		DiscoveredIppPrinter? printer = this.printers.FirstOrDefault(candidate => candidate.Uuid == uuid);
+
+		return Task.FromResult(printer);
+	}
+
 	/// <inheritdoc/>
 	Task<DiscoveredIppPrinter?> IIppPrinterDiscovery.ResolveAsync
 	(

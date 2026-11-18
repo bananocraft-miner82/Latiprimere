@@ -14,6 +14,58 @@ public sealed class WinSpoolApiTests
 {
 	private const string SkipReason = "The Windows spooler is only available on Windows."; // Reason shown when skipped
 
+	[Theory]
+	[InlineData("WSD-adb74ae8-1d57-46ea-9170-4b578f4949be", true)]
+	[InlineData("WSD-3936ac3b-cb44-4203-9cd5-bb58aa610721.0030", true)]
+	[InlineData("wsd-adb74ae8-1d57-46ea-9170-4b578f4949be", true)]
+	[InlineData("WSD-", false)]
+	[InlineData(@"WSD-x\..\..\Software", false)]
+	[InlineData("WSD-a b", false)]
+	[InlineData("USB001", false)]
+	[InlineData("http://printer:631/ipp/print", false)]
+	public void GivenPortNameWhenCheckedThenOnlyWsdNamesSafeInARegistryPathPass(string portName, bool expected)
+	{
+		// Arrange — a port name goes into a registry path (provided by InlineData above)
+
+		// Act
+		bool isWsd = WinSpoolApi.IsWsdPortName(portName);
+
+		// Assert
+		Assert.Equal(expected, isWsd);
+	}
+
+	[Fact]
+	public void GivenThisMachinesWsdPortsWhenReadingTheirUuidsThenEachIsTheRegistrysValue()
+	{
+		// Arrange — read-only; skipped on a machine without WSD ports
+		Assert.SkipUnless(OperatingSystem.IsWindows(), WinSpoolApiTests.SkipReason);
+		using Microsoft.Win32.RegistryKey? ports = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Print\Monitors\WSD Port\Ports");
+		string[] names = ports?.GetSubKeyNames() ?? [];
+		Assert.SkipWhen(names.Length == 0, "This machine has no WSD ports.");
+		WinSpoolApi spool = new WinSpoolApi();
+
+		// Act and assert
+		foreach (string name in names)
+		{
+			using Microsoft.Win32.RegistryKey? port = ports!.OpenSubKey(name);
+			Assert.Equal(port?.GetValue("Printer UUID") as string, spool.GetWsdPrinterUuid(name));
+		}
+	}
+
+	[Fact]
+	public void GivenAPortThatIsntWsdWhenReadingItsUuidThenNull()
+	{
+		// Arrange
+		Assert.SkipUnless(OperatingSystem.IsWindows(), WinSpoolApiTests.SkipReason);
+		WinSpoolApi spool = new WinSpoolApi();
+
+		// Act
+		string? uuid = spool.GetWsdPrinterUuid("PORTPROMPT:");
+
+		// Assert
+		Assert.Null(uuid);
+	}
+
 	[Fact]
 	public void GivenThisMachineWhenEnumeratePrintersThenEveryPrinterHasAName()
 	{

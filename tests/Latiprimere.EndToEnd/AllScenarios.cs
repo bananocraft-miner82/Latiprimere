@@ -56,6 +56,7 @@ public static class AllScenarios
 		IppSecurityScenarios.PasswordRequired,
 		IppSecurityScenarios.UntrustedCertificate,
 		WindowsIppRouteScenarios.PdfToPrinter,
+		WindowsIppRouteScenarios.RasterToPrinter,
 		WindowsIppFallbackScenarios.NoPdf,
 		WindowsIppFallbackScenarios.Unreachable,
 		WindowsIppFallbackScenarios.PasswordRequired,
@@ -74,7 +75,8 @@ public static class AllScenarios
 		ManualScenarios.PaperAndColour,
 		ManualScenarios.TwoSidedAndCopies,
 		ManualScenarios.Landscape,
-		ManualScenarios.Tray
+		ManualScenarios.Tray,
+		ManualScenarios.WindowsQueueOverIpp
 	];
 
 	/// <summary>

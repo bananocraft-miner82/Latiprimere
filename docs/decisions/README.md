@@ -41,6 +41,7 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0033](0033-validate-job.md) | Validate-Job before Print-Job | Accepted |
 | [0034](0034-raster-encoders.md) | Raster encoders for printers without PDF | Accepted |
 | [0035](0035-printing-pdfs-as-raster.md) | Printing PDFs as raster over IPP | Accepted |
+| [0036](0036-wsd-queues-over-ipp.md) | Windows WSD queues over IPP, matched by UUID | Accepted |
 
 ## Template
 

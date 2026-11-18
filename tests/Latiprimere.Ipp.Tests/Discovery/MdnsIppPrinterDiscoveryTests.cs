@@ -79,6 +79,28 @@ public sealed class MdnsIppPrinterDiscoveryTests
 	}
 
 	[Fact]
+	public void GivenPrintersAnnouncingUuidsWhenFindUuidThenReturnsTheOneWithItOverPlainIpp()
+	{
+		// Arrange — announced with urn:uuid: and in upper case, as some printers do; and another printer
+		const string uuid = "00000000-0000-1000-8000-00117d58570e";
+
+		DnsSdService[] services =
+		[
+			MdnsIppPrinterDiscoveryTests.CreateService("Canon", "_ipps._tcp", "192.168.1.40", 443) with { Txt = ["rp=ipp/print", "UUID=urn:uuid:00000000-0000-1000-8000-00117D58570E"] },
+			MdnsIppPrinterDiscoveryTests.CreateService("Canon", "_ipp._tcp", "192.168.1.40", 631) with { Txt = ["rp=ipp/print", "UUID=" + uuid] },
+			MdnsIppPrinterDiscoveryTests.CreateService("Other", "_ipp._tcp", "192.168.1.50", 631) with { Txt = ["rp=ipp/print", "UUID=11111111-2222-3333-4444-555555555555"] },
+		];
+
+		// Act
+		DiscoveredIppPrinter? found = MdnsIppPrinterDiscovery.FindUuid(services, uuid);
+		DiscoveredIppPrinter? missing = MdnsIppPrinterDiscovery.FindUuid(services, "99999999-0000-0000-0000-000000000000");
+
+		// Assert
+		Assert.Equal(new Uri("ipp://192.168.1.40:631/ipp/print"), found?.PrinterUri);
+		Assert.Null(missing);
+	}
+
+	[Fact]
 	public void GivenOnlyIppsAnnouncementWhenFindInstanceThenReturnsIt()
 	{
 		// Arrange

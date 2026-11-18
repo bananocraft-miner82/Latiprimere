@@ -37,6 +37,20 @@ internal sealed class FakeWinSpool : IWinSpool
 	/// <summary>Gets every name GetPrinter was asked to open, as OpenPrinter would be, in order.</summary>
 	public List<string> OpenedPrinterNames { get; } = new List<string>();
 
+	/// <summary>Gets the printer UUIDs WSD ports record, by port name.</summary>
+	public Dictionary<string, string> WsdPrinterUuids { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+	/// <summary>Gets the WSD ports whose UUID was read, in order.</summary>
+	public List<string> WsdPortsRead { get; } = new List<string>();
+
+	/// <inheritdoc/>
+	public string? GetWsdPrinterUuid(string portName)
+	{
+		this.WsdPortsRead.Add(portName);
+
+		return this.WsdPrinterUuids.GetValueOrDefault(portName);
+	}
+
 	/// <summary>Gets the number of copies of the last raw job, or 0 before the first.</summary>
 	public int LastSubmittedCopies { get; private set; }
 

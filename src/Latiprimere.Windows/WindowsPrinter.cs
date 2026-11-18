@@ -1,6 +1,8 @@
 using System.Xml;
 using Latiprimere.Ipp;
+using Latiprimere.Ipp.Discovery;
 using Latiprimere.Ipp.Mapping;
+using Latiprimere.Ipp.Raster;
 using Latiprimere.Rendering;
 using Latiprimere.Windows.DirectIpp;
 using Latiprimere.Windows.Gdi;
@@ -31,8 +33,8 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 	private readonly string printerName;          // The spooler's name for the printer
 	private readonly string? driverName;          // The printer's driver, if the spooler reported it
 	private readonly string? portName;            // The queue's port, which names the printer's URL for some queues
-	private IppPrinter? ippPrinter;               // The queue's IPP printer, once known to accept PDF
-	private bool ippPrinterRefusesPdf;            // Whether the queue's IPP printer said it doesn't accept PDF
+	private IppPrinter? ippPrinter;               // The queue's IPP printer, once known to accept PDF or raster
+	private bool ippPrinterRefusesPdf;            // Whether the queue's IPP printer said it takes neither
 	private bool lacksPrintTickets;               // Whether the driver turned out to have no Print Ticket support
 
 	/// <summary>
@@ -217,6 +219,15 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 
 			return null;
 		}
+		catch (NotSupportedException exception) when (documentStart is not null)
+		{
+			// A raster job the printer's attributes don't allow, such as no paper size: nothing was sent, and the
+			// driver may still print it (ADR 0036)
+			WindowsLog.RasterNotPossible(this.context.Logger, this.printerName, exception);
+			document.Position = documentStart.Value;
+
+			return null;
+		}
 	}
 
 	/// <summary>
@@ -244,12 +255,17 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 			return this.ippPrinter;
 		}
 
-		Uri? printerUri = route.FindPrinterUri(this.printerName, this.portName);
+		// An exact URI, or a WSD queue's printer found by the UUID its port records (ADR 0036)
+		WindowsIppTarget? target = await route
+			.FindTargetAsync(this.printerName, this.portName, this.context.Spool, cancellationToken)
+			.ConfigureAwait(false);
 
-		if (printerUri is null)
+		if (target is null)
 		{
 			return null;
 		}
+
+		Uri printerUri = target.PrinterUri;
 
 		IReadOnlyCollection<string>? formats;
 		IReadOnlyCollection<SharpIpp.Protocol.Models.IppOperation>? operations;
@@ -261,10 +277,19 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 				(
 					route.Context,
 					printerUri,
-					[IppRequestedAttributes.DocumentFormatSupported, IppRequestedAttributes.OperationsSupported],
+					[IppRequestedAttributes.DocumentFormatSupported, IppRequestedAttributes.OperationsSupported, IppRequestedAttributes.PrinterUuid],
 					cancellationToken
 				)
 				.ConfigureAwait(false);
+
+			if (target.Uuid is not null && !WindowsPrinter.IsSamePrinter(target.Uuid, attributes))
+			{
+				// Gone from where it was found, or another printer answers there now: search again at the next job
+				WindowsLog.IppPrinterNotMatched(this.context.Logger, this.printerName, printerUri);
+				route.ForgetMatch(target.Uuid);
+
+				return null;
+			}
 
 			formats = attributes is null
 				? null
@@ -275,23 +300,51 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 		}
 		catch (PrintException)
 		{
-			// Unreachable, or wants a password: the spooler prints this job, and the next one asks again
+			// Unreachable, or wants a password: the spooler prints this job, and the next one asks again, searching
+			// afresh for a printer found by UUID, which may have moved
+			if (target.Uuid is not null)
+			{
+				route.ForgetMatch(target.Uuid);
+			}
+
 			return null;
 		}
 
 		string pdf = route.Context.DocumentFormats.GetMimeType(DocumentFormat.Pdf);
 
-		if (formats is null || !formats.Contains(pdf, StringComparer.OrdinalIgnoreCase))
+		// PDF as it is, or rendered to a raster format the printer takes when there is a rasteriser (ADR 0036)
+		bool takesPdf = formats?.Contains(pdf, StringComparer.OrdinalIgnoreCase) == true;
+		bool takesRaster = formats is not null && route.Context.PdfRasterizer is not null && RasterJobPlanner.ChooseFormat(formats) is not null;
+
+		if (!takesPdf && !takesRaster)
 		{
-			// No printer at that URI, or one that doesn't take PDF: that won't change while this object lives
+			// No printer at that URI, or one that takes neither: that won't change while this object lives
 			this.ippPrinterRefusesPdf = true;
 
 			return null;
 		}
 
+		if (target.Uuid is not null)
+		{
+			WindowsLog.IppPrinterMatched(this.context.Logger, this.printerName, printerUri);
+		}
+
 		this.ippPrinter = new IppPrinter(route.Context, printerUri, this.Info, formats, operations);
 
 		return this.ippPrinter;
+	}
+
+	/// <summary>
+	/// Checks that the printer found by a WSD queue's UUID reports that UUID itself as its <c>printer-uuid</c>.
+	/// </summary>
+	/// <param name="uuid">The normalised UUID the queue's port records.</param>
+	/// <param name="attributes">What the printer reported, or <see langword="null"/> if there was no printer there.</param>
+	/// <returns>Whether it is the queue's printer; one that doesn't report a UUID isn't trusted.</returns>
+	private static bool IsSamePrinter(string uuid, SharpIpp.Protocol.Models.PrinterDescriptionAttributes? attributes)
+	{
+		string? reported = attributes is null ? null : DnsSdServiceMapper.NormalizeUuid(IppValueReader.ReadReference(attributes.PrinterUUID));
+
+		return reported == uuid;
 	}
 
 	/// <summary>
