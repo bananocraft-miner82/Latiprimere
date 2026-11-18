@@ -9,6 +9,7 @@ namespace Latiprimere.Ipp.Testing.Fakes;
 /// </summary>
 internal sealed class FakeIppClient : IIppClient, IDisposable
 {
+	private readonly List<ValidateJobRequest> validateJobRequests = []; // Validate-Job requests received
 	private int attributeListRequestCount; // Raw Get-Printer-Attributes requests made
 	private readonly Dictionary<string, IReadOnlyList<IppAttribute>> attributeListsByUri =
 		new Dictionary<string, IReadOnlyList<IppAttribute>>(StringComparer.Ordinal); // Raw attributes, by URI
@@ -269,6 +270,38 @@ internal sealed class FakeIppClient : IIppClient, IDisposable
 		}
 
 		return this.attributeListsByUri.GetValueOrDefault(printerUri) ?? Array.Empty<IppAttribute>();
+	}
+
+	/// <summary>Gets the Validate-Job requests received, in order.</summary>
+	public IReadOnlyList<ValidateJobRequest> ValidateJobRequests
+	{
+		get
+		{
+			return this.validateJobRequests;
+		}
+	}
+
+	/// <summary>Gets the vendor attributes the last Validate-Job carried, or <see langword="null"/>.</summary>
+	public IppVendorAttributes? LastValidateJobVendorAttributes { get; private set; }
+
+	/// <summary>Gets or sets an exception Validate-Job throws, as a printer's refusal (an IPP client error) or a busy
+	/// answer would.</summary>
+	public PrintException? ValidateJobFailureToThrow { get; set; }
+
+	/// <summary>
+	/// Records the request, then accepts it or throws <see cref="ValidateJobFailureToThrow"/>.
+	/// </summary>
+	/// <param name="request">The request, which is recorded.</param>
+	/// <param name="vendorAttributes">The vendor attributes, which are recorded.</param>
+	/// <param name="cancellationToken">Not used.</param>
+	/// <returns>A completed task, or a faulted one.</returns>
+	public Task ValidateJobAsync(ValidateJobRequest request, IppVendorAttributes vendorAttributes, CancellationToken cancellationToken)
+	{
+		this.ThrowIfFailing();
+		this.validateJobRequests.Add(request);
+		this.LastValidateJobVendorAttributes = vendorAttributes;
+
+		return this.ValidateJobFailureToThrow is null ? Task.CompletedTask : Task.FromException(this.ValidateJobFailureToThrow);
 	}
 
 	/// <summary>

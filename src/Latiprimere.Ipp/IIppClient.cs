@@ -52,6 +52,17 @@ internal interface IIppClient
 	Task<IReadOnlyList<IppAttribute>> GetPrinterAttributeListAsync(GetPrinterAttributesRequest request, CancellationToken cancellationToken);
 
 	/// <summary>
+	/// Sends a Validate-Job request: the job's attributes, vendor attributes included, without its document
+	/// (ADR 0033).
+	/// </summary>
+	/// <param name="request">The request.</param>
+	/// <param name="vendorAttributes">Attributes to add to the request's groups.</param>
+	/// <param name="cancellationToken">A token to cancel the operation.</param>
+	/// <returns>A task that completes when the printer has accepted the job's attributes.</returns>
+	/// <exception cref="PrintException">The request failed, or the printer refused the attributes.</exception>
+	Task ValidateJobAsync(ValidateJobRequest request, IppVendorAttributes vendorAttributes, CancellationToken cancellationToken);
+
+	/// <summary>
 	/// Sends a Print-Job request.
 	/// </summary>
 	/// <param name="request">The request, including the document.</param>

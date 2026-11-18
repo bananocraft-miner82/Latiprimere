@@ -17,6 +17,16 @@ public readonly record struct RasterBand(int PageWidth, int PageHeight, int Top,
 	public static readonly int BytesPerPixel = 4;
 
 	/// <summary>
+	/// Gets how far the page is turned as it is rendered; <see cref="RasterRotation.None"/> by default.
+	/// <see cref="PageWidth"/> and <see cref="PageHeight"/> are the turned page's size.
+	/// </summary>
+	/// <remarks>
+	/// An <see cref="IRasterDocument"/> that can't turn pages throws <see cref="NotSupportedException"/> for any other
+	/// value, rather than rendering the page unturned.
+	/// </remarks>
+	public RasterRotation Rotation { get; init; }
+
+	/// <summary>
 	/// Gets the number of bytes the band's pixels occupy.
 	/// </summary>
 	public long ByteCount

@@ -134,6 +134,18 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 	}
 
 	/// <inheritdoc/>
+	public Task ValidateJobAsync(ValidateJobRequest request, IppVendorAttributes vendorAttributes, CancellationToken cancellationToken)
+	{
+		return this.SendAsync
+		(
+			request.OperationAttributes?.PrinterUri,
+			token => this.SendRawValidateJobAsync(request, vendorAttributes, token),
+			isUpload: false,
+			cancellationToken
+		);
+	}
+
+	/// <inheritdoc/>
 	public Task<PrintJobResponse> PrintJobAsync(PrintJobRequest request, IppVendorAttributes vendorAttributes, CancellationToken cancellationToken)
 	{
 		// The typed request can't carry attributes SharpIppNext doesn't model, so a job with vendor attributes
@@ -207,6 +219,33 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 		IIppResponseMessage response = await this.client.SendAsync(printerUri, raw, cancellationToken).ConfigureAwait(false);
 
 		return SharpIppClientAdapter.ToPrintJobResponse(response);
+	}
+
+	/// <summary>
+	/// Sends a Validate-Job request in its raw form, with the vendor attributes added to their groups, as Print-Job
+	/// sends them, so the printer judges exactly what the job will carry.
+	/// </summary>
+	/// <param name="request">The typed request.</param>
+	/// <param name="vendorAttributes">The attributes to add.</param>
+	/// <param name="cancellationToken">A token to cancel the request.</param>
+	/// <returns>True, once the printer has accepted the attributes; SharpIppNext throws for a refusal.</returns>
+	private async Task<bool> SendRawValidateJobAsync
+	(
+		ValidateJobRequest  request,
+		IppVendorAttributes vendorAttributes,
+		CancellationToken   cancellationToken
+	)
+	{
+		IIppRequestMessage raw = this.client.CreateRawRequest(request);
+		raw.OperationAttributes.AddRange(vendorAttributes.Operation);
+		raw.JobAttributes.AddRange(vendorAttributes.Job);
+
+		Uri printerUri = request.OperationAttributes?.PrinterUri?.Value
+						 ?? throw new ArgumentException("The request has no printer-uri.", nameof(request));
+
+		await this.client.SendAsync(printerUri, raw, cancellationToken).ConfigureAwait(false);
+
+		return true;
 	}
 
 	/// <summary>

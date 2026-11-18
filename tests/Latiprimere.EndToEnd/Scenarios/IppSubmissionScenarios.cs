@@ -53,7 +53,7 @@ public static class IppSubmissionScenarios
 	{
 		Id = "ipp.submission.unsupported-value-refused",
 		Area = ScenarioArea.Submission,
-		Title = "Two-sided printing on a one-sided printer is refused with client-error-attributes-or-values-not-supported, and no job is created",
+		Title = "Two-sided printing on a one-sided printer is refused with client-error-attributes-or-values-not-supported by Validate-Job, before the document is sent, and no job is created",
 		Needs = TargetNeeds.None,
 		RunAsync = IppSubmissionScenarios.UnsupportedValueRefusedAsync
 	};
@@ -200,8 +200,11 @@ public static class IppSubmissionScenarios
 		context.Note("Message: " + exception!.Message);
 		context.CheckEqual("its error code is the printer's status 0x040B", (int?)IppSubmissionScenarios.AttributesOrValuesNotSupported, exception.NativeErrorCode);
 
-		IReadOnlyList<RecordedRequest> printJobs = fake.GetRequests(IppOperation.PrintJob);
-		context.CheckEqual("the job is sent once, not resent", 1, printJobs.Count);
-		context.Check("the printer created no job", printJobs.All(request => request.StatusCode != IppStatusCode.SuccessfulOk));
+		// Validate-Job carries the job's attributes without the document, so the refusal costs no upload (ADR 0033)
+		IReadOnlyList<RecordedRequest> validations = fake.GetRequests(IppOperation.ValidateJob);
+		context.CheckEqual("the job's attributes are validated once", 1, validations.Count);
+		context.Check("Validate-Job is what the printer refused", validations.All(request => request.StatusCode == (IppStatusCode)IppSubmissionScenarios.AttributesOrValuesNotSupported));
+		context.Check("Validate-Job asked for two-sided printing", validations.Single().Find("sides")?.Value == "two-sided-long-edge");
+		context.CheckEqual("the document is never sent", 0, fake.GetRequests(IppOperation.PrintJob).Count);
 	}
 }

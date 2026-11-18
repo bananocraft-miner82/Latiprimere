@@ -38,6 +38,9 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0030](0030-release-numbering.md) | Number releases after the latest one | Accepted |
 | [0031](0031-windows-print-tickets.md) | Print Tickets on Windows | Accepted; Print Capabilities in 0032 |
 | [0032](0032-vendor-options-in-capabilities.md) | Vendor options in the capabilities, and Windows Print Capabilities | Accepted |
+| [0033](0033-validate-job.md) | Validate-Job before Print-Job | Accepted |
+| [0034](0034-raster-encoders.md) | Raster encoders for printers without PDF | Accepted |
+| [0035](0035-printing-pdfs-as-raster.md) | Printing PDFs as raster over IPP | Accepted |
 
 ## Template
 

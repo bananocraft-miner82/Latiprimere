@@ -1,0 +1,210 @@
+# Phase 3 Plan: Direct IPP and v1.0
+
+> Status: **Accepted** (2026-11-18): owner, "Yes, start P3-1", accepting the recommended decisions D1 to D9. Phase 3's checklist is in [plan.md](plan.md); this breaks it into work packages, says what already exists, and records the decisions.
+>
+> Progress:
+> - **P3-1 done** (2026-11-18, [ADR 0033](decisions/0033-validate-job.md)); its check on the real HP waits for the printer to be on.
+> - **P3-2 done** (2026-11-18, [ADR 0034](decisions/0034-raster-encoders.md)): PWG raster and Apple raster encoders, checked pixel by pixel against PDFium. The `ippeveprinter` integration tests run in CI.
+> - **P3-3 built** (2026-11-18, [ADR 0035](decisions/0035-printing-pdfs-as-raster.md)): PDFs go as raster to direct IPP printers that can't take PDF, streamed and gzipped. It's checked on the scripted printer with the HP's and `ippeveprinter`'s profiles; the real `ippeveprinter` check runs in CI. Its "done when", a PDF printed on the HP, waits for the manual check on paper.
+
+## Purpose
+
+Phase 3 makes direct IPP complete enough to stand on its own, and gets the packages to a stable first release:
+
+- **Print to any IPP printer,** including those that don't accept PDF, by rendering pages to the raster formats every IPP Everywhere and AirPrint printer must take.
+- **Reach printers securely,** over IPPS, with authentication.
+- **Catch refusals before uploading,** with Validate-Job.
+- **Find printers reliably,** after a restart and behind Windows' own WSD queues.
+- **Document it, verify it on real hardware, and release it as stable.**
+
+## Where we are
+
+| Item in plan.md | What exists | What's missing |
+|---|---|---|
+| Direct IPP with mDNS discovery | Built in Spike 4 and hardened since ([ADR 0010](decisions/0010-direct-ipp-adapter-design.md)): `ipp:dnssd:` IDs, discovery over `_ipp._tcp` and `_ipps._tcp`, remembered addresses checked by UUID, busy retries, Happy Eyeballs, connect timeouts, capabilities and vendor options | IPPS, raster formats, persistence (below). The CI mDNS trial's result isn't recorded |
+| Validate-Job | Nothing. ADR 0010 left options unchecked until the capability model existed; the printer's `client-error-attributes-or-values-not-supported` reaches the caller after the upload | The whole item |
+| PDFs to printers without PDF | `IPdfRasterizer` and `IRasterDocument.RenderBand` render a PDF page by page, band by band, in BGRA (the Windows GDI path uses them). Formats are checked against `document-format-supported`, so such a printer refuses PDFs up front | Encoders for PWG raster, Apple raster and PCLm, and a job path that uses them |
+| IPPS and authentication | `IppConnectionSecurity` (TLS, credentials, certificate validation) and its HTTP handler, used by CUPS ([ADR 0020](decisions/0020-cups-authentication.md)). Discovery already sees `_ipps._tcp` but lists such printers over plain IPP | Options for direct IPP, a certificate trust model for printers' self-signed certificates, per-printer credentials |
+| Persist remembered addresses | Remembered in memory only (ADR 0010, point 4) | A store, and where it lives |
+| Docs site and samples | Eleven pages in [site/](site/), the CLI sample, and the examples sample (console, web service, worker), run by the harness | Pages for this phase's features, an API reference, and a review of every page for 1.0 |
+| macOS on real hardware | The Mac CI runner, and the manual checklists for Spikes 1 and 4 | A person running them on a Mac |
+| `1.0.0` release | Automated releases ([ADR 0028](decisions/0028-automated-releases.md), [ADR 0030](decisions/0030-release-numbering.md)), the public API analyzer, package validation, `RELEASE_PREVIEW` | An API review for 1.0, the stable switch, and a decision on what "1.0" means under the version scheme (decision D8) |
+
+Carried over from earlier phases:
+
+- **WSD queues:** route a Windows queue's PDFs to its IPP printer by UUID. The match was proven on 2026-11-18 (ADR 0027, "Follow-up"), and was waiting on this phase's raster printing, since the HP doesn't take PDF.
+- **A queue on Microsoft's IPP Class Driver** hasn't been examined.
+- **Phase 0's Mac checks** (Spikes 1 and 4) and the **CI mDNS trial**.
+
+What we know about the printers we can test with:
+
+| Printer | Formats | Raster details | Other |
+|---|---|---|---|
+| HP ENVY 5640 (captured) and the ENVY 5540 on the network | PCL, JPEG, PCLm, Apple raster (`image/urf`), octet-stream: **no PDF** | `urf-supported`: `V1.4`, `RS300-600`, `W8` (grey), `SRGB24`, `DM3` (duplex back side), `PQ3-4-5`, `IS1-7`. PCLm: strips of 32 lines, RLE, JPEG or Flate, back side rotated, 300 or 600 dpi | `ipps://…:443` offered; `requesting-user-name` only; Validate-Job supported; up to 10 operations at once |
+| `ippeveprinter` (test container) | PDF, JPEG, PWG raster | `pwg-raster-document-type-supported`: `black_1`, `sgray_8`; 300 and 600 dpi | `ipps` offered |
+
+## Work packages
+
+Sizes are rough: **S** is about a day, **M** two or three days, **L** about a week.
+
+### P3-1. Validate-Job (S)
+
+Ask the printer to validate a job before uploading its document, so a refused option fails in milliseconds rather than after the upload.
+
+- **What:** before Print-Job, send Validate-Job with the same operation and job attributes, vendor options included, but no document. A refusal throws the same `PrintException` the Print-Job would have, with the IPP status as `NativeErrorCode`.
+- **When:** direct IPP printers, and Windows queues routed to IPP (ADR 0027), whose `operations-supported` lists Validate-Job (4). Not CUPS, which accepts and then cancels.
+- **Cost:** one round trip per job, on by default (D5), with `IppNetworkOptions.ValidateJobs` to turn it off.
+- **Tests:** the scripted IPP printer refusing at Validate-Job (nothing uploaded); a printer without the operation (skipped); the real HP manually.
+- **Done when:** a job with an option the printer refuses fails before any document bytes are sent, on the fake printer and on `ippeveprinter`.
+
+### P3-2. Raster encoders (L)
+
+Turn rendered bands into the formats printers take.
+
+- **PWG raster** (`image/pwg-raster`, PWG 5102.4): required by IPP Everywhere, so every IPP Everywhere printer takes it. A sync word, then for each page a 1,796-byte header and the page's lines, each line run-length encoded.
+- **Apple raster** (`image/urf`): required by AirPrint, so nearly every printer sold since 2010 takes it. A file header and a 32-byte header per page, with the same line encoding. Its options come from `urf-supported`.
+- **PCLm** (`application/PCLm`, Mopria): a restricted PDF holding the pages as image strips. Many HP and Mopria printers, Microsoft's IPP Class Driver among their users. Recommended later (D1).
+- **Shared pieces:**
+  - colour conversion from BGRA to 1-bit black, 8-bit grey and 24-bit sRGB;
+  - the run-length line encoder (repeated lines and repeated pixels);
+  - page geometry: the media size in pixels at the chosen resolution, the PDF page fitted inside it.
+  - Each format writes to a `Stream` as pages are rendered, so a page never has to be held whole: an A4 page at 600 dpi is about 100 MB unencoded.
+- **Where:** in `Latiprimere.Ipp`, internal, since only IPP uses these formats and it already references Latiprimere.Abstractions, where `IRasterDocument` lives. No new package, and no new dependency.
+- **Tests:**
+  - byte-level checks of each header against the specifications;
+  - decoders (in the test projects only) that read the output back into pixels, so pages can be compared with the PDF as the harness already compares printed PDFs;
+  - `ippeveprinter`, which accepts PWG raster and keeps what it prints.
+- **Done when:** a three-page PDF encoded at 300 and 600 dpi, in grey and colour, decodes back to the same pages, and `ippeveprinter` accepts it.
+
+### P3-3. Printing PDFs as raster (M)
+
+Use P3-2 when a printer can't take a PDF.
+
+- **When:** a PDF job for a direct IPP printer whose `document-format-supported` lacks `application/pdf`, when an `IPdfRasterizer` is registered (as for Windows). Today such a job is refused with `NotSupportedException`. Without a rasteriser, it still is, with a message saying to add Latiprimere.Rendering.Pdfium.
+- **Which format:** PWG raster, then Apple raster, then PCLm once built, taking the first the printer lists (D2).
+- **Settings, from the job's options and the printer's raster attributes:**
+  - resolution: the printer's default, capped by a new `IppNetworkOptions.MaxRenderDpi`, as `WindowsOptions` has (D3);
+  - colour space: grey or sRGB from `ColorMode`, black-and-white only when that's all it takes;
+  - media size, and duplex with the back side turned as `pwg-raster-document-sheet-back` or URF's `DM` says;
+  - orientation, which follows the PDF's pages unless `Orientation` is chosen, as on Windows;
+  - copies, which the printer makes from one copy of the document.
+- **Upload:**
+  - streamed while pages are rendered;
+  - compressed with `compression=gzip` when the printer offers it (the HP does);
+  - resent from the start for a busy printer ([ADR 0017](decisions/0017-retry-busy-ipp-printers.md)), since rendering is repeatable;
+  - cancellation stops the rendering too.
+- **Status:** the job is followed as any IPP job, so it reports how it ended. That's the gain over printing through the Windows spooler.
+- **Tests:**
+  - harness scenarios with the scripted printer serving the HP's and `ippeveprinter`'s profiles, checking what arrived page by page;
+  - an integration test against `ippeveprinter`;
+  - a manual check on the HP: a test page, colour and grey, A4, two-sided. This prints paper, so only when you say.
+- **Done when:** a PDF prints on the HP over IPP, and the job reports Completed when the paper is out.
+
+### P3-4. Windows queues in front of IPP printers (M)
+
+Finish what ADR 0027 started, now that every IPP printer can be printed to.
+
+- **Matching:** a WSD queue's port records the printer's UUID. Match it to an IPP printer found over mDNS with the same `printer-uuid`, and route the queue's PDF jobs to it when `PrintPdfOverIpp` is on. Only a printer that announced itself and matched is contacted, so ADR 0024's rule against guessing holds.
+- **PDF or raster:** a PDF the printer can't take goes as raster (P3-3) rather than falling back to the driver.
+- **Microsoft's IPP Class Driver:** examine a queue on it with [tools/windows-queue-report](../tools/windows-queue-report/README.md), and route it too if its port records an address or UUID.
+- **Tests:**
+  - unit tests from captured registry and port data;
+  - the HP's WSD queue, manually.
+- **Done when:** a PDF printed to the HP's Windows queue goes to the printer over IPP as Apple raster, and reports how it ended.
+
+### P3-5. IPPS and authentication for direct IPP (M)
+
+- **Addresses:** `ipps:` URIs in `IppNetworkOptions.PrinterUris`, and printers announced over `_ipps._tcp`. Today those are listed over plain IPP; with IPPS on, the secure address is preferred (D4).
+- **Certificates:** printers' certificates are nearly always self-signed, so the system's trust store rejects them. Proposed, in order:
+  - the system's trust;
+  - certificates pinned by SHA-256 fingerprint in `IppNetworkOptions.TrustedCertificates`;
+  - an optional callback for anything else.
+
+  Trust on first use is offered as an opt-in only, since it needs somewhere to keep the pins (P3-6) and accepts whatever answers first.
+- **Credentials:** user name and password per printer URI, or one set for all, sent only over TLS, as for CUPS (ADR 0020). `uri-authentication-supported` says what each printer wants.
+- **Reuse:** `IppConnectionSecurity` and the TLS handler CUPS uses; this mostly exposes them for direct IPP.
+- **Tests:**
+  - `ippeveprinter` over IPPS, with its self-signed certificate pinned, and refused when it isn't;
+  - the scripted printer, which already has `SelfSignedCertificate`;
+  - the HP over `ipps://…:443`, manually.
+- **Done when:** the HP and `ippeveprinter` print over IPPS with pinned certificates, and an unpinned self-signed certificate is refused with a message giving its fingerprint.
+
+### P3-6. Remembered addresses that survive a restart (S)
+
+- **What:** an optional file that keeps each `ipp:dnssd:` name's last address and UUID, read at start-up and written when an address changes. It's off by default; `IppNetworkOptions.AddressStorePath` turns it on (D6).
+- **How:** JSON through a source-generated `System.Text.Json` context, so Native AOT still works. A missing or unreadable file means starting empty, and is logged, never an error. The UUID check on each use still guards against a reused address.
+- **Done when:** after a restart, a sleeping printer that doesn't answer mDNS is still found at its remembered address.
+
+### P3-7. Docs, samples and API reference (M)
+
+- **New guide pages:**
+  - printing to network printers, raster included;
+  - secure printers (IPPS, certificates, credentials);
+  - vendor options and Windows Print Capabilities;
+  - logging.
+- **Every page reviewed** against the 1.0 API; examples kept in `Latiprimere.Examples`, which the harness runs.
+- **An API reference** generated from the XML documentation (D7).
+- **The samples** already cover console, ASP.NET Core and a worker service; each is checked against the 1.0 API.
+
+### P3-8. macOS on real hardware (S, owner)
+
+Run on a Mac:
+
+- the harness's manual mode against a CUPS queue and a printer over direct IPP;
+- the Phase 0 checklists (Spikes 1 and 4).
+
+Record the results in [manual-tests](manual-tests/README.md). This needs you at the Mac; the rest of the phase doesn't wait on it.
+
+### P3-9. Ready for 1.0 (M)
+
+- **API review for 1.0,** as for 0.1 ([ADR 0018](decisions/0018-api-review-0-1.md)):
+  - every public type and member, the names and the exceptions;
+  - anything that should be internal before it can't be;
+  - the review recorded in an ADR.
+- **The stable switch:**
+  - the meaning of "1.0" decided (D8);
+  - the README's status line reworded;
+  - `RELEASE_PREVIEW` set to `false`.
+- **Real-printer sign-off:** ADR 0028 keeps releases as previews "until the manual testing with real printers can be confirmed". This phase adds the HP over IPP and IPPS, the Windows route, and the Mac.
+- **Housekeeping:**
+  - the open checklist items from Phases 0 and 1, including the mDNS trial's CI result;
+  - the risks table brought up to date.
+
+## Suggested order
+
+1. **P3-1 Validate-Job.** Small, independent, and a quick win for every direct IPP job.
+2. **P3-2 then P3-3: raster encoders, then raster printing.** The biggest and most valuable piece: it makes every IPP printer printable.
+3. **P3-4 Windows queues,** which needs P3-3 to pay off.
+4. **P3-5 IPPS and authentication,** then **P3-6 persistence,** which trust on first use would also use.
+5. **P3-7 docs and P3-9 for 1.0,** with **P3-8** whenever you're at the Mac.
+
+P3-1, P3-5 and P3-6 touch different code from P3-2 and P3-3, so they could run alongside them in separate sessions if you want to go faster.
+
+Rough total: four to five weeks of work, plus the manual checks.
+
+## Decisions
+
+All accepted as recommended (owner, 2026-11-18).
+
+| # | Question | Recommendation |
+|---|---|---|
+| D1 | Which raster formats? | **PWG raster and Apple raster now,** which between them cover IPP Everywhere and AirPrint printers. PCLm when a printer that takes only PCLm turns up, or after 1.0 |
+| D2 | Which format when a printer takes several? | **PDF first, then PWG raster, then Apple raster, then PCLm.** PDF keeps the job small and sharp; the raster formats are the fallbacks |
+| D3 | Raster resolution? | **The printer's default, capped by an option** (`IppNetworkOptions.MaxRenderDpi`), as on Windows. Most printers default to 300 or 600 dpi |
+| D4 | Prefer IPPS when a printer offers both? | **Yes once its certificate is trusted;** plain IPP otherwise, as now, so nothing breaks for those who configure nothing |
+| D5 | Validate-Job on by default? | **Yes,** for printers that list it: one extra round trip in exchange for refusals before the upload. An option turns it off |
+| D6 | Persist remembered addresses by default? | **No, opt-in with a file path:** a library shouldn't write files unless asked |
+| D7 | API reference generator? | **DocFX, or the site's own generator** if it has one; to check against how latiprimere.com is built |
+| D8 | What is "1.0"? The plan says `1.0.0`, but versions are now `<.NET major>.0.<build>` (ADR 0028), so the first stable release would be `11.0.<n>`. | **Keep the version scheme:** "1.0" names the first stable release, made by setting `RELEASE_PREVIEW` to `false`, and the README and website say so. A real `1.0.0` would need ADR 0028 reversed |
+| D9 | Which work needs paper? | **P3-3, P3-4 and P3-5's manual checks** on the HP: about 10 sheets in all, each printed only when you say |
+
+## Risks
+
+| Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|
+| A printer reads our raster differently from the specification | Medium | High | Decoders in the tests; `ippeveprinter` and the HP as two independent readers; the format checked against libcups' output for the same page, which can be produced with `ipptool` in the container |
+| Raster jobs are slow or large: an A4 page at 600 dpi in colour is about 100 MB unencoded | Medium | Medium | Streaming, run-length encoding, gzip when offered, and the resolution cap; measured on the HP, as for Windows in ADR 0009 |
+| Self-signed certificates make IPPS awkward to set up | High | Medium | Pinning by fingerprint, an error message that gives the fingerprint to pin, and a guide page |
+| Apple raster isn't formally published | Medium | Medium | It is well described by libcups and cups-filters, which are open source; the HP checks the result |
+| The IPP Class Driver queue can't be examined without such a printer or Windows protected print mode | Medium | Low | Its routing is optional; everything else in P3-4 stands without it |
+| The Mac checks wait on time at the Mac | Medium | Low | They don't block the rest of the phase |

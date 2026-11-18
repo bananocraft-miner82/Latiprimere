@@ -252,16 +252,26 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 		}
 
 		IReadOnlyCollection<string>? formats;
+		IReadOnlyCollection<SharpIpp.Protocol.Models.IppOperation>? operations;
 
 		try
 		{
 			SharpIpp.Protocol.Models.PrinterDescriptionAttributes? attributes = await IppPrinterQueries
-				.GetAttributesAsync(route.Context, printerUri, [IppRequestedAttributes.DocumentFormatSupported], cancellationToken)
+				.GetAttributesAsync
+				(
+					route.Context,
+					printerUri,
+					[IppRequestedAttributes.DocumentFormatSupported, IppRequestedAttributes.OperationsSupported],
+					cancellationToken
+				)
 				.ConfigureAwait(false);
 
 			formats = attributes is null
 				? null
 				: IppValueReader.ReadReference(attributes.DocumentFormatSupported)?.Select(format => format.Value).ToList();
+
+			// Whether it can check a job before its upload (ADR 0033)
+			operations = attributes is null ? null : IppValueReader.ReadReference(attributes.OperationsSupported);
 		}
 		catch (PrintException)
 		{
@@ -279,7 +289,7 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 			return null;
 		}
 
-		this.ippPrinter = new IppPrinter(route.Context, printerUri, this.Info, formats);
+		this.ippPrinter = new IppPrinter(route.Context, printerUri, this.Info, formats, operations);
 
 		return this.ippPrinter;
 	}

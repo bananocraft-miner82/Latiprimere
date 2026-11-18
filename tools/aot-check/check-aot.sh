@@ -14,7 +14,9 @@
 #   - windows.vendor-options.listed-and-sent: that printer's Print Capabilities read, parsed and printed with
 #     (ADR 0032);
 #   - ipp.vendor-options.listed-and-sent: vendor options read from raw IPP attributes and sent back, against the
-#     scripted IPP printer, so on every runner (ADR 0032).
+#     scripted IPP printer, so on every runner (ADR 0032);
+#   - ipp.raster.apple-raster-two-sided: a PDF rendered by PDFium, turned, encoded as Apple raster, gzipped and
+#     streamed through a pipe to the scripted printer with the HP's profile, so on every runner (ADR 0035).
 #
 # A scenario whose test printers this machine doesn't have is skipped; one that runs must pass. The first four are
 # the checks this script made with the CLI sample before the harness existed: CI runs only these (ADR 0029). Run every scenario
@@ -37,6 +39,7 @@ scenarios=(
 	windows.output.print-ticket
 	windows.vendor-options.listed-and-sent
 	ipp.vendor-options.listed-and-sent
+	ipp.raster.apple-raster-two-sided
 )
 
 # The ILCompiler finds the Windows linker through vswhere, which Git Bash may not have on its path

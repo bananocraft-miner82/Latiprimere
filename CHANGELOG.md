@@ -8,6 +8,12 @@ Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` 
 
 ### Added
 
+- **PDFs to network printers that can't take PDF,** such as most inkjets, are sent as PWG raster or Apple raster: whichever the printer takes, PWG raster first. This needs Latiprimere.Rendering.Pdfium: register it with `AddLatiprimerePdfium()`, or pass a `PdfiumRasterizer` to the new `IppNetworkPrintSystemFactory.Create(pdfRasterizer, options)`. Without it, such a job is refused with `NotSupportedException` saying so, as before.
+  - **Settings:** pages are rendered at the printer's default resolution, which the new `IppNetworkOptions.MaxRenderDpi` can limit. They're in colour or grey as `ColorMode` and the printer allow, on `MediaSize` or the printer's default paper. They're turned to fit unless `Orientation` is set, and two-sided back sides are turned as the printer asks.
+  - **The upload:** pages are rendered while they upload, and gzipped when the printer offers it.
+  - **A busy printer** is sent the pages again, rendered afresh, even from a stream that can't seek.
+- **`RasterBand.Rotation`:** a band can ask for its page turned in quarter turns, with the new `RasterRotation` enum. PDFium renders the page turned, without extra memory. The default is no turn, so existing rasterisers and callers are unaffected; one that can't turn pages should throw `NotSupportedException` for any other value.
+
 - **Print Tickets on Windows** with the vendor option `windows:print-ticket`: a Print Ticket in XML, such as one that asks for stapling or a driver's own quality setting. The printer's driver merges it onto its defaults, or onto a `windows:devmode` given with it, for PDF jobs, and resolves any conflicts as it does for its own settings. Options you set in `PrintOptions`, such as `MediaSize`, win over the ticket's. As with `windows:devmode`, the number of copies always comes from `Copies`, and the orientation from `Orientation` or else the document's first page. A value that isn't XML, or isn't a Print Ticket, is refused with `ArgumentException`, as is a ticket the driver finds malformed. Raw jobs ignore it, as they ignore `windows:devmode`.
 - **Vendor options in the capabilities:** `PrinterCapabilities.VendorOptions` lists everything else a printer offers, such as print quality, resolution, finishing, media types, pages per sheet and a driver's own settings. Each comes with its name, its values (or limits, for a number) and its default, and the key and values to set it through `PrintOptions.VendorOptions` as they are. Settings the typed options cover aren't listed.
   - **CUPS and network printers** list the job attributes they accept, as `ipp:` keys, such as `ipp:print-quality` with Draft (`3`), Normal (`4`) and High (`5`).
@@ -15,6 +21,10 @@ Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` 
 - **`IWindowsPrinter`**, which every Windows printer implements, reads the driver's Print Capabilities (`GetPrintCapabilitiesAsync`, optionally for the choices a Print Ticket makes) and its defaults as a Print Ticket (`GetDefaultPrintTicketAsync`), both as XML.
 - **`ipp:printer-resolution`** and other resolution attributes, whose names end in `-resolution`, take values such as `600dpi`, `600x1200dpi` or `118dpcm`.
 - **Logging:** with logging registered in dependency injection, the CUPS, IPP and Windows print systems log what they carry on without, such as vendor options that couldn't be read, under the categories `Latiprimere.Ipp` and `Latiprimere.Windows`.
+
+### Changed
+
+- **Network printers check a job's settings before the document is sent.** A job asking for something the printer can't do, such as two-sided printing on a one-sided printer, is refused with Validate-Job before its document is uploaded, with the same `PrintException` and IPP status as before. It's one short request per job, sent only to printers that list Validate-Job, and a printer too busy to answer it gets the job anyway. `IppNetworkOptions.ValidateJobs = false` turns it off. Windows queues routed straight to their IPP printer check the same way.
 
 ## 11.0.5-preview - 2026-11-17
 

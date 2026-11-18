@@ -1,5 +1,6 @@
 using Latiprimere;
 using Latiprimere.Ipp;
+using Latiprimere.Rendering;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
@@ -12,7 +13,8 @@ public static class LatiprimereIppServiceCollectionExtensions
 {
 	/// <summary>
 	/// Registers direct printing to IPP network printers. Use together with <c>AddLatiprimere()</c> from the Latiprimere
-	/// package.
+	/// package, and <c>AddLatiprimerePdfium()</c> from Latiprimere.Rendering.Pdfium to print PDFs as raster to
+	/// printers that can't take PDF.
 	/// </summary>
 	/// <param name="services">The service collection to add to.</param>
 	/// <param name="configure">
@@ -31,7 +33,12 @@ public static class LatiprimereIppServiceCollectionExtensions
 		// Register once, even if called more than once; the container disposes the print system on shutdown
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IPrintSystem, IppNetworkPrintSystem>
 		(
-			serviceProvider => (IppNetworkPrintSystem)IppNetworkPrintSystemFactory.Create(options, serviceProvider.GetService<ILoggerFactory>()))
+			serviceProvider => (IppNetworkPrintSystem)IppNetworkPrintSystemFactory.Create
+			(
+				options,
+				serviceProvider.GetService<IPdfRasterizer>(),
+				serviceProvider.GetService<ILoggerFactory>()
+			))
 		);
 
 		return services;

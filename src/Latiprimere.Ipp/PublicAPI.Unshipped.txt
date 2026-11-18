@@ -1,1 +1,6 @@
 #nullable enable
+Latiprimere.Ipp.IppNetworkOptions.ValidateJobs.get -> bool
+Latiprimere.Ipp.IppNetworkOptions.ValidateJobs.set -> void
+Latiprimere.Ipp.IppNetworkOptions.MaxRenderDpi.get -> int?
+Latiprimere.Ipp.IppNetworkOptions.MaxRenderDpi.set -> void
+static Latiprimere.Ipp.IppNetworkPrintSystemFactory.Create(Latiprimere.Rendering.IPdfRasterizer? pdfRasterizer, Latiprimere.Ipp.IppNetworkOptions? options) -> Latiprimere.IPrintSystem!

@@ -2,6 +2,8 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\src\Latiprimere.Ipp\Latiprimere.Ipp.csproj" />
+		<!-- PDFium, to check raster pages against real PDFs rendered directly (ADR 0034) -->
+		<ProjectReference Include="..\..\src\Latiprimere.Rendering.Pdfium\Latiprimere.Rendering.Pdfium.csproj" />
 		<ProjectReference Include="..\Latiprimere.Ipp.Testing\Latiprimere.Ipp.Testing.csproj" />
 		<ProjectReference Include="..\Latiprimere.Testing\Latiprimere.Testing.csproj" />
 	</ItemGroup>
