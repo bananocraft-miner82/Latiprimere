@@ -83,6 +83,13 @@ internal sealed class UnavailableWinSpool : IWinSpool
 		throw UnavailableWinSpool.CreateException();
 	}
 
+	/// <inheritdoc/>
+	/// <remarks>Always <see langword="null"/>: there are no ports.</remarks>
+	public string? GetWsdPrinterUuid(string portName)
+	{
+		return null;
+	}
+
 	/// <summary>
 	/// Creates the exception thrown by every member.
 	/// </summary>

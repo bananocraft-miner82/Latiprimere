@@ -29,7 +29,7 @@ public sealed class WindowsOptions
 
 	/// <summary>
 	/// Gets or sets a value indicating whether to send PDF jobs straight to the printer over IPP when Latiprimere knows
-	/// the queue's IPP address. Defaults to <see langword="false"/>.
+	/// or can find the queue's IPP printer. Defaults to <see langword="false"/>.
 	/// </summary>
 	/// <remarks>
 	/// <para>
@@ -38,10 +38,13 @@ public sealed class WindowsOptions
 	/// when all of these hold, and otherwise through the Windows queue as before:
 	/// </para>
 	/// <list type="bullet">
-	/// <item><description>the queue's IPP URI is in <see cref="IppPrinterUris"/>, or the queue was added by URL, so
-	/// its port is named after the printer's address;</description></item>
+	/// <item><description>the queue's IPP URI is in <see cref="IppPrinterUris"/>; or the queue was added by URL, so
+	/// its port is named after the printer's address; or it is on a WSD port, and a printer on the network announces
+	/// itself over mDNS with the UUID the port records, and reports that UUID when asked;</description></item>
 	/// <item><description>the queue isn't on a print server;</description></item>
-	/// <item><description>the printer says it accepts PDF, which is asked at its first PDF job;</description></item>
+	/// <item><description>the printer says it accepts PDF, or, with a PDF rasteriser, PWG raster or Apple raster, which
+	/// is asked at its first PDF job. A PDF it can't take is rendered and sent in one of those, at the printer's
+	/// resolution limited by <see cref="MaxRenderDpi"/>;</description></item>
 	/// <item><description>the job doesn't set <see cref="PrintOptions.OutputFile"/>, an
 	/// <see cref="PrintOptions.InputTray"/>, or a <c>windows:</c> vendor option.</description></item>
 	/// </list>
@@ -49,7 +52,8 @@ public sealed class WindowsOptions
 	/// Such jobs bypass the Windows queue: they don't appear in its queue window, and its pause, permissions,
 	/// pooling and accounting don't apply to them. Their job IDs are the printer's, and <c>ipp:</c> vendor options
 	/// are sent with them. If the printer can't be reached, the job goes through the Windows queue, which holds it
-	/// until the printer is back.
+	/// until the printer is back. Finding a WSD queue's printer listens on the network for up to two seconds at its
+	/// first PDF job; a printer not found isn't searched for again for five minutes.
 	/// </para>
 	/// </remarks>
 	public bool PrintPdfOverIpp { get; set; }

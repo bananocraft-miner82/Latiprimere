@@ -8,6 +8,9 @@ Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` 
 
 ### Added
 
+- **Windows WSD queues print PDFs over IPP without configuration,** when `WindowsOptions.PrintPdfOverIpp` is on. A queue Windows set up itself on a WSD port records its printer's UUID. The printer announcing that UUID over mDNS, and confirming it when asked, gets the queue's PDF jobs straight over IPP, so each job reports how it ended. Before, such queues needed their address in `IppPrinterUris`.
+  - **Printers that don't take PDF:** routed queues send PDFs to such printers as PWG raster or Apple raster, rendered with the Windows print system's rasteriser at the printer's resolution, limited by `WindowsOptions.MaxRenderDpi`. Before, they stayed on their driver.
+  - **Finding the printer:** the first PDF job to a WSD queue listens for up to two seconds. A printer not found isn't searched for again for five minutes, and its jobs go through the driver as before.
 - **PDFs to network printers that can't take PDF,** such as most inkjets, are sent as PWG raster or Apple raster: whichever the printer takes, PWG raster first. This needs Latiprimere.Rendering.Pdfium: register it with `AddLatiprimerePdfium()`, or pass a `PdfiumRasterizer` to the new `IppNetworkPrintSystemFactory.Create(pdfRasterizer, options)`. Without it, such a job is refused with `NotSupportedException` saying so, as before.
   - **Settings:** pages are rendered at the printer's default resolution, which the new `IppNetworkOptions.MaxRenderDpi` can limit. They're in colour or grey as `ColorMode` and the printer allow, on `MediaSize` or the printer's default paper. They're turned to fit unless `Orientation` is set, and two-sided back sides are turned as the printer asks.
   - **The upload:** pages are rendered while they upload, and gzipped when the printer offers it.

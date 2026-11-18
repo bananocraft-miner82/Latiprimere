@@ -6,6 +6,7 @@
 > - **P3-1 done** (2026-11-18, [ADR 0033](decisions/0033-validate-job.md)); its check on the real HP waits for the printer to be on.
 > - **P3-2 done** (2026-11-18, [ADR 0034](decisions/0034-raster-encoders.md)): PWG raster and Apple raster encoders, checked pixel by pixel against PDFium. The `ippeveprinter` integration tests run in CI.
 > - **P3-3 built** (2026-11-18, [ADR 0035](decisions/0035-printing-pdfs-as-raster.md)): PDFs go as raster to direct IPP printers that can't take PDF, streamed and gzipped. It's checked on the scripted printer with the HP's and `ippeveprinter`'s profiles; the real `ippeveprinter` check runs in CI. Its "done when", a PDF printed on the HP, waits for the manual check on paper.
+> - **P3-4 built** (2026-11-18, [ADR 0036](decisions/0036-wsd-queues-over-ipp.md)): WSD queues are matched to printers announced over mDNS by the UUID their port records, and routed PDFs go as raster to printers that can't take PDF. Its "done when", the HP's queue printing over IPP, waits for the manual check (`manual.windows-queue-over-ipp`). Microsoft's IPP Class Driver is still unexamined: no such queue is available.
 
 ## Purpose
 

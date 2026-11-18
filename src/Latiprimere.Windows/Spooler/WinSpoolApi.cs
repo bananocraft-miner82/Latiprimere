@@ -11,6 +11,18 @@ namespace Latiprimere.Windows.Spooler;
 [SupportedOSPlatform("windows")]
 internal sealed unsafe class WinSpoolApi : IWinSpool
 {
+	/// <summary>The registry key under which the WSD Port Monitor keeps its ports.</summary>
+	private const string WsdPortsKey = @"SYSTEM\CurrentControlSet\Control\Print\Monitors\WSD Port\Ports\";
+
+	/// <summary>The value in a WSD port's key that holds its printer's UUID.</summary>
+	private const string WsdPrinterUuidValue = "Printer UUID";
+
+	/// <summary>How WSD port names start.</summary>
+	private const string WsdPortPrefix = "WSD-";
+
+	/// <summary>The longest WSD port name read: a GUID with room for a suffix.</summary>
+	private const int MaxWsdPortNameLength = 100;
+
 	/// <summary>How many times to retry a call whose required buffer size grew between calls.</summary>
 	private const int MaxBufferAttempts = 3;
 
@@ -318,6 +330,48 @@ internal sealed unsafe class WinSpoolApi : IWinSpool
 		WindowsPrinterRecord? printer = this.GetPrinter(printerName);
 
 		return printer is null ? null : WindowsCapabilityReader.Read(printerName, printer.PortName, includePrintSchema);
+	}
+
+	/// <inheritdoc/>
+	/// <remarks>
+	/// The WSD Port Monitor keeps each port under <c>HKLM\SYSTEM\CurrentControlSet\Control\Print\Monitors\WSD
+	/// Port\Ports\&lt;port&gt;</c>, with the printer's UUID as the string value <c>Printer UUID</c>. Reading it needs
+	/// no administrator rights. Anything unexpected, such as a port name that isn't one, gives <see langword="null"/>.
+	/// </remarks>
+	public string? GetWsdPrinterUuid(string portName)
+	{
+		ArgumentNullException.ThrowIfNull(portName);
+
+		// A port name goes into a registry path, so anything that could leave the Ports key is refused
+		if (!WinSpoolApi.IsWsdPortName(portName))
+		{
+			return null;
+		}
+
+		try
+		{
+			using Microsoft.Win32.RegistryKey? port = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(WinSpoolApi.WsdPortsKey + portName);
+
+			return port?.GetValue(WinSpoolApi.WsdPrinterUuidValue) as string;
+		}
+		catch (Exception exception) when (exception is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+		{
+			return null;
+		}
+	}
+
+	/// <summary>
+	/// Checks that a name is a WSD port's, <c>WSD-</c> and a GUID with any suffix of letters, digits, dots or dashes,
+	/// and so safe in a registry path.
+	/// </summary>
+	/// <param name="portName">The port's name.</param>
+	/// <returns>Whether it is.</returns>
+	internal static bool IsWsdPortName(string portName)
+	{
+		return portName.StartsWith(WinSpoolApi.WsdPortPrefix, StringComparison.OrdinalIgnoreCase)
+			&& portName.Length > WinSpoolApi.WsdPortPrefix.Length
+			&& portName.Length <= WinSpoolApi.MaxWsdPortNameLength
+			&& portName.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '.');
 	}
 
 	/// <inheritdoc/>

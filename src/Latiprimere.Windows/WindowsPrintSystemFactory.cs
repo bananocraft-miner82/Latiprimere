@@ -1,4 +1,5 @@
 using Latiprimere.Ipp;
+using Latiprimere.Ipp.Discovery;
 using Latiprimere.Ipp.Mapping;
 using Latiprimere.Rendering;
 using Latiprimere.Windows.DirectIpp;
@@ -59,7 +60,7 @@ public static class WindowsPrintSystemFactory
 				Gdi                  = new GdiRasterPrinter(options.MaxRenderDpi ?? GdiRenderSettings.UnlimitedRenderDpi),
 				PdfRasterizer        = pdfRasterizer,
 				AllowsAnyPrinterName = options.AllowAnyPrinterName,
-				IppRoute             = options.PrintPdfOverIpp ? WindowsPrintSystemFactory.CreateIppRoute(options, loggerFactory) : null,
+				IppRoute             = options.PrintPdfOverIpp ? WindowsPrintSystemFactory.CreateIppRoute(options, pdfRasterizer, loggerFactory, logger) : null,
 				Logger               = logger
 			};
 
@@ -81,10 +82,12 @@ public static class WindowsPrintSystemFactory
 	/// Creates the route for PDF jobs straight to IPP printers, with the same settings as direct IPP printing.
 	/// </summary>
 	/// <param name="options">The options, with the configured URIs.</param>
+	/// <param name="pdfRasterizer">Renders PDFs as raster for printers that can't take PDF, or <see langword="null"/>.</param>
 	/// <param name="loggerFactory">The application's logger factory, or <see langword="null"/>.</param>
+	/// <param name="logger">The Windows print system's logger.</param>
 	/// <returns>The route, which owns its HTTP connections.</returns>
 	/// <exception cref="ArgumentException">A configured URI isn't one IPP can use.</exception>
-	private static WindowsIppRoute CreateIppRoute(WindowsOptions options, ILoggerFactory? loggerFactory)
+	private static WindowsIppRoute CreateIppRoute(WindowsOptions options, IPdfRasterizer? pdfRasterizer, ILoggerFactory? loggerFactory, ILogger logger)
 	{
 		// Checked before the connection pool exists, so a bad URI leaves nothing to dispose
 		foreach (KeyValuePair<string, Uri> configured in options.IppPrinterUris)
@@ -107,9 +110,13 @@ public static class WindowsPrintSystemFactory
 			VendorOptionPrefixes = IppVendorAttributeMapper.NetworkPrefixes,
 			// As for a printer printed to directly: a refusal comes before the upload (ADR 0033)
 			ValidateJobs         = true,
+			// A PDF the printer can't take goes as raster, rendered as for the driver (ADR 0036)
+			PdfRasterizer        = pdfRasterizer,
+			MaxRenderDpi         = options.MaxRenderDpi,
 			Logger               = IppLog.CreateLogger(loggerFactory)
 		};
 
-		return new WindowsIppRoute(ippContext, options.IppPrinterUris);
+		// A WSD queue's printer is found by the UUID its port records, among printers announced over mDNS
+		return new WindowsIppRoute(ippContext, options.IppPrinterUris, new MdnsIppPrinterDiscovery(), logger);
 	}
 }

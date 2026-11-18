@@ -98,6 +98,20 @@ public static class ManualScenarios
 	};
 
 	/// <summary>
+	/// A Windows WSD queue's PDF goes straight to its printer over IPP, found by the UUID the queue records, as PDF or
+	/// as raster, and the job reports how it ended (ADR 0036).
+	/// </summary>
+	public static readonly Scenario WindowsQueueOverIpp = new Scenario
+	{
+		Id = "manual.windows-queue-over-ipp",
+		Area = ScenarioArea.Manual,
+		Title = "With PrintPdfOverIpp on, a three-page PDF to a Windows WSD queue goes over IPP to the printer with the queue's UUID, as PDF or raster, two-sided when it can, and completes",
+		Needs = TargetNeeds.Person,
+		Timeout = ManualPrinting.ScenarioTimeout,
+		RunAsync = ManualScenarios.WindowsQueueOverIppAsync
+	};
+
+	/// <summary>
 	/// Runs <see cref="PrinterDetails"/>.
 	/// </summary>
 	/// <param name="context">The scenario's context.</param>
@@ -246,6 +260,43 @@ public static class ManualScenarios
 		else
 		{
 			context.Note("The printer doesn't report two-sided printing, so it wasn't asked for.");
+		}
+	}
+
+	/// <summary>
+	/// Runs <see cref="WindowsQueueOverIpp"/>.
+	/// </summary>
+	/// <param name="context">The scenario's context.</param>
+	/// <returns>A task that completes when the scenario has run.</returns>
+	private static async Task WindowsQueueOverIppAsync(ScenarioContext context)
+	{
+		IPrinter printer = await ManualPrinting.GetPrinterAsync(context, options => options.PrintPdfOverIpp = true);
+
+		if (printer is not Latiprimere.Windows.IWindowsPrinter)
+		{
+			context.Skip("the printer named isn't a Windows queue: name one such as windows:HP ENVY 5640 series");
+		}
+
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(context.CancellationToken);
+		bool hasTwoSided = capabilities.DuplexModes.Contains(DuplexMode.LongEdge);
+
+		PrintOptions options = new PrintOptions
+		{
+			JobName   = "Latiprimere Windows queue over IPP",
+			MediaSize = capabilities.MediaSizes.FirstOrDefault(size => size.Name == "iso_a4_210x297mm"),
+			Duplex    = hasTwoSided ? DuplexMode.LongEdge : DuplexMode.PrinterDefault
+		};
+
+		context.Person.Tell("If the queue's printer announces itself over mDNS with the UUID its WSD port records, the job goes to it over IPP, not through the driver.");
+		(IPrintJob job, _) = await ManualPrinting.PrintJobAsync(context, printer, TestDocuments.ThreePages, options);
+
+		// A routed job is the printer's IPP job, followed to how it ended; a spooled one is the queue's
+		context.CheckEqual("the job went over IPP, not through the driver", "IppPrintJob", job.GetType().Name);
+		await context.AskPersonAsync("pages 1 to 3 came out in order", "Did pages 1, 2 and 3 come out, in that order (the lines are numbered)?");
+
+		if (hasTwoSided)
+		{
+			await context.AskPersonAsync("they're two-sided, turning like a book", "Are they on two sheets, printed on both sides of the first, turning like a book?");
 		}
 	}
 

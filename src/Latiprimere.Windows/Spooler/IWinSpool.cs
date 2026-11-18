@@ -107,4 +107,11 @@ internal interface IWinSpool
 	/// <exception cref="PrintException">The Print Ticket API failed, or isn't available for this printer.</exception>
 	/// <exception cref="PrinterNotFoundException">No printer has that name.</exception>
 	byte[] GetPrintCapabilities(string printerName, byte[]? baseDevMode, IReadOnlyList<byte[]> printTickets);
+
+	/// <summary>
+	/// Reads the printer UUID a WSD port records, which is the printer's IPP <c>printer-uuid</c> too (ADR 0036).
+	/// </summary>
+	/// <param name="portName">The port's name, such as <c>WSD-adb74ae8-…</c>.</param>
+	/// <returns>The UUID as recorded, or <see langword="null"/> if the port isn't a WSD port or records none.</returns>
+	string? GetWsdPrinterUuid(string portName);
 }

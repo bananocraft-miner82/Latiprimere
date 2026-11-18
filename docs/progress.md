@@ -6,7 +6,7 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 | Item | Value |
 |---|---|
-| Phase | 3: Direct IPP and v1.0, begun ([phase-3-plan.md](phase-3-plan.md), accepted 2026-11-18); P3-1 and P3-2 done, P3-3 built (its check on the HP's paper waits). Phase 1's open item: the end-to-end harness's mDNS trial in CI. Phase 0's: the Mac checks (Spikes 1 and 4) |
+| Phase | 3: Direct IPP and v1.0, begun ([phase-3-plan.md](phase-3-plan.md), accepted 2026-11-18); P3-1 and P3-2 done, P3-3 and P3-4 built (their checks on the HP's paper wait). Phase 1's open item: the end-to-end harness's mDNS trial in CI. Phase 0's: the Mac checks (Spikes 1 and 4) |
 | Released | `11.0.5-preview` on nuget.org, 2026-11-17. The next release is `11.0.6-preview` ([ADR 0030](decisions/0030-release-numbering.md)) |
 | State | Every Phase 2 item is done. Windows PDF jobs take a Print Ticket in `windows:print-ticket` ([ADR 0031](decisions/0031-windows-print-tickets.md)). `PrinterCapabilities.VendorOptions` lists every IPP job attribute and Windows driver feature a printer offers, ready to set, and `IWindowsPrinter` reads a driver's Print Capabilities ([ADR 0032](decisions/0032-vendor-options-in-capabilities.md)). CI was green on all three runners on 2026-11-17 (owner). Releases are numbered after the latest one, and a merge with nothing new releases nothing. Every ADR is accepted (owner, 2026-11-18). |
 | Next step | P3-2: raster encoders (PWG raster and Apple raster), then P3-3: printing PDFs as raster to printers without PDF, such as the HP ENVY. When the HP is on: check Validate-Job against it (prints nothing). Owner: delete the leftover branch `post-release/v11.0.4-preview`. |
@@ -28,6 +28,38 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 **Not done**
 - **Not run on a Mac here;** the next CI run checks it.
+
+---
+
+## 2026-11-18: P3-4, Windows WSD queues over IPP
+
+**Done** (owner: "Start P3-4")
+- **WSD queues matched by UUID** ([ADR 0036](decisions/0036-wsd-queues-over-ipp.md)): with `PrintPdfOverIpp` on, a queue without an exactly known URI routes when:
+  - its WSD port's `Printer UUID`, read from the registry, is announced over mDNS by a printer;
+  - and that printer reports the same `printer-uuid` when asked.
+
+  The route remembers each printer found and forgets it when it stops answering or reports another UUID. A UUID nobody announced isn't searched for again for five minutes. A failed search leaves the job with the driver.
+- **Raster through the route:** the route gets the Windows rasteriser and `MaxRenderDpi`, so a printer that takes PWG raster or Apple raster but not PDF routes too. A raster job that can't be planned, such as a printer whose default paper has no size, prints through the driver instead.
+- **Seen on this PC:** the HP's WSD queue is gone; the Canon TS7500i's WSD port records `Printer UUID = 00000000-0000-1000-8000-00117d58570e`, read without administrator rights. No IPP printer answered mDNS during the session.
+- **Tests:**
+  - 28 new unit tests: the route's matching, remembering and five-minute wait, routed PDF and Apple raster jobs, mismatched and missing UUIDs, an unreachable match, a raster job that can't be planned, port-name checks, and mDNS's UUID pick;
+  - a read of every WSD port's UUID on the machine, checked against the registry;
+  - a manual harness scenario, `manual.windows-queue-over-ipp`, for the HP;
+  - harness: `windows.ipp-route.raster-to-printer` is new, and `windows.ipp-route.fallback-no-pdf`'s printer now takes neither PDF nor a raster format.
+- **Fixed, from P3-1:** `windows.ipp-route.refusal-not-resent` still expected the refused job's Print-Job, which Validate-Job now prevents. It runs only with the Windows test printers switched on (`LATIPRIMERE_TEST_WINDOWS_OUTPUT`), which P3-1's run didn't have. It now checks for one Validate-Job and no Print-Job.
+- **Results:**
+  - 2,054 tests, 1 failed, 204 skipped. The failure is the connection-racing test `GivenLoserConnectsAfterWinnerWhenConnectThenLoserConnectionIsClosed`: it passed 3 runs out of 3 on its own, its code is unchanged, and its 250 ms margin between the two addresses can be lost under the full run's load;
+  - every harness scenario this PC can run passes with the Windows test printers on: 46 passed, 19 skipped;
+  - the Native AOT check publishes without warnings and passes 6 scenarios. Routing a WSD queue isn't among them: it needs a real WSD queue and printer.
+
+**Not done**
+- **The HP's queue printing over IPP** (the plan's "done when"): the HP's WSD queue is no longer on this PC, and the HP was off. With the printer on and its queue re-added, run the manual scenario. It prints 2 sheets, and only after you say yes:
+
+  ```powershell
+  dotnet run --project tests/Latiprimere.TestHarness -- manual --printer "windows:HP ENVY 5640 series" manual.windows-queue-over-ipp
+  ```
+- **Microsoft's IPP Class Driver queues:** unexamined, since none is available.
+- **Standard TCP/IP ports** aren't matched: a host alone doesn't identify a printer.
 
 ---
 

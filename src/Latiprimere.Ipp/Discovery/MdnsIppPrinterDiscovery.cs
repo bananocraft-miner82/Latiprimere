@@ -42,6 +42,37 @@ internal sealed class MdnsIppPrinterDiscovery : IIppPrinterDiscovery
 		return MdnsIppPrinterDiscovery.FindInstance(collector.GetServices(), instanceName);
 	}
 
+	/// <inheritdoc/>
+	/// <remarks>
+	/// Stops as soon as the printer is announced over plain IPP. If it only answers over IPPS, that is used once the
+	/// timeout has passed.
+	/// </remarks>
+	public async Task<DiscoveredIppPrinter?> FindByUuidAsync(string uuid, TimeSpan timeout, CancellationToken cancellationToken)
+	{
+		ArgumentNullException.ThrowIfNull(uuid);
+
+		AnnouncementCollector collector = new AnnouncementCollector
+		(
+			service => service.ServiceType.StartsWith(DnsSdServiceMapper.IppServiceType, StringComparison.OrdinalIgnoreCase)
+				&& DnsSdServiceMapper.ToDiscoveredPrinter(service)?.Uuid == uuid
+		);
+
+		await MdnsIppPrinterDiscovery.BrowseAsync(collector, timeout, cancellationToken).ConfigureAwait(false);
+
+		return MdnsIppPrinterDiscovery.FindUuid(collector.GetServices(), uuid);
+	}
+
+	/// <summary>
+	/// Picks the printer announcing a UUID from the services found, preferring plain IPP over IPPS.
+	/// </summary>
+	/// <param name="services">The services found.</param>
+	/// <param name="uuid">The normalised UUID.</param>
+	/// <returns>The printer, or <see langword="null"/> if none announced it.</returns>
+	internal static DiscoveredIppPrinter? FindUuid(IEnumerable<DnsSdService> services, string uuid)
+	{
+		return MdnsIppPrinterDiscovery.ToPrinters(services).FirstOrDefault(printer => printer.Uuid == uuid);
+	}
+
 	/// <summary>
 	/// Maps services to printers, keeping one per instance name and one per URI, and preferring plain IPP over IPPS,
 	/// because network printers usually present self-signed certificates that clients reject.
