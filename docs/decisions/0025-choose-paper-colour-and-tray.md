@@ -1,6 +1,6 @@
 # 0025: Choose paper size, colour mode and tray
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-16
 
 ## Context

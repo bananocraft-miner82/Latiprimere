@@ -1,3 +1,4 @@
+using System.Text;
 using Latiprimere.Testing.Fakes;
 using Latiprimere.Windows.Gdi;
 using Latiprimere.Windows.Spooler;
@@ -435,13 +436,66 @@ public sealed class WindowsPrinterTests
 	}
 
 	[Fact]
+	public async Task GivenPrintTicketWhenPdfSubmittedThenPassesItToGdiAsUtf8()
+	{
+		// Arrange — a Print Ticket that declares UTF-16, as a .NET string written out would
+		const string ticket = """
+			<?xml version="1.0" encoding="utf-16"?>
+			<psf:PrintTicket xmlns:psf="http://schemas.microsoft.com/windows/2003/08/printing/printschemaframework" version="1" />
+			""";
+
+		FakeGdiPrinter gdi = new FakeGdiPrinter();
+
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter
+		(
+			new WindowsPrintContextBuilder().WithGdi(gdi).WithPdfRasterizer(new FakePdfRasterizer())
+		);
+
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+		PrintOptions options = new PrintOptions { VendorOptions = new Dictionary<string, string> { ["windows:print-ticket"] = ticket } };
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		GdiPrintRequest request = Assert.IsType<GdiPrintRequest>(gdi.LastRequest);
+		Assert.Null(request.SavedDevMode);
+		byte[] sentTicket = Assert.Single(request.PrintTickets);
+		string sent = Encoding.UTF8.GetString(sentTicket);
+		Assert.StartsWith("<?xml version=\"1.0\" encoding=\"utf-8\"?>", sent, StringComparison.Ordinal);
+		Assert.Contains("psf:PrintTicket", sent, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task GivenPrintTicketThatIsNotXmlWhenPdfSubmittedThenRefusesWithoutRendering()
+	{
+		// Arrange
+		FakeGdiPrinter gdi = new FakeGdiPrinter();
+
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter
+		(
+			new WindowsPrintContextBuilder().WithGdi(gdi).WithPdfRasterizer(new FakePdfRasterizer())
+		);
+
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+		PrintOptions options = new PrintOptions { VendorOptions = new Dictionary<string, string> { ["windows:print-ticket"] = "duplex please" } };
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		await Assert.ThrowsAsync<ArgumentException>(submit);
+		Assert.Null(gdi.LastRequest);
+	}
+
+	[Fact]
 	public async Task GivenUnsupportedWindowsKeyWhenRawSubmittedThenRefusesWithoutQueueingAnything()
 	{
 		// Arrange — raw jobs don't use a DEVMODE, but an unsupported key is still refused rather than ignored
 		FakeWinSpool spool = new FakeWinSpool();
 		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool));
 		using MemoryStream document = new MemoryStream(new byte[] { 0x1B, 0x40 });
-		PrintOptions options = new PrintOptions { VendorOptions = new Dictionary<string, string> { ["windows:print-ticket"] = "<x/>" } };
+		PrintOptions options = new PrintOptions { VendorOptions = new Dictionary<string, string> { ["windows:paper"] = "A4" } };
 
 		// Act
 		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromRaw(document), options, TestContext.Current.CancellationToken);
@@ -501,6 +555,282 @@ public sealed class WindowsPrinterTests
 
 		// Assert
 		await Assert.ThrowsAsync<PrintException>(getCapabilities);
+	}
+
+	[Fact]
+	public async Task GivenDriverWithPrintCapabilitiesWhenGetCapabilitiesThenListsItsFeaturesAsVendorOptions()
+	{
+		// Arrange
+		FakeWinSpool spool = new FakeWinSpool();
+
+		spool.SetCapabilities
+		(
+			"Office",
+			WindowsPrinterTests.OfficeCapabilities() with
+			{
+				PrintCapabilities = Encoding.UTF8.GetBytes(Latiprimere.Windows.Tests.PrintTickets.PrintCapabilitiesDocumentTests.Capabilities)
+			}
+		);
+
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool));
+
+		// Act
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Contains(capabilities.VendorOptions, option => option.Key == "windows:feature:psk:PageOutputQuality");
+		Assert.DoesNotContain(capabilities.VendorOptions, option => option.Key == "windows:feature:psk:PageMediaSize");
+	}
+
+	[Fact]
+	public async Task GivenDriverWithMalformedPrintCapabilitiesWhenGetCapabilitiesThenListsNoVendorOptions()
+	{
+		// Arrange — the typed capabilities don't depend on it
+		FakeWinSpool spool = new FakeWinSpool();
+		spool.SetCapabilities("Office", WindowsPrinterTests.OfficeCapabilities() with { PrintCapabilities = Encoding.UTF8.GetBytes("<not") });
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool));
+
+		// Act
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Empty(capabilities.VendorOptions);
+		Assert.NotEmpty(capabilities.MediaSizes);
+	}
+
+	[Fact]
+	public async Task GivenFeatureKeysAndPrintTicketWhenPdfSubmittedThenGdiGetsBothTicketsInOrder()
+	{
+		// Arrange — the features are checked against the capabilities for the ticket's choices
+		FakeWinSpool spool = new FakeWinSpool
+		{
+			PrintCapabilities = Encoding.UTF8.GetBytes(Latiprimere.Windows.Tests.PrintTickets.PrintCapabilitiesDocumentTests.Capabilities)
+		};
+
+		FakeGdiPrinter gdi = new FakeGdiPrinter();
+
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter
+		(
+			new WindowsPrintContextBuilder().WithSpool(spool).WithGdi(gdi).WithPdfRasterizer(new FakePdfRasterizer())
+		);
+
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		PrintOptions options = new PrintOptions
+		{
+			VendorOptions = new Dictionary<string, string>
+			{
+				["windows:print-ticket"]                 = Latiprimere.Windows.Tests.Spooler.WindowsVendorOptionsTests.CreatePrintTicket("psk:ISOA5"),
+				["windows:feature:psk:PageOutputQuality"] = "psk:High"
+			}
+		};
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		GdiPrintRequest request = Assert.IsType<GdiPrintRequest>(gdi.LastRequest);
+		Assert.Equal(2, request.PrintTickets.Count);
+		Assert.Contains("psk:ISOA5", Encoding.UTF8.GetString(request.PrintTickets[0]), StringComparison.Ordinal);
+		Assert.Contains("psk:High", Encoding.UTF8.GetString(request.PrintTickets[1]), StringComparison.Ordinal);
+		byte[] constraint = Assert.Single(spool.LastPrintCapabilitiesTickets!);
+		Assert.Equal(request.PrintTickets[0], constraint);
+	}
+
+	[Fact]
+	public async Task GivenFeatureKeysAndSavedDevModeWhenPdfSubmittedThenChecksThemForTheSavedDevMode()
+	{
+		// Arrange — the options a saved DEVMODE rules in or out are the ones the job prints with
+		FakeWinSpool spool = new FakeWinSpool
+		{
+			PrintCapabilities = Encoding.UTF8.GetBytes(Latiprimere.Windows.Tests.PrintTickets.PrintCapabilitiesDocumentTests.Capabilities)
+		};
+
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter
+		(
+			new WindowsPrintContextBuilder().WithSpool(spool).WithGdi(new FakeGdiPrinter()).WithPdfRasterizer(new FakePdfRasterizer())
+		);
+
+		byte[] saved = new byte[220];
+		saved[68] = 220;
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		PrintOptions options = new PrintOptions
+		{
+			VendorOptions = new Dictionary<string, string>
+			{
+				["windows:devmode"]                       = Convert.ToBase64String(saved),
+				["windows:feature:psk:PageOutputQuality"] = "psk:High"
+			}
+		};
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(saved, spool.LastPrintCapabilitiesDevMode);
+	}
+
+	[Fact]
+	public async Task GivenDriverWithoutPrintTicketSupportWhenGetCapabilitiesThenListsNoVendorOptionsAndLogsWhy()
+	{
+		// Arrange
+		FakeWinSpool spool = new FakeWinSpool();
+		PrintException failure = new PrintException("No provider.");
+		spool.SetCapabilities("Office", WindowsPrinterTests.OfficeCapabilities() with { PrintSchemaFailure = failure });
+		Latiprimere.Testing.Fakes.RecordingLogger logger = new Latiprimere.Testing.Fakes.RecordingLogger();
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool).WithLogger(logger));
+
+		// Act
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Empty(capabilities.VendorOptions);
+		Assert.NotEmpty(capabilities.MediaSizes);
+		Assert.Same(failure, Assert.Single(logger.Entries).Exception);
+	}
+
+	[Fact]
+	public async Task GivenDriverWithoutPrintTicketSupportWhenGetCapabilitiesTwiceThenTriesAndLogsOnlyOnce()
+	{
+		// Arrange — every read would otherwise open a Print Ticket session, fail and log
+		FakeWinSpool spool = new FakeWinSpool();
+		spool.SetCapabilities("Office", WindowsPrinterTests.OfficeCapabilities() with { PrintSchemaFailure = new PrintException("No provider.") });
+		Latiprimere.Testing.Fakes.RecordingLogger logger = new Latiprimere.Testing.Fakes.RecordingLogger();
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool).WithLogger(logger));
+
+		// Act
+		await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+		PrinterCapabilities second = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(1, spool.PrintSchemaRequests);
+		Assert.Single(logger.Entries);
+		Assert.NotEmpty(second.MediaSizes);
+	}
+
+	[Fact]
+	public async Task GivenDefaultTicketThatIsNotXmlWhenGetCapabilitiesThenListsTheOptionsWithoutDefaultsAndLogsIt()
+	{
+		// Arrange
+		FakeWinSpool spool = new FakeWinSpool();
+
+		spool.SetCapabilities
+		(
+			"Office",
+			WindowsPrinterTests.OfficeCapabilities() with
+			{
+				PrintCapabilities  = Encoding.UTF8.GetBytes(Latiprimere.Windows.Tests.PrintTickets.PrintCapabilitiesDocumentTests.Capabilities),
+				DefaultPrintTicket = Encoding.UTF8.GetBytes("<not")
+			}
+		);
+
+		Latiprimere.Testing.Fakes.RecordingLogger logger = new Latiprimere.Testing.Fakes.RecordingLogger();
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool).WithLogger(logger));
+
+		// Act
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		VendorOption quality = Assert.Single(capabilities.VendorOptions, option => option.Key == "windows:feature:psk:PageOutputQuality");
+		Assert.Null(quality.DefaultValue);
+		Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Warning, Assert.Single(logger.Entries).Level);
+	}
+
+	[Fact]
+	public async Task GivenFeatureThePrinterLacksWhenPdfSubmittedThenRefusesWithoutRendering()
+	{
+		// Arrange
+		FakeWinSpool spool = new FakeWinSpool
+		{
+			PrintCapabilities = Encoding.UTF8.GetBytes(Latiprimere.Windows.Tests.PrintTickets.PrintCapabilitiesDocumentTests.Capabilities)
+		};
+
+		FakeGdiPrinter gdi = new FakeGdiPrinter();
+		FakePdfRasterizer rasterizer = new FakePdfRasterizer();
+
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter
+		(
+			new WindowsPrintContextBuilder().WithSpool(spool).WithGdi(gdi).WithPdfRasterizer(rasterizer)
+		);
+
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+		PrintOptions options = new PrintOptions { VendorOptions = new Dictionary<string, string> { ["windows:feature:psk:JobStapleAllDocuments"] = "psk:StapleTopLeft" } };
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		await Assert.ThrowsAsync<ArgumentException>(submit);
+		Assert.Null(gdi.LastRequest);
+	}
+
+	[Fact]
+	public async Task GivenFeatureKeyWhenRawSubmittedThenIgnoresItAsRawJobsIgnoreTheDriver()
+	{
+		// Arrange — raw data goes to the printer unchanged, as with windows:devmode
+		FakeWinSpool spool = new FakeWinSpool();
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool));
+		using MemoryStream document = new MemoryStream(new byte[] { 0x1B, 0x40 });
+		PrintOptions options = new PrintOptions { VendorOptions = new Dictionary<string, string> { ["windows:feature:psk:PageOutputQuality"] = "psk:High" } };
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromRaw(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.NotNull(spool.LastSubmittedBytes);
+		Assert.Null(spool.LastPrintCapabilitiesTickets);
+	}
+
+	[Fact]
+	public async Task GivenWindowsPrinterWhenGetPrintCapabilitiesWithTicketThenReturnsTheDriversDocumentForIt()
+	{
+		// Arrange — what the catalog returns is an IWindowsPrinter
+		FakeWinSpool spool = new FakeWinSpool { PrintCapabilities = Encoding.UTF8.GetBytes("﻿<psf:PrintCapabilities />") };
+		IPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool));
+		IWindowsPrinter windowsPrinter = Assert.IsAssignableFrom<IWindowsPrinter>(printer);
+
+		// Act
+		string document = await windowsPrinter.GetPrintCapabilitiesAsync
+		(
+			Latiprimere.Windows.Tests.Spooler.WindowsVendorOptionsTests.CreatePrintTicket("psk:ISOA5"),
+			TestContext.Current.CancellationToken
+		);
+
+		// Assert — without the byte order mark
+		Assert.Equal("<psf:PrintCapabilities />", document);
+		Assert.Equal("Office", windowsPrinter.QueueName);
+		Assert.Contains("psk:ISOA5", Encoding.UTF8.GetString(Assert.Single(spool.LastPrintCapabilitiesTickets!)), StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task GivenTicketThatIsNotXmlWhenGetPrintCapabilitiesThenThrowsArgumentExceptionWithoutAskingTheDriver()
+	{
+		// Arrange
+		FakeWinSpool spool = new FakeWinSpool();
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool));
+
+		// Act
+		Func<Task> read = () => printer.GetPrintCapabilitiesAsync("A5 please", TestContext.Current.CancellationToken);
+
+		// Assert
+		await Assert.ThrowsAsync<ArgumentException>(read);
+		Assert.Null(spool.LastPrintCapabilitiesTickets);
+	}
+
+	[Fact]
+	public async Task GivenDriverWithoutPrintTicketSupportWhenGetDefaultPrintTicketThenThrowsItsPrintException()
+	{
+		// Arrange
+		FakeWinSpool spool = new FakeWinSpool { PrintTicketFailure = new PrintException("No provider.") };
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool));
+
+		// Act
+		Func<Task> read = () => printer.GetDefaultPrintTicketAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(read);
+		Assert.Equal("No provider.", exception.Message);
 	}
 
 	/// <summary>

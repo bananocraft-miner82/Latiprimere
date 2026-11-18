@@ -8,6 +8,39 @@ namespace Latiprimere.Windows.Tests.DependencyInjection;
 public sealed class LatiprimereWindowsServiceCollectionExtensionsTests
 {
 	[Fact]
+	public void GivenLoggerFactoryInServicesWhenAddLatiprimereWindowsThenThePrintSystemLogsThroughIt()
+	{
+		// Arrange — the print systems log what they carry on without, such as vendor options that couldn't be read
+		ServiceCollection services = new ServiceCollection();
+		Latiprimere.Testing.Fakes.RecordingLoggerFactory loggerFactory = new Latiprimere.Testing.Fakes.RecordingLoggerFactory();
+		services.AddSingleton<Microsoft.Extensions.Logging.ILoggerFactory>(loggerFactory);
+
+		// Act
+		services.AddLatiprimereWindows();
+		using ServiceProvider serviceProvider = services.BuildServiceProvider();
+		IPrintSystem printSystem = Assert.Single(serviceProvider.GetServices<IPrintSystem>());
+
+		// Assert
+		Assert.Same(loggerFactory.Logger, Assert.IsType<WindowsPrintSystem>(printSystem).Logger);
+		Assert.Contains("Latiprimere.Windows", loggerFactory.Categories);
+	}
+
+	[Fact]
+	public void GivenNoLoggerFactoryWhenAddLatiprimereWindowsThenThePrintSystemLogsNothing()
+	{
+		// Arrange
+		ServiceCollection services = new ServiceCollection();
+
+		// Act
+		services.AddLatiprimereWindows();
+		using ServiceProvider serviceProvider = services.BuildServiceProvider();
+		IPrintSystem printSystem = Assert.Single(serviceProvider.GetServices<IPrintSystem>());
+
+		// Assert
+		Assert.Same(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Assert.IsType<WindowsPrintSystem>(printSystem).Logger);
+	}
+
+	[Fact]
 	public void GivenServicesWhenAddLatiprimereWindowsThenResolvesWindowsPrintSystem()
 	{
 		// Arrange

@@ -101,3 +101,16 @@ The printer's PDF support is checked at its first PDF job rather than at lookup,
 - A queue added by URL, pointing at the test container's `ippeveprinter`, routes PDFs and reports their real outcome. It needs an admin to add the queue, so it belongs on the CI runner, which is elevated.
 - A connect failure falls back to the spooler without printing twice.
 - A WSD queue with an `IppPrinterUris` entry routes; without one, it doesn't.
+
+## Follow-up
+
+Queues examined with [tools/windows-queue-report](../../tools/windows-queue-report/README.md):
+
+- **2026-11-18, a WSD queue Windows 11 (25H2, build 26200) set up itself** for an HP ENVY 5540 series:
+  - the driver is HP's inbox class driver (`HP PCL3 A-size Printer Class Driver`, v4), not Microsoft's IPP Class Driver;
+  - the port is named `WSD-<GUID>`, on the WSD Port Monitor, and its registry key records the printer's UUID (`Printer UUID`);
+  - **that UUID is the printer's IPP `printer-uuid`:** the printer answered Get-Printer-Attributes over IPP with `urn:uuid:` followed by the same value, and announces itself over mDNS too.
+
+  So a WSD queue can be matched exactly to an IPP printer found over mDNS, by UUID: the "revisit" this ADR allowed for. The match would contact only a printer that announced itself, and only after its UUID matched, so ADR 0024's rule against guessing still holds. Building it is left for later: this printer doesn't accept PDF over IPP, so routing would only pay off once Phase 3 renders PDFs to the raster formats it does accept.
+- **Still unexamined: a queue on Microsoft's IPP Class Driver.** Windows 11 uses that driver for printers that only offer IPP, and for every printer under Windows protected print mode. Until one has been examined, such queues need `IppPrinterUris`.
+

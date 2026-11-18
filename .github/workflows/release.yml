@@ -2,8 +2,10 @@ name: Release
 
 # Publishes a release to nuget.org whenever a pull request is merged into the release branch. See docs/releasing.md.
 #
-#  1. prepare: the version is <.NET major>.0.<this workflow's run number>, ending in -preview while the repository
-#     variable RELEASE_PREVIEW isn't false (tools/releasing/next-version.sh). The
+#  0. check: stops here, publishing nothing, if the merged commit's files are exactly the latest release's, as when
+#     only a post-release pull request's commit is merged into release (tools/releasing/anything-to-release.sh).
+#  1. prepare: the version is <.NET major>.0.<one more than the latest release's build number>, ending in -preview
+#     while the repository variable RELEASE_PREVIEW isn't false (tools/releasing/next-version.sh, ADR 0030). The
 #     release commit sets it, marks the public API shipped and dates the changelog's notes
 #     (tools/releasing/prepare-release.sh), and is pushed to post-release/v<version>.
 #  2. build: build.yml builds, tests and packs that commit on all three runners.
@@ -23,8 +25,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check:
+    name: Check there's something to release
+    runs-on: ubuntu-latest
+
+    outputs:
+      release: ${{ steps.check.outputs.release }}
+
+    steps:
+      # All history and tags, to find the latest release
+      - name: Check out
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Compare with the latest release
+        id: check
+        run: |
+          release=$(sh tools/releasing/anything-to-release.sh)
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+
+          if [ "$release" = false ]; then
+            echo "Nothing to release: this commit has the same files as the latest release." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # The later jobs need this one, so they're skipped with it
   prepare:
     name: Prepare the release commit
+    needs: check
+    if: needs.check.outputs.release == 'true'
     runs-on: ubuntu-latest
 
     permissions:
@@ -35,7 +64,8 @@ jobs:
       sha: ${{ steps.commit.outputs.sha }}
 
     steps:
-      # All history and tags, so the script can refuse a version already tagged
+      # All history and tags, so the scripts can number the release after the latest one and refuse a version
+      # already tagged
       - name: Check out
         uses: actions/checkout@v5
         with:
@@ -58,7 +88,7 @@ jobs:
               ;;
           esac
 
-          version=$(sh tools/releasing/next-version.sh "$GITHUB_RUN_NUMBER" $preview)
+          version=$(sh tools/releasing/next-version.sh $preview)
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Releasing $version" >> "$GITHUB_STEP_SUMMARY"
 

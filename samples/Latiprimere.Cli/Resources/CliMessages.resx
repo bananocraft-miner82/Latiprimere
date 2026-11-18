@@ -16,13 +16,18 @@
 		<value>Usage:
   Latiprimere.Cli list
   Latiprimere.Cli caps &lt;printer-id&gt;
+  Latiprimere.Cli print-capabilities &lt;printer-id&gt; [--ticket FILE | --default-ticket]
   Latiprimere.Cli print &lt;printer-id&gt; &lt;file&gt; [--raw] [--copies N] [--duplex one|long|short] [--landscape] [--cancel]
                  [--output FILE] [--stats] [--paper NAME] [--color color|mono] [--tray ID] [--option KEY=VALUE]...
+                 [--ticket FILE]
 
 Files are sent as PDF unless --raw is given. --cancel cancels the job straight after submitting it.
 --output prints to FILE instead of the device (Windows printers only). --stats reports time and memory used.
 --paper and --tray take a paper size's name (such as iso_a4_210x297mm) and a tray's ID, as caps lists them.
---option sets a vendor option, such as ipp:print-quality=5; repeat it for more.
+--option sets a vendor option, such as ipp:print-quality=5; repeat it for more. caps lists the printer's vendor
+options with their values. --ticket sends a Print Ticket file as windows:print-ticket (Windows printers only).
+print-capabilities writes a Windows printer driver's Print Capabilities as XML, for the defaults with any --ticket
+FILE merged on, or with --default-ticket its default Print Ticket.
 Set CUPS_SERVER (for example localhost:631) to use a CUPS server from Windows.
 IPP printers on the network are found automatically and listed by name; quote IDs with spaces, for example
 "ipp:dnssd:Office Laser". List other printers in LATIPRIMERE_IPP_PRINTERS (comma-separated URIs, for example
@@ -93,6 +98,38 @@ ipp://192.168.1.20/ipp/print).</value>
 	</data>
 	<data name="MissingPrintArguments" xml:space="preserve">
 		<value>print needs a printer ID and a file.</value>
+	</data>
+	<data name="MissingPrintCapabilitiesArguments" xml:space="preserve">
+		<value>print-capabilities needs a printer ID, then --ticket FILE or --default-ticket, not both.</value>
+	</data>
+	<data name="FileUnreadable" xml:space="preserve">
+		<value>A file couldn't be read: {0}</value>
+		<comment>{0} is the reason, from the exception message, which names the file.</comment>
+	</data>
+	<data name="NotAWindowsPrinter" xml:space="preserve">
+		<value>{0} isn't a Windows printer. Print Capabilities and Print Tickets come from Windows printer drivers; caps lists every printer's vendor options.</value>
+		<comment>{0} is the printer ID.</comment>
+	</data>
+	<data name="CapabilityVendorOptions" xml:space="preserve">
+		<value>Vendor options:</value>
+	</data>
+	<data name="VendorOptionLine" xml:space="preserve">
+		<value>    {0} ({1}): {2}</value>
+		<comment>{0} is the option's key, {1} its display name, {2} its values.</comment>
+	</data>
+	<data name="VendorChoiceValue" xml:space="preserve">
+		<value>{0} ({1})</value>
+		<comment>{0} is the value to set, {1} its display name.</comment>
+	</data>
+	<data name="VendorNumberValue" xml:space="preserve">
+		<value>a whole number from {0} to {1}</value>
+		<comment>{0} and {1} are the limits; a missing one is shown as …</comment>
+	</data>
+	<data name="VendorTextValue" xml:space="preserve">
+		<value>text</value>
+	</data>
+	<data name="VendorSeveralValues" xml:space="preserve">
+		<value> (several, separated by commas)</value>
 	</data>
 	<data name="MissingCapabilitiesArguments" xml:space="preserve">
 		<value>caps needs a printer ID.</value>

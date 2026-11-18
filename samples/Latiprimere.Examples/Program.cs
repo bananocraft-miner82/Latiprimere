@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Latiprimere;
 using Microsoft.Extensions.DependencyInjection;
@@ -51,7 +52,11 @@ internal static class Program
 				return 0;
 
 			case "capabilities" when arguments.Length == 1:
-				await ReadingCapabilities.ShowAsync(await catalog.GetPrinterAsync(arguments[0]));
+				IPrinter printer = await catalog.GetPrinterAsync(arguments[0]);
+				await ReadingCapabilities.ShowAsync(printer);
+				await ReadingCapabilities.ShowVendorOptionsAsync(printer);
+				PrintOptions best = await ReadingCapabilities.ChooseBestQualityAsync(printer);
+				Console.WriteLine($"Best quality: {string.Join(", ", best.VendorOptions.Select(option => $"{option.Key}={option.Value}"))}");
 				return 0;
 
 			case "options" when arguments.Length == 2:

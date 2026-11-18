@@ -51,4 +51,42 @@ internal static class IppPrinterQueries
 			return null;
 		}
 	}
+
+	/// <summary>
+	/// Reads a printer's attributes as they were encoded, including those the typed response leaves out.
+	/// </summary>
+	/// <param name="context">The client and settings to use.</param>
+	/// <param name="printerUri">The printer's URI.</param>
+	/// <param name="requestedAttributes">The attributes, or attribute groups, to read.</param>
+	/// <param name="cancellationToken">A token to cancel the operation.</param>
+	/// <returns>The attributes, or <see langword="null"/> if there is no printer at that URI.</returns>
+	/// <exception cref="PrintException">The printer could not be reached or rejected the request.</exception>
+	internal static async Task<IReadOnlyList<IppAttribute>?> GetAttributeListAsync
+	(
+		IppPrintContext   context,
+		Uri               printerUri,
+		string[]          requestedAttributes,
+		CancellationToken cancellationToken
+	)
+	{
+		GetPrinterAttributesRequest request = new GetPrinterAttributesRequest
+		{
+			OperationAttributes = new GetPrinterAttributesOperationAttributes
+			{
+				PrinterUri          = new IppValue<Uri>(printerUri),
+				RequestingUserName  = new StringWithLanguage(context.RequestingUserName),
+				RequestedAttributes = new IppValue<string[]>(requestedAttributes)
+			}
+		};
+
+		try
+		{
+			return await context.Client.GetPrinterAttributeListAsync(request, cancellationToken).ConfigureAwait(false);
+		}
+		catch (PrintException exception)
+			when (exception.NativeErrorCode == (int)IppStatusCode.ClientErrorNotFound)
+		{
+			return null;
+		}
+	}
 }

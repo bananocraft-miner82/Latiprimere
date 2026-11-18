@@ -178,11 +178,58 @@ internal sealed class FakeWinSpool : IWinSpool
 		this.capabilities[printerName] = record;
 	}
 
-	/// <summary>Returns the capabilities set for the printer.</summary>
+	/// <summary>Returns the capabilities set for the printer, without the Print Capabilities unless asked for, as
+	/// the real spooler does.</summary>
 	/// <param name="printerName">The printer name.</param>
+	/// <param name="includePrintSchema">Whether the Print Capabilities were asked for, which is recorded.</param>
 	/// <returns>The capabilities, or <see langword="null"/> if none were set.</returns>
-	public WindowsCapabilitiesRecord? GetCapabilities(string printerName)
+	public WindowsCapabilitiesRecord? GetCapabilities(string printerName, bool includePrintSchema)
 	{
-		return this.capabilities.GetValueOrDefault(printerName);
+		this.PrintSchemaRequests += includePrintSchema ? 1 : 0;
+		WindowsCapabilitiesRecord? record = this.capabilities.GetValueOrDefault(printerName);
+
+		return includePrintSchema || record is null
+			? record
+			: record with { PrintCapabilities = null, DefaultPrintTicket = null, PrintSchemaFailure = null };
+	}
+
+	/// <summary>Gets how many capability reads asked for the Print Capabilities too.</summary>
+	public int PrintSchemaRequests { get; private set; }
+
+	/// <summary>Gets or sets the default Print Ticket every printer reports, as UTF-8 XML.</summary>
+	public byte[] DefaultPrintTicket { get; set; } = [];
+
+	/// <summary>Gets or sets the Print Capabilities document every printer reports, as UTF-8 XML.</summary>
+	public byte[] PrintCapabilities { get; set; } = [];
+
+	/// <summary>Gets or sets an exception the Print Ticket calls throw, as for a driver without Print Ticket
+	/// support.</summary>
+	public Exception? PrintTicketFailure { get; set; }
+
+	/// <summary>Gets the tickets the last <see cref="GetPrintCapabilities"/> call was given.</summary>
+	public IReadOnlyList<byte[]>? LastPrintCapabilitiesTickets { get; private set; }
+
+	/// <summary>Gets the starting DEVMODE the last <see cref="GetPrintCapabilities"/> call was given.</summary>
+	public byte[]? LastPrintCapabilitiesDevMode { get; private set; }
+
+	/// <summary>Returns <see cref="DefaultPrintTicket"/>.</summary>
+	/// <param name="printerName">The printer name.</param>
+	/// <returns>The ticket.</returns>
+	public byte[] GetDefaultPrintTicket(string printerName)
+	{
+		return this.PrintTicketFailure is null ? this.DefaultPrintTicket : throw this.PrintTicketFailure;
+	}
+
+	/// <summary>Returns <see cref="PrintCapabilities"/>, recording the tickets.</summary>
+	/// <param name="printerName">The printer name.</param>
+	/// <param name="baseDevMode">The starting DEVMODE, which is recorded.</param>
+	/// <param name="printTickets">The tickets.</param>
+	/// <returns>The document.</returns>
+	public byte[] GetPrintCapabilities(string printerName, byte[]? baseDevMode, IReadOnlyList<byte[]> printTickets)
+	{
+		this.LastPrintCapabilitiesTickets = printTickets;
+		this.LastPrintCapabilitiesDevMode = baseDevMode;
+
+		return this.PrintTicketFailure is null ? this.PrintCapabilities : throw this.PrintTicketFailure;
 	}
 }

@@ -31,4 +31,15 @@ internal sealed record WindowsCapabilitiesRecord
 
 	/// <summary>Gets the default DMCOLOR_* value, or <see langword="null"/> if the DEVMODE doesn't set one.</summary>
 	public short? DefaultColor { get; init; }
+
+	/// <summary>Gets the driver's Print Capabilities document, as UTF-8 XML, or <see langword="null"/> if the driver
+	/// has no Print Ticket support.</summary>
+	public byte[]? PrintCapabilities { get; init; }
+
+	/// <summary>Gets the driver's default Print Ticket, as UTF-8 XML, or <see langword="null"/>.</summary>
+	public byte[]? DefaultPrintTicket { get; init; }
+
+	/// <summary>Gets why the Print Capabilities couldn't be read, such as a driver without Print Ticket support; or
+	/// <see langword="null"/>.</summary>
+	public Exception? PrintSchemaFailure { get; init; }
 }

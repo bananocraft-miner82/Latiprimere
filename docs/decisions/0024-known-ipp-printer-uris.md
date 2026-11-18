@@ -1,6 +1,6 @@
 # 0024: Look up only known IPP printer URIs and Windows printer names
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-15
 
 ## Context

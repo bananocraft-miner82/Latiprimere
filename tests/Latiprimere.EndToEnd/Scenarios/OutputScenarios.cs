@@ -84,6 +84,30 @@ public static class OutputScenarios
 	};
 
 	/// <summary>
+	/// Microsoft Print to PDF takes its paper from a Print Ticket, and a typed option wins over the ticket (ADR 0031).
+	/// </summary>
+	public static readonly Scenario WindowsPrintTicket = new Scenario
+	{
+		Id = "windows.output.print-ticket",
+		Area = ScenarioArea.Rendering,
+		Title = "A Print Ticket in windows:print-ticket puts Microsoft Print to PDF's page on A5, and a paper size chosen in the options wins over the ticket's",
+		Needs = TargetNeeds.MicrosoftPrintToPdf,
+		RunAsync = OutputScenarios.WindowsPrintTicketAsync
+	};
+
+	/// <summary>
+	/// A delta Print Ticket that asks for A5 paper and nothing else.
+	/// </summary>
+	private const string A5PrintTicket = """
+		<?xml version="1.0" encoding="utf-8"?>
+		<psf:PrintTicket xmlns:psf="http://schemas.microsoft.com/windows/2003/08/printing/printschemaframework" xmlns:psk="http://schemas.microsoft.com/windows/2003/08/printing/printschemakeywords" version="1">
+		  <psf:Feature name="psk:PageMediaSize">
+		    <psf:Option name="psk:ISOA5" />
+		  </psf:Feature>
+		</psf:PrintTicket>
+		""";
+
+	/// <summary>
 	/// The most a page's ink may differ from the source's, as a share of it, for its content to count as intact on
 	/// paper of the same shape: allows for scaling to fit and for anti-aliasing.
 	/// </summary>
@@ -175,6 +199,32 @@ public static class OutputScenarios
 
 		// The portrait page is scaled down to fit across the landscape one, so it covers less of it
 		context.Check("with landscape the page has content", landscape.Ink > OutputScenarios.NotBlank, landscape.ToString());
+	}
+
+	/// <summary>
+	/// Runs <see cref="WindowsPrintTicket"/>.
+	/// </summary>
+	/// <param name="context">The scenario's context.</param>
+	/// <returns>A task that completes when the scenario has run.</returns>
+	private static async Task WindowsPrintTicketAsync(ScenarioContext context)
+	{
+		await using CatalogFixture fixture = context.CreateCatalog();
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(TestPrinters.MicrosoftPrintToPdf, context.CancellationToken);
+		PdfPage source = OutputScenarios.InspectSourcePage(context);
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(context.CancellationToken);
+		MediaSize? a4 = capabilities.MediaSizes.FirstOrDefault(size => size.Name == "iso_a4_210x297mm");
+		context.Require("the capabilities include A4", a4 is not null);
+
+		Dictionary<string, string> ticket = new Dictionary<string, string> { ["windows:print-ticket"] = OutputScenarios.A5PrintTicket };
+
+		PrintOptions ticketOnly = new PrintOptions { VendorOptions = ticket };
+		PdfPage onA5 = (await PdfPrinters.PrintToMicrosoftPdfAsync(context, printer, TestDocuments.MixedOnePage, ticketOnly, "ticket-a5")).Pages.Single();
+		context.Check("with the ticket asking for A5 the page is A5, 148 x 210 mm", onA5.IsPaper(148, 210), onA5.ToString());
+		OutputScenarios.CheckContent(context, "on the ticket's A5", source, onA5);
+
+		PrintOptions typedWins = new PrintOptions { MediaSize = a4, VendorOptions = ticket };
+		PdfPage onA4 = (await PdfPrinters.PrintToMicrosoftPdfAsync(context, printer, TestDocuments.MixedOnePage, typedWins, "ticket-a4")).Pages.Single();
+		context.Check("with A4 chosen in the options as well, the page is A4", onA4.IsPaper(210, 297), onA4.ToString());
 	}
 
 	/// <summary>

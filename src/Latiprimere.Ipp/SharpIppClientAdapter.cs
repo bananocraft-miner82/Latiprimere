@@ -118,6 +118,22 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 	}
 
 	/// <inheritdoc/>
+	public Task<IReadOnlyList<IppAttribute>> GetPrinterAttributeListAsync
+	(
+		GetPrinterAttributesRequest request,
+		CancellationToken cancellationToken
+	)
+	{
+		return this.SendAsync
+		(
+			request.OperationAttributes?.PrinterUri,
+			token => this.SendRawGetPrinterAttributesAsync(request, token),
+			isUpload: false,
+			cancellationToken
+		);
+	}
+
+	/// <inheritdoc/>
 	public Task<PrintJobResponse> PrintJobAsync(PrintJobRequest request, IppVendorAttributes vendorAttributes, CancellationToken cancellationToken)
 	{
 		// The typed request can't carry attributes SharpIppNext doesn't model, so a job with vendor attributes
@@ -191,6 +207,28 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 		IIppResponseMessage response = await this.client.SendAsync(printerUri, raw, cancellationToken).ConfigureAwait(false);
 
 		return SharpIppClientAdapter.ToPrintJobResponse(response);
+	}
+
+	/// <summary>
+	/// Sends a Get-Printer-Attributes request in its raw form, and reads the printer attributes as they came.
+	/// </summary>
+	/// <param name="request">The typed request.</param>
+	/// <param name="cancellationToken">A token to cancel the request.</param>
+	/// <returns>The printer attributes, from every printer attributes group.</returns>
+	private async Task<IReadOnlyList<IppAttribute>> SendRawGetPrinterAttributesAsync
+	(
+		GetPrinterAttributesRequest request,
+		CancellationToken           cancellationToken
+	)
+	{
+		IIppRequestMessage raw = this.client.CreateRawRequest(request);
+
+		Uri printerUri = request.OperationAttributes?.PrinterUri?.Value
+						 ?? throw new ArgumentException("The request has no printer-uri.", nameof(request));
+
+		IIppResponseMessage response = await this.client.SendAsync(printerUri, raw, cancellationToken).ConfigureAwait(false);
+
+		return response.PrinterAttributes.SelectMany(group => group).ToList();
 	}
 
 	/// <inheritdoc/>

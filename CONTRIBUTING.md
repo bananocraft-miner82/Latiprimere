@@ -857,9 +857,14 @@ Latiprimere is split into packages with a strict, one-way dependency hierarchy. 
 ### Dependency Rule
 
 - **`Latiprimere.Abstractions`** references nothing within the solution, and no third-party packages.
-- **Platform adapters** reference `Latiprimere.Abstractions` and their own third-party dependencies only.
-  Adapters never reference each other; shared protocol code (such as the IPP transport) lives in its own internal-facing
-  project that adapters may share.
+- **Platform adapters** reference `Latiprimere.Abstractions`, their own third-party dependencies, and
+  `Microsoft.Extensions.Logging.Abstractions` and `Microsoft.Extensions.DependencyInjection.Abstractions`.
+  Adapters don't reference each other, with one exception: **`Latiprimere.Ipp`** is both the direct IPP adapter and the
+  shared IPP transport, so `Latiprimere.Cups` references it for its protocol code ([ADR 0006](docs/decisions/0006-ipp-and-cups-adapter-design.md)),
+  and `Latiprimere.Windows` references it to send PDFs straight to a queue's IPP printer
+  ([ADR 0027](docs/decisions/0027-direct-ipp-for-windows-queues.md)). Nothing references `Latiprimere.Cups` or
+  `Latiprimere.Windows`, and `Latiprimere.Ipp` references no other adapter. Shared code goes in `Latiprimere.Ipp`'s
+  internals (`InternalsVisibleTo`), not in a public API.
 - **`Latiprimere`** references the abstractions and the adapters it selects between.
 - No package references a higher layer. Third-party types (for example, SharpIppNext or PDFium types) must never
   appear in a public API.
@@ -880,8 +885,9 @@ interface signatures. Print dialogs and previews will live in separate, optional
 - Wrap native handles in `SafeHandle` subclasses; never pass raw `IntPtr` handles around managed code.
 - Code must be trim-safe and Native AOT compatible: no reflection-based serialisation, no dynamic code generation.
   `IsAotCompatible` turns on the analyzers for `src/`, but they can't see into dependencies. CI also publishes the CLI
-  sample and the end-to-end harness with Native AOT, and runs four of the native harness's scenarios
-  (`tools/aot-check/check-aot.sh`); run the script yourself after adding a dependency or a new code path through one.
+  sample and the end-to-end harness with Native AOT, and runs the native harness's scenarios listed at the top of
+  `tools/aot-check/check-aot.sh`; run the script yourself after adding a dependency or a new code path through one,
+  and add a scenario to its list when the new path has one.
   It needs the platform's native toolchain, as the script's header says. `tools/test-harness/run.ps1 -Aot` (or
   `run.sh --aot`) runs every scenario natively.
 - Convert native errors into Latiprimere exceptions at the interop boundary, keeping the native code in the exception.

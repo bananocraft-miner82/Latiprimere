@@ -56,6 +56,20 @@ internal static class Program
 
 			return ExitCodes.PrintFailed;
 		}
+		catch (ArgumentException exception)
+		{
+			// A vendor option the printer doesn't offer, or a Print Ticket that isn't one: the message says what's wrong
+			ConsoleOutput.WriteError(CliMessages.InvalidArguments, exception.Message);
+
+			return ExitCodes.InvalidArguments;
+		}
+		catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+		{
+			// A --ticket file, or the file to print, that can't be read
+			ConsoleOutput.WriteError(CliMessages.InvalidArguments, CliMessages.FormatFileUnreadable(exception.Message));
+
+			return ExitCodes.InvalidArguments;
+		}
 	}
 
 	/// <summary>
@@ -87,10 +101,11 @@ internal static class Program
 
 		return command switch
 		{
-			ListCommand.Name         => ListCommand.RunAsync(catalog),
-			PrintCommand.Name        => PrintCommand.RunAsync(catalog, commandArguments),
-			CapabilitiesCommand.Name => CapabilitiesCommand.RunAsync(catalog, commandArguments),
-			_                        => Task.FromResult(ConsoleOutput.WriteUsage()),
+			ListCommand.Name              => ListCommand.RunAsync(catalog),
+			PrintCommand.Name             => PrintCommand.RunAsync(catalog, commandArguments),
+			CapabilitiesCommand.Name      => CapabilitiesCommand.RunAsync(catalog, commandArguments),
+			PrintCapabilitiesCommand.Name => PrintCapabilitiesCommand.RunAsync(catalog, commandArguments),
+			_                             => Task.FromResult(ConsoleOutput.WriteUsage()),
 		};
 	}
 }

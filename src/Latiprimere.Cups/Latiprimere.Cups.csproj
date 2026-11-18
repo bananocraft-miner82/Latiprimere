@@ -12,6 +12,8 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+		<!-- Diagnostics, when the application registers logging -->
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
 	</ItemGroup>
 
 	<ItemGroup>

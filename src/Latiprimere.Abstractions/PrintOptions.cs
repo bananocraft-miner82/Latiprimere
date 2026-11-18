@@ -118,7 +118,12 @@ public sealed record PrintOptions
 	/// </description></item>
 	/// <item><description>
 	/// <c>windows:devmode</c>, read by the Windows spooler: a DEVMODE saved from the same printer's driver, encoded
-	/// in base64, used for PDF jobs instead of the driver's defaults. Other <c>windows:</c> keys are refused with
+	/// in base64, used for PDF jobs instead of the driver's defaults.
+	/// </description></item>
+	/// <item><description>
+	/// <c>windows:print-ticket</c>, read by the Windows spooler: a Print Ticket in XML, which the printer's driver
+	/// merges onto the driver's defaults, or onto <c>windows:devmode</c>, for PDF jobs. It reaches the driver's own
+	/// features as well as the Print Schema's. Other <c>windows:</c> keys are refused with
 	/// <see cref="NotSupportedException"/>.
 	/// </description></item>
 	/// </list>

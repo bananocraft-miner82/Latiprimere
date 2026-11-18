@@ -72,7 +72,7 @@
 	</data>
 	<data name="VendorOptionNotSupported" xml:space="preserve">
 		<value>The Windows print spooler doesn't support the vendor option '{0}'. It supports {1}.</value>
-		<comment>{0} is the key, such as windows:print-ticket; {1} the supported keys.</comment>
+		<comment>{0} is the key, such as windows:paper; {1} the supported keys, such as windows:devmode and windows:print-ticket.</comment>
 	</data>
 	<data name="DevModeNotBase64" xml:space="preserve">
 		<value>The vendor option windows:devmode must be a DEVMODE encoded in base64.</value>
@@ -80,6 +80,69 @@
 	<data name="DevModeInvalid" xml:space="preserve">
 		<value>The vendor option windows:devmode isn't a DEVMODE: it has {0} bytes, but says its public part has {1} and the driver's data {2}. Save the whole DEVMODE from the printer's driver.</value>
 		<comment>{0} is the decoded length, {1} dmSize, {2} dmDriverExtra.</comment>
+	</data>
+	<data name="PrintTicketApiMissing" xml:space="preserve">
+		<value>The printer '{0}' can't use Print Tickets or Print Capabilities: this Windows doesn't have the Print Ticket API (prntvpt.dll). {1}</value>
+		<comment>{0} is the printer name, {1} the runtime's message about the missing library or function.</comment>
+	</data>
+	<data name="PrintCapabilitiesUnreadable" xml:space="preserve">
+		<value>The driver of the printer '{0}' gave Print Capabilities that can't be read: {1}</value>
+		<comment>{0} is the printer name, {1} the XML parser's message.</comment>
+	</data>
+	<data name="PrintSchemaRootUnexpected" xml:space="preserve">
+		<value>The document's root element is {0}, not {1}.</value>
+		<comment>{0} is the root element's name, {1} the one expected, both with their namespace in braces.</comment>
+	</data>
+	<data name="PrintSchemaDocumentEmpty" xml:space="preserve">
+		<value>The document has no root element.</value>
+	</data>
+	<data name="VendorFeatureOptionUnavailable" xml:space="preserve">
+		<value>The printer '{0}' rules out the option '{1}' for the vendor option '{2}': the device or an administrator doesn't allow it, and the driver would print with another instead. It offers {3}.</value>
+		<comment>{0} is the printer name, {1} the value given, {2} the key, {3} the values the printer offers, separated by commas.</comment>
+	</data>
+	<data name="VendorParameterRange" xml:space="preserve">
+		<value>{0} to {1}</value>
+		<comment>{0} and {1} are a number's lowest and highest values, or VendorParameterNoLimit.</comment>
+	</data>
+	<data name="VendorParameterNoLimit" xml:space="preserve">
+		<value>no limit</value>
+		<comment>Stands for a missing lowest or highest value in VendorParameterRange.</comment>
+	</data>
+	<data name="VendorFeatureNameInvalid" xml:space="preserve">
+		<value>The vendor option '{0}' must name a feature or parameter as prefix:name after windows:feature: or windows:parameter:, such as windows:feature:psk:PageOutputQuality, and have a value.</value>
+		<comment>{0} is the key.</comment>
+	</data>
+	<data name="VendorFeatureUnknown" xml:space="preserve">
+		<value>The printer '{0}' has no feature or parameter '{1}' (vendor option '{2}'). The printer's capabilities list its vendor options.</value>
+		<comment>{0} is the printer name, {1} the feature or parameter name, such as ns0000:JobImageType, {2} the key.</comment>
+	</data>
+	<data name="VendorFeatureOptionUnknown" xml:space="preserve">
+		<value>The printer '{0}' has no option '{1}' for the vendor option '{2}'. It offers {3}.</value>
+		<comment>{0} is the printer name, {1} the value given, {2} the key, {3} the values the printer offers, separated by commas.</comment>
+	</data>
+	<data name="VendorParameterOutOfRange" xml:space="preserve">
+		<value>The vendor option '{0}' must be a whole number from {1} for the printer '{2}', not '{3}'.</value>
+		<comment>{0} is the key, {1} the range, such as "1 to 99", {2} the printer name, {3} the value given.</comment>
+	</data>
+	<data name="VendorFeatureSetByTypedOption" xml:space="preserve">
+		<value>The vendor option '{0}' sets what PrintOptions.{1} sets for this job. Use PrintOptions.{1} on its own.</value>
+		<comment>{0} is the key, {1} the PrintOptions property, such as MediaSize or Copies.</comment>
+	</data>
+	<data name="PrintTicketNotXml" xml:space="preserve">
+		<value>The vendor option windows:print-ticket must be a Print Ticket in XML: {0}</value>
+		<comment>{0} is the XML parser's message.</comment>
+	</data>
+	<data name="PrintTicketNotPrintTicket" xml:space="preserve">
+		<value>The vendor option windows:print-ticket must be a Print Ticket, whose root element is PrintTicket in the namespace {1}, but its root element is '{0}'.</value>
+		<comment>{0} is the root element's name, with its namespace in braces if it has one; {1} the Print Schema Framework namespace.</comment>
+	</data>
+	<data name="PrintTicketRefused" xml:space="preserve">
+		<value>The printer '{0}' refused the vendor option windows:print-ticket: {1}</value>
+		<comment>{0} is the printer name, {1} the reason the Print Ticket API gave.</comment>
+	</data>
+	<data name="PrintTicketCallFailed" xml:space="preserve">
+		<value>The printer '{0}' couldn't apply the vendor option windows:print-ticket: {1} failed with 0x{2}. {3}</value>
+		<comment>{0} is the printer name, {1} the Print Ticket API function, {2} its HRESULT in hexadecimal, {3} Windows's description of it.</comment>
 	</data>
 	<data name="MediaSizeNotListed" xml:space="preserve">
 		<value>The printer '{0}' can't print on {1} ({2}): its driver doesn't list that paper size. Choose one of the sizes in the printer's capabilities.</value>
