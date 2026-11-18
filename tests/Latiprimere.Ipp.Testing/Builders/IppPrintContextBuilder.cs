@@ -12,6 +12,9 @@ internal sealed class IppPrintContextBuilder
 	private TimeSpan busyRetryDuration = TimeSpan.Zero;                      // How long jobs turned away as busy are resent
 	private IReadOnlyList<string> vendorOptionPrefixes = Mapping.IppVendorAttributeMapper.NetworkPrefixes; // Keys read
 	private Microsoft.Extensions.Logging.ILogger logger = Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance; // Where to log
+	private bool validateJobs = false;                                       // Whether to send Validate-Job first
+	private Latiprimere.Rendering.IPdfRasterizer? pdfRasterizer;             // Renders PDFs for raster jobs
+	private int? maxRenderDpi;                                               // The raster resolution limit
 
 	/// <summary>Sets how long to resend jobs turned away as busy, with millisecond waits between attempts.</summary>
 	/// <param name="busyRetryDuration">How long to keep resending.</param>
@@ -53,12 +56,46 @@ internal sealed class IppPrintContextBuilder
 		return this;
 	}
 
+	/// <summary>Sets whether jobs are validated with Validate-Job before they are sent.</summary>
+	/// <param name="validateJobs">Whether to validate.</param>
+	/// <returns>This builder, for chaining.</returns>
+	public IppPrintContextBuilder WithValidateJobs(bool validateJobs)
+	{
+		this.validateJobs = validateJobs;
+
+		return this;
+	}
+
 	/// <summary>Sets the logger.</summary>
 	/// <param name="logger">The logger.</param>
 	/// <returns>This builder, for chaining.</returns>
 	public IppPrintContextBuilder WithLogger(Microsoft.Extensions.Logging.ILogger logger)
 	{
 		this.logger = logger;
+
+		return this;
+	}
+
+	/// <summary>
+	/// Sets the rasteriser that renders PDFs for printers that can't take PDF.
+	/// </summary>
+	/// <param name="pdfRasterizer">The rasteriser.</param>
+	/// <returns>This builder.</returns>
+	public IppPrintContextBuilder WithPdfRasterizer(Latiprimere.Rendering.IPdfRasterizer pdfRasterizer)
+	{
+		this.pdfRasterizer = pdfRasterizer;
+
+		return this;
+	}
+
+	/// <summary>
+	/// Sets the highest resolution raster jobs are rendered at.
+	/// </summary>
+	/// <param name="maxRenderDpi">The limit.</param>
+	/// <returns>This builder.</returns>
+	public IppPrintContextBuilder WithMaxRenderDpi(int maxRenderDpi)
+	{
+		this.maxRenderDpi = maxRenderDpi;
 
 		return this;
 	}
@@ -79,6 +116,9 @@ internal sealed class IppPrintContextBuilder
 			VendorOptionPrefixes = this.vendorOptionPrefixes,
 			BusyRetryFirstDelay  = TimeSpan.FromMilliseconds(1),
 			BusyRetryMaxDelay    = TimeSpan.FromMilliseconds(4),
+			ValidateJobs         = this.validateJobs,
+			PdfRasterizer        = this.pdfRasterizer,
+			MaxRenderDpi         = this.maxRenderDpi,
 			Logger               = this.logger
 		};
 	}

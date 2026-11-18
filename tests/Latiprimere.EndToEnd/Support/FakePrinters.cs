@@ -32,20 +32,29 @@ public static class FakePrinters
 	/// </summary>
 	/// <param name="printerUri">The printer's URI.</param>
 	/// <param name="configure">Changes other IPP options, or <see langword="null"/>.</param>
+	/// <param name="renderPdfs">Whether to register PDFium, so PDFs to printers that can't take PDF go as raster.</param>
 	/// <returns>The catalog fixture. The caller disposes it.</returns>
-	public static CatalogFixture CreateCatalog(Uri printerUri, Action<IppNetworkOptions>? configure = null)
+	public static CatalogFixture CreateCatalog(Uri printerUri, Action<IppNetworkOptions>? configure = null, bool renderPdfs = false)
 	{
 		return new CatalogFixture
 		(
-			services => services.AddLatiprimereIpp
-			(
-				options =>
+			services =>
+			{
+				if (renderPdfs)
 				{
-					options.EnableDiscovery = false;
-					options.PrinterUris.Add(printerUri);
-					configure?.Invoke(options);
+					services.AddLatiprimerePdfium();
 				}
-			)
+
+				services.AddLatiprimereIpp
+				(
+					options =>
+					{
+						options.EnableDiscovery = false;
+						options.PrinterUris.Add(printerUri);
+						configure?.Invoke(options);
+					}
+				);
+			}
 		);
 	}
 

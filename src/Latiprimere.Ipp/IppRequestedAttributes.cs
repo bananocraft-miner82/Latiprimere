@@ -29,6 +29,9 @@ internal static class IppRequestedAttributes
 	/// <summary>The document formats the printer accepts.</summary>
 	internal const string DocumentFormatSupported = "document-format-supported";
 
+	/// <summary>The operations the printer supports, such as Validate-Job.</summary>
+	internal const string OperationsSupported = "operations-supported";
+
 	/// <summary>The printer's UUID, which IPP Everywhere printers also announce over DNS-SD.</summary>
 	internal const string PrinterUuid = "printer-uuid";
 
@@ -85,7 +88,7 @@ internal static class IppRequestedAttributes
 		IppRequestedAttributes.PrinterLocation,
 		IppRequestedAttributes.PrinterMakeAndModel,
 		IppRequestedAttributes.PrinterState,
-		IppRequestedAttributes.PrinterStateMessage,
+		IppRequestedAttributes.PrinterStateMessage
 	};
 
 	/// <summary>
@@ -104,6 +107,7 @@ internal static class IppRequestedAttributes
 		IppRequestedAttributes.PrinterStateMessage,
 		IppRequestedAttributes.DocumentFormatSupported,
 		IppRequestedAttributes.PrinterUuid,
+		IppRequestedAttributes.OperationsSupported
 	};
 
 	/// <summary>
@@ -120,7 +124,7 @@ internal static class IppRequestedAttributes
 		IppRequestedAttributes.ColorSupported,
 		IppRequestedAttributes.CopiesSupported,
 		IppRequestedAttributes.OrientationRequestedSupported,
-		IppRequestedAttributes.MediaSourceSupported,
+		IppRequestedAttributes.MediaSourceSupported
 	};
 
 	/// <summary>
@@ -141,6 +145,6 @@ internal static class IppRequestedAttributes
 		IppRequestedAttributes.JobId,
 		IppRequestedAttributes.JobState,
 		IppRequestedAttributes.JobStateMessage,
-		IppRequestedAttributes.JobImpressionsCompleted,
+		IppRequestedAttributes.JobImpressionsCompleted
 	};
 }

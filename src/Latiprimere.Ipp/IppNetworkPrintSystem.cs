@@ -257,7 +257,9 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 			?.Select(format => format.Value)
 			.ToList();
 
-		return new IppPrinter(context, locatedUri, info, formats);
+		IReadOnlyCollection<IppOperation>? operations = IppValueReader.ReadReference(attributes.OperationsSupported);
+
+		return new IppPrinter(context, locatedUri, info, formats, operations);
 	}
 
 	/// <summary>

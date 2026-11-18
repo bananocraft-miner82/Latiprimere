@@ -14,7 +14,9 @@
 #   - windows.vendor-options.listed-and-sent: that printer's Print Capabilities read, parsed and printed with
 #     (ADR 0032);
 #   - ipp.vendor-options.listed-and-sent: vendor options read from raw IPP attributes and sent back, against the
-#     scripted IPP printer, so on every runner (ADR 0032).
+#     scripted IPP printer, so on every runner (ADR 0032);
+#   - ipp.raster.apple-raster-two-sided: a PDF rendered by PDFium, turned, encoded as Apple raster, gzipped and
+#     streamed through a pipe to the scripted printer with the HP's profile, so on every runner (ADR 0035).
 #
 # A scenario whose test printers this machine doesn't have is skipped; one that runs must pass. The first four are
 # the checks this script made with the CLI sample before the harness existed: CI runs only these (ADR 0029). Run every scenario
@@ -37,6 +39,7 @@ scenarios=(
 	windows.output.print-ticket
 	windows.vendor-options.listed-and-sent
 	ipp.vendor-options.listed-and-sent
+	ipp.raster.apple-raster-two-sided
 )
 
 # The ILCompiler finds the Windows linker through vswhere, which Git Bash may not have on its path
@@ -77,20 +80,28 @@ harness="$harness_directory/Latiprimere.TestHarness"
 [[ -f "$harness.exe" ]] && harness="$harness.exe"
 
 # On macOS, launchd starts CUPS on demand, and it exits after about a minute with nothing to do. Only its local
-# socket starts it again, not the TCP port Latiprimere connects to, and the publishes above leave it idle for
-# minutes. lpstat goes through that socket, so it wakes the scheduler; then wait for the port to answer.
+# socket starts it again, not the TCP port, and the publishes above leave it idle for minutes. lpstat goes through
+# that socket, so it wakes the scheduler. A server given as the socket's path (CI's, /private/var/run/cupsd) needs
+# nothing more, as Latiprimere connects through it too; one given as host:port also has to answer on that port.
 wake_macos_cups() {
 	local server="$LATIPRIMERE_TEST_CUPS_SERVER"
-	local host="${server%:*}"
-	local port="${server##*:}"
-	[[ "$server" == *:* ]] || port=631
+	local host=""
+	local port=""
+	local target="$server" # As shown if it never answers
 	local attempts=0
 
-	until lpstat -r 2> /dev/null | grep -q "scheduler is running" && nc -z "$host" "$port" 2> /dev/null; do
+	if [[ "$server" != /* ]]; then
+		host="${server%:*}"
+		port="${server##*:}"
+		[[ "$server" == *:* ]] || port=631
+		target="$host:$port"
+	fi
+
+	until lpstat -r 2> /dev/null | grep -q "scheduler is running" && { [[ -z "$host" ]] || nc -z "$host" "$port" 2> /dev/null; }; do
 		attempts=$((attempts + 1))
 
 		if [[ "$attempts" -ge 60 ]]; then
-			echo "The CUPS scheduler did not answer on $host:$port." >&2
+			echo "The CUPS scheduler did not answer on $target." >&2
 			exit 1
 		fi
 

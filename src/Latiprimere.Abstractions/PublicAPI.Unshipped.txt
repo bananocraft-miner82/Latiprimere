@@ -1,6 +1,13 @@
 #nullable enable
 Latiprimere.PrinterCapabilities.VendorOptions.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.VendorOption!>!
 Latiprimere.PrinterCapabilities.VendorOptions.init -> void
+Latiprimere.Rendering.RasterBand.Rotation.get -> Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterBand.Rotation.init -> void
+Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterRotation.Anticlockwise90 = 3 -> Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterRotation.Clockwise90 = 1 -> Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterRotation.Half = 2 -> Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterRotation.None = 0 -> Latiprimere.Rendering.RasterRotation
 Latiprimere.VendorOption
 Latiprimere.VendorOption.<Clone>$() -> Latiprimere.VendorOption!
 Latiprimere.VendorOption.AllowsSeveralValues.get -> bool

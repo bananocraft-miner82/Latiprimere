@@ -210,7 +210,7 @@ internal static class IppVendorOptionMapper
 	/// </summary>
 	/// <param name="attributes">The attributes.</param>
 	/// <returns>Each top-level attribute's values, by name; a collection keeps only its opening entry.</returns>
-	private static Dictionary<string, List<IppAttribute>> GroupTopLevel(IReadOnlyList<IppAttribute> attributes)
+	internal static Dictionary<string, List<IppAttribute>> GroupTopLevel(IReadOnlyList<IppAttribute> attributes)
 	{
 		Dictionary<string, List<IppAttribute>> byName = new Dictionary<string, List<IppAttribute>>(StringComparer.Ordinal);
 		string? current = null;

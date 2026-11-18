@@ -87,4 +87,23 @@
 		<value>The vendor options '{0}' and '{1}' both set {2}. Use one of them.</value>
 		<comment>{0} and {1} are the keys, such as ipp:print-quality and cups:print-quality; {2} the IPP attribute name.</comment>
 	</data>
+	<data name="AppleRasterNotOneBit" xml:space="preserve">
+		<value>Apple raster has no 1-bit form: its pages are 8-bit grey or 24-bit colour.</value>
+	</data>
+	<data name="PdfNeedsRasterizerForPrinter" xml:space="preserve">
+		<value>The printer doesn't accept PDF documents; it accepts: {0}. PDFs can be printed to it as raster images with a PDF rasteriser: add Latiprimere.Rendering.Pdfium and call AddLatiprimerePdfium(), or pass a PdfiumRasterizer to IppNetworkPrintSystemFactory.Create.</value>
+		<comment>{0} is the comma-separated MIME types the printer reports.</comment>
+	</data>
+	<data name="RasterNoResolution" xml:space="preserve">
+		<value>The printer accepts '{0}' but lists no resolution for it with the same dots per inch across and down, which Latiprimere needs.</value>
+		<comment>{0} is the raster MIME type.</comment>
+	</data>
+	<data name="RasterNoColorSpace" xml:space="preserve">
+		<value>The printer accepts '{0}' but lists no colour space for it that Latiprimere can send: 8-bit grey, 24-bit sRGB or 1-bit black.</value>
+		<comment>{0} is the raster MIME type.</comment>
+	</data>
+	<data name="RasterMediaUnknown" xml:space="preserve">
+		<value>A PDF sent as raster needs the paper size, and the printer's default paper '{0}' doesn't give it. Choose one with PrintOptions.MediaSize.</value>
+		<comment>{0} is the printer's media-default keyword, or empty if it reports none.</comment>
+	</data>
 </root>

@@ -38,7 +38,7 @@ Their tests skip when `LATIPRIMERE_TEST_CUPS_SETUP=macos` (see "Integration Test
 
 ```bash
 sh tools/macos-test-printers/install-test-printers.sh
-export LATIPRIMERE_TEST_CUPS_SERVER=127.0.0.1:631 LATIPRIMERE_TEST_CUPS_SETUP=macos
+export LATIPRIMERE_TEST_CUPS_SERVER=/private/var/run/cupsd LATIPRIMERE_TEST_CUPS_SETUP=macos
 export LATIPRIMERE_TEST_CUPS_OUTPUT=/Users/Shared/LatiprimereTestOutput
 export LATIPRIMERE_TEST_IPP_PRINTER=ipp://127.0.0.1:8631/ipp/print
 dotnet test

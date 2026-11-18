@@ -23,6 +23,7 @@ public sealed class IppNetworkOptions
 	private TimeSpan busyRetryDuration = IppNetworkOptions.DefaultBusyRetryDuration; // Backs BusyRetryDuration
 	private TimeSpan connectTimeout = IppNetworkOptions.DefaultConnectTimeout;       // Backs ConnectTimeout
 	private TimeSpan discoveryDuration = IppNetworkOptions.DefaultDiscoveryDuration; // Backs DiscoveryDuration
+	private int? maxRenderDpi;                                                        // Backs MaxRenderDpi
 
 	/// <summary>
 	/// Gets or sets a value indicating whether to find printers on the local network with DNS-SD (Bonjour/mDNS)
@@ -126,4 +127,53 @@ public sealed class IppNetworkOptions
 	/// name is used.
 	/// </summary>
 	public string? UserName { get; set; }
+
+	/// <summary>
+	/// Gets or sets whether to ask a printer to check a job's attributes with Validate-Job before sending the
+	/// document. Defaults to <see langword="true"/>.
+	/// </summary>
+	/// <remarks>
+	/// A printer refuses a job with an option it can't carry out, such as a paper size it doesn't have. With this on,
+	/// it refuses before the document is uploaded, with a <see cref="PrintException"/> whose
+	/// <see cref="PrintException.NativeErrorCode"/> is the IPP status, rather than after. It costs one short request
+	/// per job, and is only sent to printers that list Validate-Job among their operations. A printer too busy to
+	/// answer it gets the job anyway.
+	/// </remarks>
+	public bool ValidateJobs { get; set; } = true;
+
+	/// <summary>
+	/// Gets or sets the highest resolution, in dots per inch, a PDF is rendered at when it is sent as raster to a
+	/// printer that can't take PDF. Defaults to <see langword="null"/>: the printer's default resolution.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// A printer that doesn't take PDF is sent its pages as images, in PWG raster or Apple raster, at one of the
+	/// resolutions it lists, which needs a PDF rasteriser such as Latiprimere.Rendering.Pdfium. Its default is used
+	/// when it has one and it is within this limit; otherwise the highest it lists within the limit and 600 dpi.
+	/// If it lists none that low, its lowest is used.
+	/// </para>
+	/// <para>
+	/// Lower resolutions render and upload faster: an A4 page at 600 dpi is four times the pixels of one at
+	/// 300 dpi. Small text and fine lines are softer.
+	/// </para>
+	/// </remarks>
+	/// <exception cref="ArgumentOutOfRangeException">The value is zero or negative.</exception>
+	public int? MaxRenderDpi
+	{
+		get
+		{
+			return this.maxRenderDpi;
+		}
+
+		set
+		{
+			// A page needs at least one dot per inch to be rendered at all
+			if (value is not null)
+			{
+				ArgumentOutOfRangeException.ThrowIfLessThan(value.Value, 1, nameof(IppNetworkOptions.MaxRenderDpi));
+			}
+
+			this.maxRenderDpi = value;
+		}
+	}
 }
