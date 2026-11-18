@@ -14,6 +14,22 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 ---
 
+## 2026-11-18: CI fixes after the Phase 3 push
+
+**Done** (owner: "The macos and ubuntu ci jobs failed")
+- **The raster integration tests** sent straight through the client, or through a context without busy retries. CI runs each target framework's tests at once against one `ippeveprinter`, which takes one job at a time, so one got `server-error-busy`. Both tests now resend for up to two minutes, as the print system does. Checked against the scripted printer turning three jobs away as busy.
+- **Every CUPS integration test on macOS** was refused at `127.0.0.1:631`. The runner's CUPS log showed why:
+  - launchd starts cupsd on demand, and cupsd exits after a minute with nothing to do ("will restart on demand");
+  - launchd then starts it again only for its socket, `/private/var/run/cupsd`, not for TCP;
+  - the build took longer than that minute, so the tests found nothing listening.
+
+  The tests now reach a Mac's CUPS through the socket: CI, `tools/test-harness/run.sh`, the macOS printers README and CONTRIBUTING. That's what Latiprimere does on a Mac by default, so applications aren't affected; only the test settings forced TCP.
+
+**Not done**
+- **Not run on a Mac here;** the next CI run checks it.
+
+---
+
 ## 2026-11-18: P3-3, printing PDFs as raster
 
 **Done** (owner: "Yes, start P3-3")

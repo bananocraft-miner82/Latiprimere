@@ -1111,7 +1111,7 @@ internal sealed class FakeIppTransport : IIppTransport
 
   | Variable | Value | Tests it switches on |
   |---|---|---|
-  | `LATIPRIMERE_TEST_CUPS_SERVER` | The CUPS test container or a Mac's own CUPS, `127.0.0.1:631` | CUPS queues |
+  | `LATIPRIMERE_TEST_CUPS_SERVER` | The CUPS test container, `127.0.0.1:631`, or a Mac's own CUPS through its socket, `/private/var/run/cupsd` (cupsd exits when idle, and only the socket starts it again) | CUPS queues |
   | `LATIPRIMERE_TEST_CUPS_OUTPUT` | The container's `/output` on the host, or the Mac's capture folder | Byte-for-byte checks of raw jobs |
   | `LATIPRIMERE_TEST_CUPS_SETUP` | `container` (the default) or `macos` | On `macos`, skips the CUPS-PDF and Secure tests |
   | `LATIPRIMERE_TEST_IPP_PRINTER` | `ippeveprinter` in the container or on the Mac, `ipp://127.0.0.1:8631/ipp/print` | Direct IPP |

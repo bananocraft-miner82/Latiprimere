@@ -60,14 +60,16 @@ jobs:
 
       # macOS: no Docker on these runners, so the runner's own CUPS gets the container's Raw, Paused and Virtual-IPP
       # queues, and ippeveprinter on 8631. Raw sends its jobs to a capture server, since Apple's CUPS can't take an
-      # extra backend. The tests of CUPS-PDF and Secure, which only the container has, skip.
+      # extra backend. The tests of CUPS-PDF and Secure, which only the container has, skip. The tests reach CUPS
+      # through its socket, as Mac applications do: cupsd exits after a minute with nothing to do, and launchd starts
+      # it again for the socket but not for 127.0.0.1:631, which a build can easily outlast.
       - name: Set up macOS test printers
         if: runner.os == 'macOS'
         run: |
           output_directory=/Users/Shared/LatiprimereTestOutput
           sh tools/macos-test-printers/install-test-printers.sh "$output_directory"
           {
-            echo "LATIPRIMERE_TEST_CUPS_SERVER=127.0.0.1:631"
+            echo "LATIPRIMERE_TEST_CUPS_SERVER=/private/var/run/cupsd"
             echo "LATIPRIMERE_TEST_CUPS_OUTPUT=$output_directory"
             echo "LATIPRIMERE_TEST_CUPS_SETUP=macos"
             echo "LATIPRIMERE_TEST_IPP_PRINTER=ipp://127.0.0.1:8631/ipp/print"
