@@ -1,5 +1,6 @@
 using SharpIpp.Models.Requests;
 using SharpIpp.Models.Responses;
+using SharpIpp.Protocol.Models;
 
 namespace Latiprimere.Ipp;
 
@@ -39,6 +40,27 @@ internal interface IIppClient
 	/// <returns>The response.</returns>
 	/// <exception cref="PrintException">The request failed or was rejected.</exception>
 	Task<GetPrinterAttributesResponse> GetPrinterAttributesAsync(GetPrinterAttributesRequest request, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Sends a Get-Printer-Attributes request and returns every printer attribute as it was encoded, with its tag:
+	/// including those the typed response leaves out, such as vendor and job template attributes (ADR 0032).
+	/// </summary>
+	/// <param name="request">The request.</param>
+	/// <param name="cancellationToken">A token to cancel the operation.</param>
+	/// <returns>The attributes in the order received; each value of a set is its own entry.</returns>
+	/// <exception cref="PrintException">The request failed or was rejected.</exception>
+	Task<IReadOnlyList<IppAttribute>> GetPrinterAttributeListAsync(GetPrinterAttributesRequest request, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Sends a Validate-Job request: the job's attributes, vendor attributes included, without its document
+	/// (ADR 0033).
+	/// </summary>
+	/// <param name="request">The request.</param>
+	/// <param name="vendorAttributes">Attributes to add to the request's groups.</param>
+	/// <param name="cancellationToken">A token to cancel the operation.</param>
+	/// <returns>A task that completes when the printer has accepted the job's attributes.</returns>
+	/// <exception cref="PrintException">The request failed, or the printer refused the attributes.</exception>
+	Task ValidateJobAsync(ValidateJobRequest request, IppVendorAttributes vendorAttributes, CancellationToken cancellationToken);
 
 	/// <summary>
 	/// Sends a Print-Job request.

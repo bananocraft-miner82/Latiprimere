@@ -27,7 +27,18 @@ internal static class Program
 		services.AddLatiprimereCups();
 		services.AddLatiprimereWindows();
 		services.AddLatiprimerePdfium();
-		services.AddLatiprimereIpp(Program.ConfigureIpp);
+
+		// The settings are checked as they are registered, so a bad printer address in the environment fails here
+		try
+		{
+			services.AddLatiprimereIpp(Program.ConfigureIpp);
+		}
+		catch (ArgumentException exception)
+		{
+			ConsoleOutput.WriteError(CliMessages.InvalidArguments, exception.Message);
+
+			return ExitCodes.InvalidArguments;
+		}
 
 		using ServiceProvider serviceProvider = services.BuildServiceProvider();
 		IPrinterCatalog catalog = serviceProvider.GetRequiredService<IPrinterCatalog>();
@@ -56,6 +67,20 @@ internal static class Program
 
 			return ExitCodes.PrintFailed;
 		}
+		catch (ArgumentException exception)
+		{
+			// A vendor option the printer doesn't offer, or a Print Ticket that isn't one: the message says what's wrong
+			ConsoleOutput.WriteError(CliMessages.InvalidArguments, exception.Message);
+
+			return ExitCodes.InvalidArguments;
+		}
+		catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+		{
+			// A --ticket file, or the file to print, that can't be read
+			ConsoleOutput.WriteError(CliMessages.InvalidArguments, CliMessages.FormatFileUnreadable(exception.Message));
+
+			return ExitCodes.InvalidArguments;
+		}
 	}
 
 	/// <summary>
@@ -63,14 +88,20 @@ internal static class Program
 	/// <c>LATIPRIMERE_IPP_PRINTERS</c> environment variable.
 	/// </summary>
 	/// <param name="options">The options to configure.</param>
+	/// <exception cref="ArgumentException">A value in the variable isn't an absolute <c>ipp</c> or <c>ipps</c> URI.</exception>
 	private static void ConfigureIpp(IppNetworkOptions options)
 	{
 		string configuredPrinters = Environment.GetEnvironmentVariable(Program.IppPrintersVariable) ?? string.Empty;
 		IEnumerable<string> uris = configuredPrinters.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-		foreach (string uri in uris)
+		foreach (string text in uris)
 		{
-			options.PrinterUris.Add(new Uri(uri));
+			if (!Uri.TryCreate(text, UriKind.Absolute, out Uri? uri) || uri.Scheme is not ("ipp" or "ipps"))
+			{
+				throw new ArgumentException(CliMessages.FormatIppPrinterUriInvalid(Program.IppPrintersVariable, text));
+			}
+
+			options.PrinterUris.Add(uri);
 		}
 	}
 
@@ -87,10 +118,11 @@ internal static class Program
 
 		return command switch
 		{
-			ListCommand.Name         => ListCommand.RunAsync(catalog),
-			PrintCommand.Name        => PrintCommand.RunAsync(catalog, commandArguments),
-			CapabilitiesCommand.Name => CapabilitiesCommand.RunAsync(catalog, commandArguments),
-			_                        => Task.FromResult(ConsoleOutput.WriteUsage()),
+			ListCommand.Name              => ListCommand.RunAsync(catalog),
+			PrintCommand.Name             => PrintCommand.RunAsync(catalog, commandArguments),
+			CapabilitiesCommand.Name      => CapabilitiesCommand.RunAsync(catalog, commandArguments),
+			PrintCapabilitiesCommand.Name => PrintCapabilitiesCommand.RunAsync(catalog, commandArguments),
+			_                             => Task.FromResult(ConsoleOutput.WriteUsage()),
 		};
 	}
 }

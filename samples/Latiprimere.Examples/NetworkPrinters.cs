@@ -17,7 +17,8 @@ internal static class NetworkPrinters
 	private const string WarehousePrinterUri = "ipp://192.168.20.15/ipp/print";
 
 	/// <summary>
-	/// Registers direct IPP printing, with one printer configured by address as well as those discovery finds.
+	/// Registers direct IPP printing, with one printer configured by address as well as those discovery finds, and
+	/// PDFium, so PDFs to printers that can't take PDF are sent as raster.
 	/// </summary>
 	/// <returns>The service provider, which the caller disposes.</returns>
 	public static ServiceProvider BuildServiceProvider()
@@ -25,6 +26,7 @@ internal static class NetworkPrinters
 		ServiceCollection services = new ServiceCollection();
 
 		services.AddLatiprimere();
+		services.AddLatiprimerePdfium(); // Renders PDFs for printers that can't take PDF
 		services.AddLatiprimereIpp(options =>
 		{
 			// A printer that discovery can't see, such as one on another subnet

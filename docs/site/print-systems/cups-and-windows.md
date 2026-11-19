@@ -2,7 +2,7 @@
 title: CUPS servers and the Windows spooler
 description: Connect to remote CUPS servers with a password and TLS, and print PDFs, save with Microsoft Print to PDF and use print servers on Windows.
 sidebar:
-  order: 2
+  order: 3
 ---
 
 The CUPS and Windows print systems need no settings for the usual case: the local CUPS scheduler on Linux and macOS, and the local spooler on Windows. This page covers the rest.
@@ -18,6 +18,8 @@ When you don't set `Server`, Latiprimere uses, in order:
 3. `localhost:631`.
 
 Set `Server` to use another machine, as a host name with an optional port (`printserver:631`) or the path of a socket. Setting a server also lets you use CUPS from Windows.
+
+A `Server` that isn't either throws `ArgumentException` when `AddLatiprimereCups` is called. An invalid `CUPS_SERVER` doesn't stop your application starting: each request to CUPS fails with a `PrintException` saying what's wrong with it, and the catalog lists the other print systems' printers meanwhile.
 
 ### A server with a password and its own certificate
 
@@ -95,6 +97,42 @@ static async Task SaveWithPrintToPdfAsync(IPrinterCatalog catalog, Stream docume
 ```
 
 This is also a handy way to test printing code without using paper. Only the Windows spooler can print to a file; other print systems throw `NotSupportedException` when `OutputFile` is set.
+
+### PDFs straight to the printer over IPP
+
+A PDF drawn through a driver reaches the printer as a picture of each page, and the spooler often says a job has finished as soon as it has left the computer. Most network printers' queues stand in front of a printer that also speaks IPP. With `PrintPdfOverIpp` on, a PDF job for such a queue goes straight to that printer instead, as it is or, for a printer that can't take PDF, rendered as PWG or Apple raster. It prints faster, with sharp text, and the job reports how it really ended.
+
+```csharp
+ServiceCollection services = new ServiceCollection();
+
+services.AddLatiprimere();
+services.AddLatiprimerePdfium(); // Draws PDFs through drivers, and renders them for printers that can't take PDF
+services.AddLatiprimereWindows(options =>
+{
+	options.PrintPdfOverIpp = true;
+
+	// A queue on a Standard TCP/IP port doesn't say where its printer's IPP is
+	options.IppPrinterUris["Warehouse Laser"] = new Uri("ipp://192.168.20.15/ipp/print");
+});
+```
+
+Latiprimere finds a queue's printer in one of three ways:
+
+- **Configured:** the queue's name is in `IppPrinterUris`. Needed for queues on Standard TCP/IP ports, as their port doesn't give the IPP address and Latiprimere doesn't guess it.
+- **Added by URL:** the queue was added with the printer's address, so its port is named after it.
+- **WSD:** the queue is on a WSD port, which Windows sets up for printers it finds itself. Its port records the printer's UUID, and Latiprimere looks on the network, over mDNS, for a printer announcing that UUID, then checks the printer reports the same UUID when asked. The first PDF job listens for up to two seconds; a printer not found isn't looked for again for five minutes.
+
+A job goes through the queue's driver as before when any of these is so:
+
+- the queue's printer can't be found, or is on a print server;
+- the printer takes neither PDF nor a raster format, or there's no PDF rasteriser for a printer that only takes raster;
+- the job sets `OutputFile`, an `InputTray` or a `windows:` vendor option, which need the driver;
+- the printer can't be reached when the job is sent: the queue holds the job until the printer is back, and the next job looks for the printer again;
+- the pages can't be planned as raster for the printer, such as when it reports no paper size.
+
+Those last two need a document stream that can seek, such as a file, to start again through the queue: from one that can't, the exception is thrown instead.
+
+Jobs sent over IPP bypass the Windows queue: they don't appear in its queue window, and its pause, permissions, pooling and accounting don't apply to them. Their job IDs are the printer's, `ipp:` vendor options are sent with them, and `MaxRenderDpi` limits the resolution of any raster. An `ipps://` address is trusted only if the computer trusts its certificate: pinned certificates and passwords are for [network printers](/docs/print-systems/secure-printers/) printed to directly.
 
 ### Printers on print servers
 

@@ -1,6 +1,8 @@
+using System.IO.Compression;
 using Latiprimere.EndToEnd.Support;
 using Latiprimere.FakeIppPrinter;
 using Latiprimere.Testing.Fixtures;
+using Latiprimere.Testing.Raster;
 using Microsoft.Extensions.DependencyInjection;
 using SharpIpp.Protocol.Models;
 
@@ -22,6 +24,18 @@ public static class WindowsIppRouteScenarios
 		Title = "A PDF to Microsoft Print to PDF's queue, mapped to an IPP printer, reaches that printer unchanged under the Windows printer ID, and reports the printer's outcome",
 		Needs = TargetNeeds.MicrosoftPrintToPdf,
 		RunAsync = WindowsIppRouteScenarios.PdfToPrinterAsync
+	};
+
+	/// <summary>
+	/// A PDF to a queue whose IPP printer takes Apple raster but not PDF goes to it as Apple raster (ADR 0036).
+	/// </summary>
+	public static readonly Scenario RasterToPrinter = new Scenario
+	{
+		Id = "windows.ipp-route.raster-to-printer",
+		Area = ScenarioArea.Submission,
+		Title = "A PDF to Microsoft Print to PDF's queue, mapped to a printer with the HP ENVY's attributes, which takes Apple raster but not PDF, reaches it as three gzipped Apple raster pages at MaxRenderDpi, under the Windows printer ID, and completes",
+		Needs = TargetNeeds.MicrosoftPrintToPdf,
+		RunAsync = WindowsIppRouteScenarios.RasterToPrinterAsync
 	};
 
 	/// <summary>
@@ -70,5 +84,61 @@ public static class WindowsIppRouteScenarios
 		context.CheckEqual("as application/pdf", "application/pdf", printJobs[0].Find("document-format")?.Value);
 		context.CheckEqual("with copies 2", "2", printJobs[0].Find("copies")?.Value);
 		context.Check("the PDF arrives unchanged, not rendered", printJobs[0].Document.AsSpan().SequenceEqual(pdf), $"{printJobs[0].Document.Length} bytes received, {pdf.Length} sent");
+	}
+
+	/// <summary>
+	/// Runs <see cref="RasterToPrinter"/>.
+	/// </summary>
+	/// <param name="context">The scenario's context.</param>
+	/// <returns>A task that completes when the scenario has run.</returns>
+	private static async Task RasterToPrinterAsync(ScenarioContext context)
+	{
+		if (!OperatingSystem.IsWindows())
+		{
+			throw new PlatformNotSupportedException("The Windows print system needs Windows.");
+		}
+
+		FakePrinterProfile profile = await FakePrinterProfile.LoadBuiltInAsync(FakePrinterProfile.HpEnvy5640, context.CancellationToken);
+		await using FakePrinter fake = await FakePrinters.StartAsync(context, new FakePrinterOptions { Profile = profile });
+
+		await using CatalogFixture fixture = new CatalogFixture
+		(
+			services => services.AddLatiprimerePdfium().AddLatiprimereWindows
+			(
+				options =>
+				{
+					options.PrintPdfOverIpp = true;
+					options.MaxRenderDpi = 300;
+					options.IppPrinterUris[TestPrinters.MicrosoftPrintToPdfName] = fake.PrinterUri;
+				}
+			)
+		);
+
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(TestPrinters.MicrosoftPrintToPdf, context.CancellationToken);
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+
+		// Held in case the job falls back to the driver, which can't share with another process
+		using SharedPrinterLock printerLock = new SharedPrinterLock(TestPrinters.MicrosoftPrintToPdfName);
+
+		PrintOptions options = new PrintOptions { MediaSize = new MediaSize { Name = "iso_a4_210x297mm", DisplayName = "A4", WidthMillimetres = 210, HeightMillimetres = 297 } };
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, context.CancellationToken);
+		PrintJobStatus status = await JobFollower.WaitUntilFinishedAsync(context, job);
+		await FakePrinters.SaveRequestsAsync(context, fake);
+
+		context.CheckEqual("the job keeps the Windows printer ID", TestPrinters.MicrosoftPrintToPdf, job.PrinterId);
+		context.CheckEqual("the job completes", PrintJobState.Completed, status.State);
+
+		IReadOnlyList<RecordedRequest> printJobs = fake.GetRequests(IppOperation.PrintJob);
+		context.Require("the printer received one Print-Job", printJobs.Count == 1, $"{printJobs.Count}");
+		context.CheckEqual("as image/urf", "image/urf", printJobs[0].Find("document-format")?.Value);
+		context.CheckEqual("gzipped", "gzip", printJobs[0].Find("compression")?.Value);
+
+		using GZipStream gzip = new GZipStream(new MemoryStream(printJobs[0].Document), CompressionMode.Decompress);
+		using MemoryStream raster = new MemoryStream();
+		await gzip.CopyToAsync(raster, context.CancellationToken);
+		RasterDocument pages = RasterDocumentReader.Read(raster.ToArray());
+
+		context.CheckEqual("three pages", 3, pages.Pages.Count);
+		context.Check("each A4 at 300 dpi, the limit set", pages.Pages.All(page => (page.Width, page.Height, page.DpiX) == (2480, 3507, 300)));
 	}
 }

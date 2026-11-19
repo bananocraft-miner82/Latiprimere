@@ -44,6 +44,7 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 	private readonly IDisposable? ownedClient;          // The client to dispose with this print system, if owned
 	private readonly ConcurrentDictionary<string, DiscoveredIppPrinter> knownPrinters =
 		new ConcurrentDictionary<string, DiscoveredIppPrinter>(StringComparer.OrdinalIgnoreCase); // Last seen, by name
+	private readonly IppAddressStore? addressStore;     // Keeps knownPrinters across restarts, if configured
 
 	/// <summary>
 	/// Initialises a new instance of the <see cref="IppNetworkPrintSystem"/> class.
@@ -65,6 +66,28 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 		this.configuredUris = options.PrinterUris.ToList();
 		this.allowsAnyPrinterUri = options.AllowAnyPrinterUri;
 		this.ownedClient = ownedClient;
+
+		// Where printers were seen before a restart, if the application keeps it (ADR 0038)
+		if (!string.IsNullOrWhiteSpace(options.AddressStorePath))
+		{
+			this.addressStore = new IppAddressStore(options.AddressStorePath, context.Logger);
+
+			foreach (DiscoveredIppPrinter printer in this.addressStore.Load())
+			{
+				this.knownPrinters.TryAdd(printer.InstanceName, printer);
+			}
+		}
+	}
+
+	/// <summary>
+	/// Gets where the print system logs, from the application's logger factory when dependency injection has one.
+	/// </summary>
+	internal Microsoft.Extensions.Logging.ILogger Logger
+	{
+		get
+		{
+			return this.context.Logger;
+		}
 	}
 
 	/// <inheritdoc/>
@@ -80,6 +103,13 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 	/// Gets how long a remembered address has to answer before the name is searched for instead. Settable for tests.
 	/// </summary>
 	internal TimeSpan KnownAddressTimeout { get; init; } = IppNetworkPrintSystem.DefaultKnownAddressTimeout;
+
+	/// <summary>
+	/// Gets a value indicating whether a printer found on the network that announces an IPPS address is reached
+	/// there first, falling back to plain IPP if its certificate isn't trusted: true when the application trusts more
+	/// than the system does (decision D4, ADR 0037).
+	/// </summary>
+	internal bool PrefersIpps { get; init; }
 
 	/// <inheritdoc/>
 	/// <remarks>Always <see langword="true"/>: IPP needs only a network.</remarks>
@@ -104,22 +134,19 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 		}
 
 		// Remember where each name was seen, so looking it up can try that address before searching
-		foreach (DiscoveredIppPrinter printer in discovered)
-		{
-			this.knownPrinters[printer.InstanceName] = printer;
-		}
+		this.Remember(discovered);
 
 		// Discovered printers by name, except those also configured by URI, which keep the identifier the
-		// application chose
+		// application chose. Announced URIs always name the port, where a configured one may leave it out.
 		List<PrinterInfo> printers = discovered
-			.Where(printer => !this.configuredUris.Contains(printer.PrinterUri))
+			.Where(printer => !this.configuredUris.Any(configured => IppNetworkPrintSystem.IsAnnouncementOf(printer, configured)))
 			.Select(IppNetworkPrintSystem.ToPrinterInfo)
 			.ToList();
 
 		// Configured printers by URI, described from their announcement if they made one
 		foreach (Uri printerUri in this.configuredUris)
 		{
-			DiscoveredIppPrinter? announcement = discovered.FirstOrDefault(printer => printer.PrinterUri == printerUri);
+			DiscoveredIppPrinter? announcement = discovered.FirstOrDefault(printer => IppNetworkPrintSystem.IsAnnouncementOf(printer, printerUri));
 			printers.Add(IppNetworkPrintSystem.ToPrinterInfo(printerUri, announcement));
 		}
 
@@ -246,7 +273,9 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 			?.Select(format => format.Value)
 			.ToList();
 
-		return new IppPrinter(context, locatedUri, info, formats);
+		IReadOnlyCollection<IppOperation>? operations = IppValueReader.ReadReference(attributes.OperationsSupported);
+
+		return new IppPrinter(context, locatedUri, info, formats, operations);
 	}
 
 	/// <summary>
@@ -268,6 +297,21 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 	}
 
 	/// <summary>
+	/// Checks whether a printer's announcement gives a configured URI, as its IPP or its IPPS address, whether or not
+	/// the configured URI names IPP's default port.
+	/// </summary>
+	/// <param name="printer">The announcement.</param>
+	/// <param name="configured">The configured URI.</param>
+	/// <returns>Whether the announcement is the configured printer's.</returns>
+	private static bool IsAnnouncementOf(DiscoveredIppPrinter printer, Uri configured)
+	{
+		Uri candidate = IppNetworkPrintSystem.WithExplicitPort(configured);
+
+		return IppNetworkPrintSystem.WithExplicitPort(printer.PrinterUri) == candidate
+			|| (printer.SecureUri is not null && IppNetworkPrintSystem.WithExplicitPort(printer.SecureUri) == candidate);
+	}
+
+	/// <summary>
 	/// Checks whether a URI may be looked up: it is configured, a printer announced it, or any URI is allowed.
 	/// </summary>
 	/// <param name="printerUri">The URI from the printer identifier.</param>
@@ -281,8 +325,9 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 
 		Uri candidate = IppNetworkPrintSystem.WithExplicitPort(printerUri);
 
+		// A printer that announced both addresses is known at either
 		return this.configuredUris.Any(configured => IppNetworkPrintSystem.WithExplicitPort(configured) == candidate)
-			|| this.knownPrinters.Values.Any(known => IppNetworkPrintSystem.WithExplicitPort(known.PrinterUri) == candidate);
+			|| this.knownPrinters.Values.Any(known => IppNetworkPrintSystem.IsAnnouncementOf(known, candidate));
 	}
 
 	/// <summary>
@@ -350,13 +395,17 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 		// The remembered address first: fast, and needs no multicast
 		if (this.knownPrinters.TryGetValue(instanceName, out DiscoveredIppPrinter? known))
 		{
-			PrinterDescriptionAttributes? knownAttributes = await this
-				.TryReadKnownAddressAsync(known.PrinterUri, cancellationToken)
-				.ConfigureAwait(false);
-
-			if (knownAttributes is not null && IppNetworkPrintSystem.IsSamePrinter(known, knownAttributes))
+			// Its IPPS address first, when preferred; one that doesn't answer, or isn't trusted, gives way to the next
+			foreach (Uri address in this.GetAddresses(known))
 			{
-				return new LocatedPrinter { PrinterUri = known.PrinterUri, Attributes = knownAttributes };
+				PrinterDescriptionAttributes? knownAttributes = await this
+					.TryReadKnownAddressAsync(address, cancellationToken)
+					.ConfigureAwait(false);
+
+				if (knownAttributes is not null && IppNetworkPrintSystem.IsSamePrinter(known, knownAttributes))
+				{
+					return new LocatedPrinter { PrinterUri = address, Attributes = knownAttributes };
+				}
 			}
 		}
 
@@ -370,7 +419,70 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 			return null;
 		}
 
-		this.knownPrinters[instanceName] = announcement;
+		this.Remember([announcement]);
+
+		return await this.ReadAnnouncedPrinterAsync(announcement, cancellationToken).ConfigureAwait(false);
+	}
+
+	/// <summary>
+	/// Remembers where printers were seen, and writes the address store if any address changed.
+	/// </summary>
+	/// <param name="printers">The printers' announcements.</param>
+	private void Remember(IReadOnlyCollection<DiscoveredIppPrinter> printers)
+	{
+		bool changed = false;
+
+		foreach (DiscoveredIppPrinter printer in printers)
+		{
+			changed |= !this.knownPrinters.TryGetValue(printer.InstanceName, out DiscoveredIppPrinter? before)
+				|| before.PrinterUri != printer.PrinterUri
+				|| before.SecureUri != printer.SecureUri
+				|| before.Uuid != printer.Uuid;
+
+			this.knownPrinters[printer.InstanceName] = printer;
+		}
+
+		if (changed)
+		{
+			// A live view, read when the store's turn to write comes, so a concurrent write can't leave older addresses
+			this.addressStore?.Save(this.knownPrinters.Select(known => known.Value));
+		}
+	}
+
+	/// <summary>
+	/// Gives the addresses to try for a printer found on the network: its IPPS address first when preferred, then
+	/// its usual one.
+	/// </summary>
+	/// <param name="printer">The printer's announcement.</param>
+	/// <returns>The addresses, in order.</returns>
+	private Uri[] GetAddresses(DiscoveredIppPrinter printer)
+	{
+		return this.PrefersIpps && printer.SecureUri is not null ? [printer.SecureUri, printer.PrinterUri] : [printer.PrinterUri];
+	}
+
+	/// <summary>
+	/// Reads a printer found on the network: over IPPS when preferred, and over plain IPP if the encrypted connection
+	/// can't be opened, because its certificate isn't trusted or nothing answers on the IPPS port.
+	/// </summary>
+	/// <param name="announcement">The printer's announcement.</param>
+	/// <param name="cancellationToken">A token to cancel the request.</param>
+	/// <returns>The printer's address and attributes, or <see langword="null"/> if there is no printer there.</returns>
+	/// <exception cref="PrintException">The printer couldn't be reached or rejected the request.</exception>
+	private async Task<LocatedPrinter?> ReadAnnouncedPrinterAsync(DiscoveredIppPrinter announcement, CancellationToken cancellationToken)
+	{
+		if (this.PrefersIpps && announcement.SecureUri is not null)
+		{
+			try
+			{
+				return await this.ReadPrinterAsync(announcement.SecureUri, cancellationToken).ConfigureAwait(false);
+			}
+			catch (PrintException exception)
+				when (IppConnectionErrors.IsSecureConnectionFailure(exception) || IppConnectionErrors.IsConnectFailure(exception))
+			{
+				// Nothing was sent, so plain IPP may still answer; a refusal by the printer itself is the answer
+				IppLog.SecureAddressUnusable(this.Logger, announcement.SecureUri, announcement.PrinterUri, exception);
+			}
+		}
 
 		return await this.ReadPrinterAsync(announcement.PrinterUri, cancellationToken).ConfigureAwait(false);
 	}

@@ -171,9 +171,17 @@ public sealed class HarnessTargets
 			reasons.Add($"no CUPS output folder: set {IntegrationEnvironment.CupsOutputVariable} to an existing folder");
 		}
 
-		if (missing.HasFlag(TargetNeeds.CupsContainer) && this.CupsServer is not null)
+		// The container is a CUPS server too: without any server, that's the reason, unless it was given just now
+		if (missing.HasFlag(TargetNeeds.CupsContainer))
 		{
-			reasons.Add($"the CUPS server is a Mac's own CUPS ({IntegrationEnvironment.CupsSetupVariable}), without the container's queues");
+			if (this.CupsServer is not null)
+			{
+				reasons.Add($"the CUPS server is a Mac's own CUPS ({IntegrationEnvironment.CupsSetupVariable}), without the container's queues");
+			}
+			else if (!missing.HasFlag(TargetNeeds.CupsServer))
+			{
+				reasons.Add($"no CUPS test server: set {IntegrationEnvironment.CupsServerVariable}");
+			}
 		}
 
 		if (missing.HasFlag(TargetNeeds.IppPrinter))

@@ -308,6 +308,17 @@ Two exceptions, both enforced by the build:
 - **Test methods** are documented by their GivenWhenThen names. Builders, fakes and fixtures in test projects are
   documented like production code.
 
+The public types' comments are also the website's API reference: `tools/api-reference` writes them as pages in
+[docs/site/reference/](docs/site/reference/index.md), which are committed. After changing a public type or its
+comments, run it and commit the pages it changes:
+
+```bash
+dotnet run --project tools/api-reference
+```
+
+CI fails while the committed pages don't match the code. Write public comments for the people using the packages:
+they don't see ADRs or the plan, so don't cite them there.
+
 ---
 
 ### End-of-Line Comments
@@ -837,19 +848,17 @@ Latiprimere is split into packages with a strict, one-way dependency hierarchy. 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  Consumers — applications, samples, future UI add-ons        │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ references ↓
-┌──────────────────────────────▼───────────────────────────────┐
-│  Latiprimere — services, platform selection, DI registration  │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ references ↓
-┌──────────────────────────────▼───────────────────────────────┐
-│  Platform adapters (Latiprimere.*)                            │
-│  .Windows · .Cups · .Ipp · .Rendering.Pdfium                 │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ references ↓
-┌──────────────────────────────▼───────────────────────────────┐
-│  Latiprimere.Abstractions — interfaces, records, enums,       │
+└──────────────┬─────────────────────────────────┬─────────────┘
+               │ references ↓                    │ references ↓
+┌──────────────▼──────────────┐ ┌────────────────▼─────────────┐
+│  Latiprimere — the catalog  │ │  Platform adapters           │
+│  and its DI registration    │ │  (Latiprimere.*): .Windows,  │
+│                             │ │  .Cups, .Ipp,                │
+│                             │ │  .Rendering.Pdfium           │
+└──────────────┬──────────────┘ └────────────────┬─────────────┘
+               │ references ↓                    │ references ↓
+┌──────────────▼─────────────────────────────────▼─────────────┐
+│  Latiprimere.Abstractions — interfaces, records, enums,      │
 │  exception types. No implementations, no dependencies.       │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -857,10 +866,18 @@ Latiprimere is split into packages with a strict, one-way dependency hierarchy. 
 ### Dependency Rule
 
 - **`Latiprimere.Abstractions`** references nothing within the solution, and no third-party packages.
-- **Platform adapters** reference `Latiprimere.Abstractions` and their own third-party dependencies only.
-  Adapters never reference each other; shared protocol code (such as the IPP transport) lives in its own internal-facing
-  project that adapters may share.
-- **`Latiprimere`** references the abstractions and the adapters it selects between.
+- **Platform adapters** reference `Latiprimere.Abstractions`, their own third-party dependencies, and
+  `Microsoft.Extensions.Logging.Abstractions` and `Microsoft.Extensions.DependencyInjection.Abstractions`.
+  Adapters don't reference each other, with one exception: **`Latiprimere.Ipp`** is both the direct IPP adapter and the
+  shared IPP transport, so `Latiprimere.Cups` references it for its protocol code ([ADR 0006](docs/decisions/0006-ipp-and-cups-adapter-design.md)),
+  and `Latiprimere.Windows` references it to send PDFs straight to a queue's IPP printer
+  ([ADR 0027](docs/decisions/0027-direct-ipp-for-windows-queues.md)). Nothing references `Latiprimere.Cups` or
+  `Latiprimere.Windows`, and `Latiprimere.Ipp` references no other adapter. Shared code goes in `Latiprimere.Ipp`'s
+  internals (`InternalsVisibleTo`), not in a public API.
+- **`Latiprimere`** references only `Latiprimere.Abstractions`, with the logging and dependency injection
+  abstractions, and no adapter. Each adapter registers its print system through its own `AddLatiprimere…()`
+  extension, and the catalog uses every registered print system that reports `IsSupported`; so an application
+  references the adapters it wants, alongside `Latiprimere`. Adapters don't reference `Latiprimere` either.
 - No package references a higher layer. Third-party types (for example, SharpIppNext or PDFium types) must never
   appear in a public API.
 
@@ -880,8 +897,9 @@ interface signatures. Print dialogs and previews will live in separate, optional
 - Wrap native handles in `SafeHandle` subclasses; never pass raw `IntPtr` handles around managed code.
 - Code must be trim-safe and Native AOT compatible: no reflection-based serialisation, no dynamic code generation.
   `IsAotCompatible` turns on the analyzers for `src/`, but they can't see into dependencies. CI also publishes the CLI
-  sample and the end-to-end harness with Native AOT, and runs four of the native harness's scenarios
-  (`tools/aot-check/check-aot.sh`); run the script yourself after adding a dependency or a new code path through one.
+  sample and the end-to-end harness with Native AOT, and runs the native harness's scenarios listed at the top of
+  `tools/aot-check/check-aot.sh`; run the script yourself after adding a dependency or a new code path through one,
+  and add a scenario to its list when the new path has one.
   It needs the platform's native toolchain, as the script's header says. `tools/test-harness/run.ps1 -Aot` (or
   `run.sh --aot`) runs every scenario natively.
 - Convert native errors into Latiprimere exceptions at the interop boundary, keeping the native code in the exception.
@@ -1105,7 +1123,7 @@ internal sealed class FakeIppTransport : IIppTransport
 
   | Variable | Value | Tests it switches on |
   |---|---|---|
-  | `LATIPRIMERE_TEST_CUPS_SERVER` | The CUPS test container or a Mac's own CUPS, `127.0.0.1:631` | CUPS queues |
+  | `LATIPRIMERE_TEST_CUPS_SERVER` | The CUPS test container, `127.0.0.1:631`, or a Mac's own CUPS through its socket, `/private/var/run/cupsd` (cupsd exits when idle, and only the socket starts it again) | CUPS queues |
   | `LATIPRIMERE_TEST_CUPS_OUTPUT` | The container's `/output` on the host, or the Mac's capture folder | Byte-for-byte checks of raw jobs |
   | `LATIPRIMERE_TEST_CUPS_SETUP` | `container` (the default) or `macos` | On `macos`, skips the CUPS-PDF and Secure tests |
   | `LATIPRIMERE_TEST_IPP_PRINTER` | `ippeveprinter` in the container or on the Mac, `ipp://127.0.0.1:8631/ipp/print` | Direct IPP |

@@ -27,4 +27,17 @@ internal static class IppConnectionErrors
 			_ => false,
 		};
 	}
+
+	/// <summary>
+	/// Checks whether a failure was the TLS handshake, most often because the printer's certificate isn't trusted, so
+	/// nothing was sent.
+	/// </summary>
+	/// <param name="exception">The failure, as <see cref="SharpIppClientAdapter"/> reports it.</param>
+	/// <returns>Whether the encrypted connection couldn't be opened.</returns>
+	internal static bool IsSecureConnectionFailure(PrintException exception)
+	{
+		ArgumentNullException.ThrowIfNull(exception);
+
+		return exception.InnerException is HttpRequestException { HttpRequestError: HttpRequestError.SecureConnectionError };
+	}
 }

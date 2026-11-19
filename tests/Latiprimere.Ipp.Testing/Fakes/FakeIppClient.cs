@@ -9,6 +9,10 @@ namespace Latiprimere.Ipp.Testing.Fakes;
 /// </summary>
 internal sealed class FakeIppClient : IIppClient, IDisposable
 {
+	private readonly List<ValidateJobRequest> validateJobRequests = []; // Validate-Job requests received
+	private int attributeListRequestCount; // Raw Get-Printer-Attributes requests made
+	private readonly Dictionary<string, IReadOnlyList<IppAttribute>> attributeListsByUri =
+		new Dictionary<string, IReadOnlyList<IppAttribute>>(StringComparer.Ordinal); // Raw attributes, by URI
 	private readonly Dictionary<string, PrinterDescriptionAttributes> printersByUri =
 		new Dictionary<string, PrinterDescriptionAttributes>(); // Printer attributes, by printer URI
 	private readonly List<CUPSGetPrintersRequest> cupsGetPrintersRequests =
@@ -17,6 +21,7 @@ internal sealed class FakeIppClient : IIppClient, IDisposable
 		new List<GetPrinterAttributesRequest>(); // Get-Printer-Attributes requests received
 	private readonly HashSet<string> unreachableUris = new HashSet<string>(); // URIs that fail to connect
 	private readonly HashSet<string> unresponsiveUris = new HashSet<string>(); // URIs that never answer
+	private readonly HashSet<string> untrustedUris = new HashSet<string>();    // URIs whose TLS handshake fails
 	private readonly List<byte[]> receivedDocuments = new List<byte[]>(); // Document bytes of each Print-Job, in order
 
 	/// <summary>Gets or sets the printers returned by CUPS-Get-Printers.</summary>
@@ -104,12 +109,22 @@ internal sealed class FakeIppClient : IIppClient, IDisposable
 	}
 
 	/// <summary>
-	/// Makes Get-Printer-Attributes for a printer URI fail as if nothing could be connected to there.
+	/// Makes Get-Printer-Attributes for a printer URI fail as if nothing could be connected to there, with the
+	/// connection error <see cref="SharpIppClientAdapter"/> reports then.
 	/// </summary>
 	/// <param name="printerUri">The printer URI.</param>
 	public void AddUnreachable(Uri printerUri)
 	{
 		this.unreachableUris.Add(printerUri.ToString());
+	}
+
+	/// <summary>
+	/// Makes a URI's printer refuse the encrypted connection, as when its certificate isn't trusted.
+	/// </summary>
+	/// <param name="printerUri">The printer's ipps URI.</param>
+	public void AddUntrusted(Uri printerUri)
+	{
+		this.untrustedUris.Add(printerUri.ToString());
 	}
 
 	/// <summary>
@@ -192,7 +207,12 @@ internal sealed class FakeIppClient : IIppClient, IDisposable
 
 		if (this.unreachableUris.Contains(printerUri))
 		{
-			throw new PrintException("Could not connect.");
+			throw new PrintException("Could not connect.", new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused."));
+		}
+
+		if (this.untrustedUris.Contains(printerUri))
+		{
+			throw new PrintException("Could not open an encrypted connection.", new HttpRequestException(HttpRequestError.SecureConnectionError, "The certificate isn't trusted."));
 		}
 
 		if (!this.printersByUri.TryGetValue(printerUri, out PrinterDescriptionAttributes? attributes))
@@ -201,6 +221,103 @@ internal sealed class FakeIppClient : IIppClient, IDisposable
 		}
 
 		return new GetPrinterAttributesResponse { PrinterAttributes = attributes };
+	}
+
+	/// <summary>Gets or sets an exception the raw Get-Printer-Attributes request alone throws, as from a printer
+	/// that refuses the job-template group.</summary>
+	public PrintException? AttributeListFailureToThrow { get; set; }
+
+	/// <summary>Gets how many raw Get-Printer-Attributes requests were made.</summary>
+	public int AttributeListRequestCount
+	{
+		get
+		{
+			return this.attributeListRequestCount;
+		}
+	}
+
+	/// <summary>
+	/// Sets the raw printer attributes a printer reports, for its vendor options.
+	/// </summary>
+	/// <param name="printerUri">The printer's URI.</param>
+	/// <param name="attributes">The attributes.</param>
+	public void SetAttributeList(Uri printerUri, IReadOnlyList<IppAttribute> attributes)
+	{
+		this.attributeListsByUri[printerUri.ToString()] = attributes;
+	}
+
+	/// <summary>
+	/// Returns the raw attributes set for the printer, or none, failing as <see cref="GetPrinterAttributesAsync"/>
+	/// does.
+	/// </summary>
+	/// <param name="request">The request, which is recorded.</param>
+	/// <param name="cancellationToken">Ends the wait for an unresponsive URI.</param>
+	/// <returns>The attributes.</returns>
+	public async Task<IReadOnlyList<IppAttribute>> GetPrinterAttributeListAsync
+	(
+		GetPrinterAttributesRequest request,
+		CancellationToken cancellationToken
+	)
+	{
+		// Fails as the typed call does, but is recorded apart, so tests counting typed requests are unaffected
+		this.ThrowIfFailing();
+		this.attributeListRequestCount++;
+
+		if (this.AttributeListFailureToThrow is not null)
+		{
+			throw this.AttributeListFailureToThrow;
+		}
+
+		string printerUri = request.OperationAttributes?.PrinterUri?.Value?.ToString() ?? string.Empty;
+
+		if (this.unresponsiveUris.Contains(printerUri))
+		{
+			await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+		}
+
+		if (this.unreachableUris.Contains(printerUri))
+		{
+			throw new PrintException("Could not connect.", new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused."));
+		}
+
+		if (!this.printersByUri.ContainsKey(printerUri))
+		{
+			throw new PrintException("Not found.") { NativeErrorCode = (int)IppStatusCode.ClientErrorNotFound };
+		}
+
+		return this.attributeListsByUri.GetValueOrDefault(printerUri) ?? Array.Empty<IppAttribute>();
+	}
+
+	/// <summary>Gets the Validate-Job requests received, in order.</summary>
+	public IReadOnlyList<ValidateJobRequest> ValidateJobRequests
+	{
+		get
+		{
+			return this.validateJobRequests;
+		}
+	}
+
+	/// <summary>Gets the vendor attributes the last Validate-Job carried, or <see langword="null"/>.</summary>
+	public IppVendorAttributes? LastValidateJobVendorAttributes { get; private set; }
+
+	/// <summary>Gets or sets an exception Validate-Job throws, as a printer's refusal (an IPP client error) or a busy
+	/// answer would.</summary>
+	public PrintException? ValidateJobFailureToThrow { get; set; }
+
+	/// <summary>
+	/// Records the request, then accepts it or throws <see cref="ValidateJobFailureToThrow"/>.
+	/// </summary>
+	/// <param name="request">The request, which is recorded.</param>
+	/// <param name="vendorAttributes">The vendor attributes, which are recorded.</param>
+	/// <param name="cancellationToken">Not used.</param>
+	/// <returns>A completed task, or a faulted one.</returns>
+	public Task ValidateJobAsync(ValidateJobRequest request, IppVendorAttributes vendorAttributes, CancellationToken cancellationToken)
+	{
+		this.ThrowIfFailing();
+		this.validateJobRequests.Add(request);
+		this.LastValidateJobVendorAttributes = vendorAttributes;
+
+		return this.ValidateJobFailureToThrow is null ? Task.CompletedTask : Task.FromException(this.ValidateJobFailureToThrow);
 	}
 
 	/// <summary>

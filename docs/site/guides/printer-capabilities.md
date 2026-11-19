@@ -1,6 +1,6 @@
 ---
 title: Reading printer capabilities
-description: Read a printer's paper sizes, duplex and colour modes, trays and copy limit, and choose options it can carry out.
+description: Read a printer's paper sizes, duplex and colour modes, trays, copy limit and vendor options, and choose options it can carry out.
 sidebar:
   order: 2
 ---
@@ -46,6 +46,7 @@ Most copies:   1
 | `Orientations`                       | `Portrait`, `Landscape`                              |
 | `InputTrays`                         | Paper sources, as `InputTray` (an `Id` and a `Name`) |
 | `MaxCopies`                          | The most copies one job can ask for                  |
+| `VendorOptions`                      | Everything else the printer offers, as `VendorOption`: see below |
 
 A `MediaSize` has a `DisplayName` to show people, a `Name` that is the print system's own name for it, and its size in `WidthMillimetres` and `HeightMillimetres`.
 
@@ -99,9 +100,13 @@ A tray works the same way: pick one from `InputTrays` and pass it as `InputTray`
 
 How each print system carries them out:
 
-- **CUPS and network printers** get them as IPP job attributes. A printer that can't do one may print on something close instead, or refuse the job with a `PrintException`.
+- **CUPS and network printers** get them as IPP job attributes. A printer that can't do one may print on something close instead, or refuse the job with a `PrintException`. A PDF sent to a network printer as raster, because it can't take PDF, is also rendered at that paper size and in that colour.
 - **Windows** checks a size or tray against the driver's own lists, and refuses one the driver doesn't list with `NotSupportedException` before anything is queued, since the driver would otherwise print on its default paper without saying so. Monochrome pages are made grey before the driver gets them, as some drivers, Microsoft Print to PDF among them, ignore the setting.
 - **Raw jobs** don't use them: the data is sent unchanged, so the printer's own language chooses paper and colour. See [Labels and receipts](/docs/guides/labels-and-receipts/).
+
+## Vendor options: everything else the printer offers
+
+Printers offer far more than the typed options cover: print quality, resolution, finishing such as stapling, and settings a driver invents for itself. `VendorOptions` lists them, each with the key and values to pass back through `PrintOptions.VendorOptions`. On Windows, `IWindowsPrinter` also reads the driver's Print Capabilities and default Print Ticket. Both are described in [Vendor options and Windows Print Capabilities](/docs/guides/vendor-options/).
 
 ## Comparing capabilities
 

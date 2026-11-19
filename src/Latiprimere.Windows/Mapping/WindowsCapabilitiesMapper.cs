@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Xml;
 using Latiprimere.Windows.Interop;
+using Latiprimere.Windows.PrintTickets;
 using Latiprimere.Windows.Spooler;
 
 namespace Latiprimere.Windows.Mapping;
@@ -127,5 +129,22 @@ internal static class WindowsCapabilitiesMapper
 			WidthMillimetres  = width,
 			HeightMillimetres = height
 		};
+	}
+
+	/// <summary>
+	/// Lists the driver's Print Capabilities features and parameters as vendor options (ADR 0032).
+	/// </summary>
+	/// <param name="record">The driver's capabilities, with its Print Capabilities document if it has one.</param>
+	/// <param name="withDefaults">Whether to read each option's default from the default Print Ticket.</param>
+	/// <returns>The vendor options; empty without Print Ticket support.</returns>
+	/// <exception cref="XmlException">The Print Capabilities, or with <paramref name="withDefaults"/> the default
+	/// ticket, aren't XML.</exception>
+	internal static IReadOnlyList<VendorOption> ToVendorOptions(WindowsCapabilitiesRecord record, bool withDefaults)
+	{
+		ArgumentNullException.ThrowIfNull(record);
+
+		return record.PrintCapabilities is null
+			? Array.Empty<VendorOption>()
+			: PrintCapabilitiesDocument.Parse(record.PrintCapabilities).ToVendorOptions(withDefaults ? record.DefaultPrintTicket : null);
 	}
 }

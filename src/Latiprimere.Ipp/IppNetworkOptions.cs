@@ -1,3 +1,6 @@
+using System.Net;
+using System.Net.Security;
+
 namespace Latiprimere.Ipp;
 
 /// <summary>
@@ -23,6 +26,7 @@ public sealed class IppNetworkOptions
 	private TimeSpan busyRetryDuration = IppNetworkOptions.DefaultBusyRetryDuration; // Backs BusyRetryDuration
 	private TimeSpan connectTimeout = IppNetworkOptions.DefaultConnectTimeout;       // Backs ConnectTimeout
 	private TimeSpan discoveryDuration = IppNetworkOptions.DefaultDiscoveryDuration; // Backs DiscoveryDuration
+	private int? maxRenderDpi;                                                        // Backs MaxRenderDpi
 
 	/// <summary>
 	/// Gets or sets a value indicating whether to find printers on the local network with DNS-SD (Bonjour/mDNS)
@@ -126,4 +130,132 @@ public sealed class IppNetworkOptions
 	/// name is used.
 	/// </summary>
 	public string? UserName { get; set; }
+
+	/// <summary>
+	/// Gets or sets whether to ask a printer to check a job's attributes with Validate-Job before sending the
+	/// document. Defaults to <see langword="true"/>.
+	/// </summary>
+	/// <remarks>
+	/// A printer refuses a job with an option it can't carry out, such as a paper size it doesn't have. With this on,
+	/// it refuses before the document is uploaded, with a <see cref="PrintException"/> whose
+	/// <see cref="PrintException.NativeErrorCode"/> is the IPP status, rather than after. It costs one short request
+	/// per job, and is only sent to printers that list Validate-Job among their operations. A printer too busy to
+	/// answer it gets the job anyway.
+	/// </remarks>
+	public bool ValidateJobs { get; set; } = true;
+
+	/// <summary>
+	/// Gets or sets the highest resolution, in dots per inch, a PDF is rendered at when it is sent as raster to a
+	/// printer that can't take PDF. Defaults to <see langword="null"/>: the printer's default resolution.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// A printer that doesn't take PDF is sent its pages as images, in PWG raster or Apple raster, at one of the
+	/// resolutions it lists, which needs a PDF rasteriser such as Latiprimere.Rendering.Pdfium. Its default is used
+	/// when it has one and it is within this limit; otherwise the highest it lists within the limit and 600 dpi.
+	/// If it lists none that low, its lowest is used. Resolutions above 2400 dpi are never used, whatever this limit.
+	/// </para>
+	/// <para>
+	/// Lower resolutions render and upload faster: an A4 page at 600 dpi is four times the pixels of one at
+	/// 300 dpi. Small text and fine lines are softer.
+	/// </para>
+	/// </remarks>
+	/// <exception cref="ArgumentOutOfRangeException">The value is zero or negative.</exception>
+	public int? MaxRenderDpi
+	{
+		get
+		{
+			return this.maxRenderDpi;
+		}
+
+		set
+		{
+			// A page needs at least one dot per inch to be rendered at all
+			if (value is not null)
+			{
+				ArgumentOutOfRangeException.ThrowIfLessThan(value.Value, 1, nameof(IppNetworkOptions.MaxRenderDpi));
+			}
+
+			this.maxRenderDpi = value;
+		}
+	}
+
+	/// <summary>
+	/// Gets the SHA-256 fingerprints of printer certificates to trust over IPPS (<c>ipps://</c>), in hexadecimal, with
+	/// or without colons between the bytes, such as <c>3A:7F:…</c>.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Printers nearly always present a certificate they made themselves, which no computer trusts, so a printer's
+	/// IPPS address is refused until its certificate is trusted. A certificate pinned here is trusted whatever name it
+	/// carries, as printers' certificates rarely name the address they're reached at. The
+	/// <see cref="PrintException"/> for a refused certificate gives its fingerprint; check it against the one the
+	/// printer's web page shows before adding it.
+	/// </para>
+	/// <para>
+	/// Once a certificate is pinned, or <see cref="ServerCertificateValidationCallback"/> is set, a printer found on
+	/// the network that announces both addresses is reached over IPPS, and over plain IPP only if its certificate
+	/// isn't trusted.
+	/// </para>
+	/// </remarks>
+	public IList<string> TrustedCertificateFingerprints { get; } = new List<string>();
+
+	/// <summary>
+	/// Gets or sets the check of a printer's certificate that neither the system trusts nor
+	/// <see cref="TrustedCertificateFingerprints"/> pins, or <see langword="null"/>, the default, to refuse it.
+	/// </summary>
+	/// <remarks>
+	/// Return <see langword="true"/> only for a certificate you have checked, for example by its fingerprint: anyone
+	/// able to intercept the connection could otherwise read the documents and any password.
+	/// </remarks>
+	public RemoteCertificateValidationCallback? ServerCertificateValidationCallback { get; set; }
+
+	/// <summary>
+	/// Gets or sets the user name and password sent to every printer over IPPS, or <see langword="null"/>, the default,
+	/// to send none. <see cref="PrinterCredentials"/> overrides it for particular printers.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// They are sent with every request, as HTTP Basic authentication, and only over IPPS, never in clear text. A
+	/// printer that asks for a password over plain IPP is refused with a <see cref="PrintAuthenticationException"/>
+	/// saying to use its <c>ipps://</c> address. The <see cref="NetworkCredential.Domain"/> is not used.
+	/// </para>
+	/// <para>
+	/// Every printer reached over IPPS receives them, once its certificate is trusted. While they are set, a
+	/// certificate the system trusts is enough only for printers configured in <see cref="PrinterUris"/> or
+	/// <see cref="PrinterCredentials"/>: anyone on the network can announce a printer at a host whose certificate a
+	/// public authority issued, so a printer found on the network must have its certificate pinned in
+	/// <see cref="TrustedCertificateFingerprints"/> or accepted by <see cref="ServerCertificateValidationCallback"/>.
+	/// Until then its IPPS address is refused, and it is reached over plain IPP, without them, if it announces that
+	/// too. To keep a password to one printer, use
+	/// <see cref="PrinterCredentials"/>.
+	/// </para>
+	/// </remarks>
+	public NetworkCredential? Credentials { get; set; }
+
+	/// <summary>
+	/// Gets the user names and passwords of particular printers, by printer URI, such as
+	/// <c>ipps://192.168.1.20/ipp/print</c>. They are matched by host and port, and sent only over IPPS, as
+	/// <see cref="Credentials"/> are.
+	/// </summary>
+	public IDictionary<Uri, NetworkCredential> PrinterCredentials { get; } = new Dictionary<Uri, NetworkCredential>();
+
+	/// <summary>
+	/// Gets or sets a file in which to remember where each printer found on the network was last seen, so it is
+	/// found there after the application restarts even if it doesn't answer the search, as a sleeping printer may
+	/// not. Defaults to <see langword="null"/>: remembered only while the print system lives.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The file is JSON, read when the print system is created and written whenever a printer's address changes. A
+	/// missing or unreadable file means starting with nothing remembered, and is logged, never an error; so is a
+	/// file that can't be written. A remembered address is used only while the printer there still reports the
+	/// UUID it announced.
+	/// </para>
+	/// <para>
+	/// Keep it where only the application can write: an address in it counts as a printer found on the network, so
+	/// it may be looked up by its <c>ipp:</c> URI identifier as well as by name.
+	/// </para>
+	/// </remarks>
+	public string? AddressStorePath { get; set; }
 }

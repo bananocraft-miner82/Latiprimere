@@ -42,6 +42,37 @@ internal sealed class MdnsIppPrinterDiscovery : IIppPrinterDiscovery
 		return MdnsIppPrinterDiscovery.FindInstance(collector.GetServices(), instanceName);
 	}
 
+	/// <inheritdoc/>
+	/// <remarks>
+	/// Stops as soon as the printer is announced over plain IPP. If it only answers over IPPS, that is used once the
+	/// timeout has passed.
+	/// </remarks>
+	public async Task<DiscoveredIppPrinter?> FindByUuidAsync(string uuid, TimeSpan timeout, CancellationToken cancellationToken)
+	{
+		ArgumentNullException.ThrowIfNull(uuid);
+
+		AnnouncementCollector collector = new AnnouncementCollector
+		(
+			service => service.ServiceType.StartsWith(DnsSdServiceMapper.IppServiceType, StringComparison.OrdinalIgnoreCase)
+				&& DnsSdServiceMapper.ToDiscoveredPrinter(service)?.Uuid == uuid
+		);
+
+		await MdnsIppPrinterDiscovery.BrowseAsync(collector, timeout, cancellationToken).ConfigureAwait(false);
+
+		return MdnsIppPrinterDiscovery.FindUuid(collector.GetServices(), uuid);
+	}
+
+	/// <summary>
+	/// Picks the printer announcing a UUID from the services found, preferring plain IPP over IPPS.
+	/// </summary>
+	/// <param name="services">The services found.</param>
+	/// <param name="uuid">The normalised UUID.</param>
+	/// <returns>The printer, or <see langword="null"/> if none announced it.</returns>
+	internal static DiscoveredIppPrinter? FindUuid(IEnumerable<DnsSdService> services, string uuid)
+	{
+		return MdnsIppPrinterDiscovery.ToPrinters(services).FirstOrDefault(printer => printer.Uuid == uuid);
+	}
+
 	/// <summary>
 	/// Maps services to printers, keeping one per instance name and one per URI, and preferring plain IPP over IPPS,
 	/// because network printers usually present self-signed certificates that clients reject.
@@ -54,13 +85,21 @@ internal sealed class MdnsIppPrinterDiscovery : IIppPrinterDiscovery
 	/// </remarks>
 	internal static List<DiscoveredIppPrinter> ToPrinters(IEnumerable<DnsSdService> services)
 	{
-		return services
+		List<DiscoveredIppPrinter> all = services
 			.OrderBy(service => service.ServiceType.StartsWith(DnsSdServiceMapper.IppsServiceType, StringComparison.OrdinalIgnoreCase))
 			.ThenBy(service => service.Instance.Length)
 			.Select(DnsSdServiceMapper.ToDiscoveredPrinter)
 			.OfType<DiscoveredIppPrinter>()
+			.ToList();
+
+		// An instance announced over both keeps its IPPS address too, for when its certificate is trusted
+		return all
 			.DistinctBy(printer => printer.InstanceName, StringComparer.OrdinalIgnoreCase)
 			.DistinctBy(printer => printer.PrinterUri)
+			.Select(printer => printer.PrinterUri.Scheme != "ipp" ? printer : printer with
+			{
+				SecureUri = all.FirstOrDefault(other => MdnsIppPrinterDiscovery.IsSecureAddressOf(other, printer))?.PrinterUri
+			})
 			.ToList();
 	}
 
@@ -139,5 +178,24 @@ internal sealed class MdnsIppPrinterDiscovery : IIppPrinterDiscovery
 	private static bool IsInstance(DnsSdService service, string instanceName)
 	{
 		return string.Equals(service.Instance, instanceName, StringComparison.OrdinalIgnoreCase);
+	}
+
+	/// <summary>
+	/// Checks whether an IPPS announcement is the same printer's as a plain IPP one: the same name, from the same host,
+	/// and not with another UUID.
+	/// </summary>
+	/// <param name="secure">The IPPS announcement.</param>
+	/// <param name="plain">The plain IPP announcement.</param>
+	/// <returns>Whether its address is the printer's IPPS address.</returns>
+	/// <remarks>
+	/// A name is unique only within a service type, so anyone on the network may announce an IPPS service with the
+	/// name of another's IPP one. The host must match, so a lookup preferring IPPS doesn't go elsewhere.
+	/// </remarks>
+	private static bool IsSecureAddressOf(DiscoveredIppPrinter secure, DiscoveredIppPrinter plain)
+	{
+		return secure.PrinterUri.Scheme == "ipps"
+			&& string.Equals(secure.InstanceName, plain.InstanceName, StringComparison.OrdinalIgnoreCase)
+			&& string.Equals(secure.PrinterUri.Host, plain.PrinterUri.Host, StringComparison.OrdinalIgnoreCase)
+			&& (secure.Uuid is null || plain.Uuid is null || secure.Uuid == plain.Uuid);
 	}
 }

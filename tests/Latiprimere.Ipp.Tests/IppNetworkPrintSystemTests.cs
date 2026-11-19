@@ -79,6 +79,33 @@ public sealed class IppNetworkPrintSystemTests
 		Assert.Null(printers[1].Location);
 	}
 
+	[Theory]
+	[InlineData("ipp://192.168.1.20/ipp/print")]
+	[InlineData("ipps://192.168.1.20/ipp/print")]
+	public async Task GivenConfiguredUriWithoutThePortTheAnnouncementGivesWhenGetPrintersThenListsItOnce(string configuredUri)
+	{
+		// Arrange — announced URIs always name the port; the IPPS one is 631 too, so it matches without one
+		FakeIppPrinterDiscovery discovery = new FakeIppPrinterDiscovery();
+		discovery.AddPrinter("Office Laser", IppNetworkPrintSystemTests.OfficeUri, secureUri: new Uri("ipps://192.168.1.20:631/ipp/print"));
+		IppNetworkOptions options = new IppNetworkOptions();
+		options.PrinterUris.Add(new Uri(configuredUri));
+
+		using IppNetworkPrintSystem printSystem = IppNetworkPrintSystemTests.CreatePrintSystem
+		(
+			new FakeIppClient(),
+			discovery,
+			options
+		);
+
+		// Act
+		IReadOnlyList<PrinterInfo> printers = await printSystem.GetPrintersAsync(TestContext.Current.CancellationToken);
+
+		// Assert — under the configured identifier, described from the announcement
+		PrinterInfo printer = Assert.Single(printers);
+		Assert.Equal("ipp:" + configuredUri, printer.Id);
+		Assert.Equal("Office Laser", printer.Name);
+	}
+
 	[Fact]
 	public async Task GivenDiscoveryDisabledWhenGetPrintersThenListsOnlyConfiguredPrinters()
 	{
@@ -630,6 +657,116 @@ public sealed class IppNetworkPrintSystemTests
 	private static Task<IPrinter?> FindOfficeAsync(IppNetworkPrintSystem printSystem)
 	{
 		return printSystem.FindPrinterAsync("ipp:dnssd:Office", TestContext.Current.CancellationToken);
+	}
+
+	[Theory]
+	[InlineData(true, "none", "ipps://192.168.1.20:443/ipp/print")]
+	[InlineData(true, "untrusted", "ipp://192.168.1.20:631/ipp/print")]
+	[InlineData(true, "unreachable", "ipp://192.168.1.20:631/ipp/print")]
+	[InlineData(false, "none", "ipp://192.168.1.20:631/ipp/print")]
+	public async Task GivenPrinterAnnouncingIppsWhenLookedUpByNameThenIppsIsUsedOnlyWhenPreferredAndItOpens(bool prefersIpps, string failure, string expected)
+	{
+		// Arrange — trust configured or not; the IPPS address fine, its certificate untrusted, or nothing listening
+		// there (provided by InlineData above)
+		Uri plain = new Uri("ipp://192.168.1.20:631/ipp/print");
+		Uri secure = new Uri("ipps://192.168.1.20:443/ipp/print");
+		FakeIppClient client = new FakeIppClient();
+		client.AddPrinter(plain, new PrinterAttributesBuilder().WithName("Office").Build());
+		client.AddPrinter(secure, new PrinterAttributesBuilder().WithName("Office").Build());
+
+		if (failure == "untrusted")
+		{
+			client.AddUntrusted(secure);
+		}
+		else if (failure == "unreachable")
+		{
+			client.AddUnreachable(secure);
+		}
+
+		FakeIppPrinterDiscovery discovery = new FakeIppPrinterDiscovery();
+		discovery.AddPrinter("Office", plain, secureUri: secure);
+		using IppNetworkPrintSystem system = new IppNetworkPrintSystem
+		(
+			new IppPrintContextBuilder().WithClient(client).WithDocumentFormats(IppDocumentFormats.Standard).Build(),
+			discovery,
+			new IppNetworkOptions(),
+			client
+		)
+		{
+			PrefersIpps = prefersIpps
+		};
+
+		// Act
+		IPrinter? printer = await system.FindPrinterAsync("ipp:dnssd:Office", TestContext.Current.CancellationToken);
+
+		// Assert — the address used is the one the next request goes to
+		Assert.NotNull(printer);
+		Assert.Equal(new Uri(expected), client.GetPrinterAttributesRequests[^1].OperationAttributes?.PrinterUri?.Value);
+	}
+
+	[Theory]
+	[InlineData("ipp:ipp://192.168.1.20:631/ipp/print")]
+	[InlineData("ipp:ipps://192.168.1.20:443/ipp/print")]
+	[InlineData("ipp:ipps://192.168.1.20/ipp/print")]
+	public async Task GivenPrinterListedWithBothAddressesWhenLookedUpByEitherUriThenItIsKnown(string printerId)
+	{
+		// Arrange — the last one names IPPS's own port 631, which the printer doesn't use, so isn't known
+		Uri plain = new Uri("ipp://192.168.1.20:631/ipp/print");
+		Uri secure = new Uri("ipps://192.168.1.20:443/ipp/print");
+		FakeIppClient client = new FakeIppClient();
+		client.AddPrinter(plain, new PrinterAttributesBuilder().WithName("Office").Build());
+		client.AddPrinter(secure, new PrinterAttributesBuilder().WithName("Office").Build());
+		client.AddPrinter(new Uri("ipps://192.168.1.20/ipp/print"), new PrinterAttributesBuilder().WithName("Office").Build());
+		FakeIppPrinterDiscovery discovery = new FakeIppPrinterDiscovery();
+		discovery.AddPrinter("Office", plain, secureUri: secure);
+		using IppNetworkPrintSystem printSystem = IppNetworkPrintSystemTests.CreatePrintSystem(client, discovery, new IppNetworkOptions());
+		_ = await printSystem.GetPrintersAsync(TestContext.Current.CancellationToken);
+
+		// Act
+		IPrinter? printer = await printSystem.FindPrinterAsync(printerId, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(!printerId.EndsWith("20/ipp/print", StringComparison.Ordinal), printer is not null);
+	}
+
+	[Theory]
+	[InlineData("1c852a4d-b800-1f08-abcd-a0d3c1d9e51b", true)]
+	[InlineData("99999999-0000-0000-0000-000000000000", false)]
+	public async Task GivenAnAddressStoreWhenRestartedThenASleepingPrinterIsFoundAtItsRememberedAddressOnlyIfItIsStillThere(string reportedUuid, bool expected)
+	{
+		// Arrange — the first run lists the printer; after the restart it doesn't answer the search, and either
+		// it, or another printer, answers at its address (provided by InlineData above)
+		string path = Path.Combine(Path.GetTempPath(), "latiprimere-tests", Guid.NewGuid().ToString("N"), "printers.json");
+		Uri printerUri = new Uri("ipp://192.168.1.20:631/ipp/print");
+		FakeIppClient client = new FakeIppClient();
+		client.AddPrinter(printerUri, new PrinterAttributesBuilder().WithName("Office").WithUuid("urn:uuid:" + reportedUuid).Build());
+
+		FakeIppPrinterDiscovery before = new FakeIppPrinterDiscovery();
+		before.AddPrinter("Office", printerUri, "1c852a4d-b800-1f08-abcd-a0d3c1d9e51b");
+		IppNetworkOptions options = new IppNetworkOptions { AddressStorePath = path };
+
+		try
+		{
+			using (IppNetworkPrintSystem first = IppNetworkPrintSystemTests.CreatePrintSystem(client, before, options))
+			{
+				await first.GetPrintersAsync(TestContext.Current.CancellationToken);
+			}
+
+			FakeIppPrinterDiscovery after = new FakeIppPrinterDiscovery();
+			using IppNetworkPrintSystem second = IppNetworkPrintSystemTests.CreatePrintSystem(client, after, options);
+
+			// Act
+			IPrinter? printer = await second.FindPrinterAsync("ipp:dnssd:Office", TestContext.Current.CancellationToken);
+
+			// Assert — found without searching, or searched for and not found
+			Assert.True(File.Exists(path));
+			Assert.Equal(expected, printer is not null);
+			Assert.Equal(expected ? 0 : 1, after.ResolvedNames.Count);
+		}
+		finally
+		{
+			Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
+		}
 	}
 
 	/// <summary>

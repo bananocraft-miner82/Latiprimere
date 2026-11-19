@@ -27,6 +27,44 @@ public sealed class IppVendorAttributeMapperTests
 	}
 
 	[Theory]
+	[InlineData("600dpi", 600, 600, ResolutionUnit.DotsPerInch)]
+	[InlineData("600x1200dpi", 600, 1200, ResolutionUnit.DotsPerInch)]
+	[InlineData("118dpcm", 118, 118, ResolutionUnit.DotsPerCm)]
+	public void GivenResolutionValueWhenToAttributesThenSendsResolution(string value, int width, int height, ResolutionUnit units)
+	{
+		// Arrange — as printer-resolution lists them (provided by InlineData above)
+		Dictionary<string, string> options = new Dictionary<string, string> { ["ipp:printer-resolution"] = value };
+
+		// Act
+		IppVendorAttributes attributes = IppVendorAttributeMapper.ToAttributes(options, IppVendorAttributeMapper.NetworkPrefixes, new PrintJobRequest());
+
+		// Assert
+		IppAttribute attribute = Assert.Single(attributes.Job);
+		Assert.Equal(Tag.Resolution, attribute.Tag);
+		Resolution resolution = Assert.IsType<Resolution>(attribute.Value);
+		Assert.Equal(width, resolution.Width);
+		Assert.Equal(height, resolution.Height);
+		Assert.Equal(units, resolution.Units);
+	}
+
+	[Theory]
+	[InlineData("cups:resolution", "600dpi")]
+	[InlineData("ipp:x-vendor-label", "300dpi")]
+	public void GivenResolutionLikeValueForOtherAttributeWhenToAttributesThenSendsName(string key, string value)
+	{
+		// Arrange — CUPS reads its resolution option as text, so "600dpi" stays a name, as before (provided by InlineData above)
+		Dictionary<string, string> options = new Dictionary<string, string> { [key] = value };
+
+		// Act
+		IppVendorAttributes attributes = IppVendorAttributeMapper.ToAttributes(options, IppVendorAttributeMapper.CupsPrefixes, new PrintJobRequest());
+
+		// Assert
+		IppAttribute attribute = Assert.Single(attributes.Job);
+		Assert.Equal(Tag.NameWithoutLanguage, attribute.Tag);
+		Assert.Equal(value, attribute.Value);
+	}
+
+	[Theory]
 	[InlineData("true", Tag.Boolean, true)]
 	[InlineData("false", Tag.Boolean, false)]
 	[InlineData("draft", Tag.Keyword, "draft")]

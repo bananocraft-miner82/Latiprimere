@@ -1,6 +1,6 @@
 # 0011: Capability model
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-11
 
 ## Context

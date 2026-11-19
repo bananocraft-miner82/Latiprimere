@@ -1,6 +1,6 @@
 # 0028: Automated releases from the release branch
 
-- Status: Proposed
+- Status: Accepted; its build number superseded by [0030](0030-release-numbering.md)
 - Date: 2026-11-16
 
 ## Context

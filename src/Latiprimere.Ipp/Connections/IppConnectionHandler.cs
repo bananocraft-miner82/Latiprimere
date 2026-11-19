@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Headers;
-using System.Text;
 
 namespace Latiprimere.Ipp.Connections;
 
@@ -22,8 +21,7 @@ namespace Latiprimere.Ipp.Connections;
 /// </remarks>
 internal sealed class IppConnectionHandler : DelegatingHandler
 {
-	private readonly bool useTls;                              // Whether to rewrite http to https
-	private readonly AuthenticationHeaderValue? authorization; // The Basic credentials, or null for none
+	private readonly IppConnectionSecurity security; // How to protect requests
 
 	/// <summary>
 	/// Initialises a new instance of the <see cref="IppConnectionHandler"/> class.
@@ -38,8 +36,7 @@ internal sealed class IppConnectionHandler : DelegatingHandler
 		ArgumentNullException.ThrowIfNull(security);
 		ArgumentNullException.ThrowIfNull(innerHandler);
 
-		this.useTls = security.UseTls;
-		this.authorization = IppConnectionHandler.CreateAuthorization(security.Credentials);
+		this.security = security;
 	}
 
 	/// <summary>
@@ -52,35 +49,21 @@ internal sealed class IppConnectionHandler : DelegatingHandler
 	{
 		ArgumentNullException.ThrowIfNull(request);
 
-		if (this.useTls && request.RequestUri is not null && request.RequestUri.Scheme == Uri.UriSchemeHttp)
+		if (this.security.UseTls && request.RequestUri is not null && request.RequestUri.Scheme == Uri.UriSchemeHttp)
 		{
 			request.RequestUri = IppConnectionHandler.ToHttps(request.RequestUri);
 		}
 
-		if (this.authorization is not null)
+		// The printer's own credentials, or those for all; for direct IPP, only over TLS (ADR 0037)
+		NetworkCredential? credentials = request.RequestUri is null ? null : this.security.FindCredentialsToSend(request.RequestUri);
+		AuthenticationHeaderValue? authorization = BasicAuthentication.CreateHeader(credentials);
+
+		if (authorization is not null)
 		{
-			request.Headers.Authorization = this.authorization;
+			request.Headers.Authorization = authorization;
 		}
 
 		return base.SendAsync(request, cancellationToken);
-	}
-
-	/// <summary>
-	/// Creates the Basic authorization header for a user name and password.
-	/// </summary>
-	/// <param name="credentials">The credentials, or <see langword="null"/>.</param>
-	/// <returns>The header, or <see langword="null"/> when there are no credentials.</returns>
-	private static AuthenticationHeaderValue? CreateAuthorization(NetworkCredential? credentials)
-	{
-		if (credentials is null)
-		{
-			return null;
-		}
-
-		// RFC 7617: user-id ":" password, in UTF-8, base64-encoded
-		byte[] userPass = Encoding.UTF8.GetBytes(credentials.UserName + ":" + credentials.Password);
-
-		return new AuthenticationHeaderValue("Basic", Convert.ToBase64String(userPass));
 	}
 
 	/// <summary>

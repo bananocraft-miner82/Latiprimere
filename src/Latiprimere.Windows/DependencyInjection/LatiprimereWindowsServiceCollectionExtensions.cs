@@ -2,6 +2,7 @@ using Latiprimere;
 using Latiprimere.Rendering;
 using Latiprimere.Windows;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +20,8 @@ public static class LatiprimereWindowsServiceCollectionExtensions
 	/// <param name="configure">Configures how to print, or <see langword="null"/> for the defaults.</param>
 	/// <returns>The same service collection, for chaining.</returns>
 	/// <exception cref="ArgumentNullException"><paramref name="services"/> is <see langword="null"/>.</exception>
+	/// <exception cref="ArgumentException">On Windows with <see cref="WindowsOptions.PrintPdfOverIpp"/> on, a URI in
+	/// <see cref="WindowsOptions.IppPrinterUris"/> isn't an absolute ipp, ipps, http or https URI.</exception>
 	public static IServiceCollection AddLatiprimereWindows(this IServiceCollection services, Action<WindowsOptions>? configure = null)
 	{
 		ArgumentNullException.ThrowIfNull(services);
@@ -27,13 +30,17 @@ public static class LatiprimereWindowsServiceCollectionExtensions
 		WindowsOptions options = new WindowsOptions();
 		configure?.Invoke(options);
 
+		// Checked now, where the mistake was made, rather than when the catalog is first resolved
+		WindowsPrintSystemFactory.ValidateOptions(options);
+
 		// Register once, even if called more than once
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IPrintSystem, WindowsPrintSystem>
 		(
 			serviceProvider => (WindowsPrintSystem)WindowsPrintSystemFactory.Create
 			(
 				serviceProvider.GetService<IPdfRasterizer>(),
-				options
+				options,
+				serviceProvider.GetService<ILoggerFactory>()
 			))
 		);
 

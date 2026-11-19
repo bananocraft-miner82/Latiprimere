@@ -26,7 +26,7 @@ internal static class Installation
 		services.AddLatiprimere();         // The printer catalog
 		services.AddLatiprimereCups();     // Linux and macOS
 		services.AddLatiprimereWindows();  // Windows
-		services.AddLatiprimerePdfium();   // PDFs on Windows
+		services.AddLatiprimerePdfium();   // PDFs on Windows and for printers without PDF
 		services.AddLatiprimereIpp();      // Network printers, on every platform
 
 		return services.BuildServiceProvider();

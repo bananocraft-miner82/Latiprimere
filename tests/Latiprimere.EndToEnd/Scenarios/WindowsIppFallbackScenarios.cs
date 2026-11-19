@@ -32,7 +32,7 @@ public static class WindowsIppFallbackScenarios
 	{
 		Id = "windows.ipp-route.fallback-no-pdf",
 		Area = ScenarioArea.Submission,
-		Title = "A PDF to a queue whose IPP printer doesn't take PDF (the HP ENVY's attributes) goes to the spooler instead (which refuses it for its text-only driver), and the printer gets no job",
+		Title = "A PDF to a queue whose IPP printer takes neither PDF nor a raster format (the HP ENVY's attributes without Apple raster) goes to the spooler instead (which refuses it for its text-only driver), and the printer gets no job",
 		Needs = TargetNeeds.WindowsTestPrinters,
 		RunAsync = WindowsIppFallbackScenarios.NoPdfAsync
 	};
@@ -68,7 +68,7 @@ public static class WindowsIppFallbackScenarios
 	{
 		Id = "windows.ipp-route.refusal-not-resent",
 		Area = ScenarioArea.Submission,
-		Title = "A job the IPP printer refuses is reported with the printer's status, and isn't printed through the spooler as well",
+		Title = "A job the IPP printer refuses is reported with the printer's status, by Validate-Job before the document is sent, and isn't printed through the spooler as well",
 		Needs = TargetNeeds.WindowsTestPrinters,
 		RunAsync = WindowsIppFallbackScenarios.RefusalThrownAsync
 	};
@@ -100,7 +100,10 @@ public static class WindowsIppFallbackScenarios
 	/// <returns>A task that completes when the scenario has run.</returns>
 	private static async Task NoPdfAsync(ScenarioContext context)
 	{
-		FakePrinterProfile profile = await FakePrinterProfile.LoadBuiltInAsync(FakePrinterProfile.HpEnvy5640, context.CancellationToken);
+		// Without image/urf: a printer that takes Apple raster gets the PDF as raster (ADR 0036)
+		FakePrinterProfile profile = (await FakePrinterProfile.LoadBuiltInAsync(FakePrinterProfile.HpEnvy5640, context.CancellationToken))
+			.Set("document-format-supported", Tag.MimeMediaType, "application/vnd.hp-PCL", "image/jpeg", "application/PCLm", "application/octet-stream");
+
 		await using FakePrinter fake = await FakePrinters.StartAsync(context, new FakePrinterOptions { Profile = profile });
 		await using CatalogFixture fixture = WindowsIppFallbackScenarios.CreateCatalog(WindowsIppFallbackScenarios.PausedPrinterName, fake.PrinterUri);
 		IPrinter printer = await fixture.Catalog.GetPrinterAsync("windows:" + WindowsIppFallbackScenarios.PausedPrinterName, context.CancellationToken);
@@ -199,7 +202,8 @@ public static class WindowsIppFallbackScenarios
 		context.Require("submitting throws a PrintException", exception is not null);
 		context.Note("Message: " + exception!.Message);
 		context.CheckEqual("its error code is the printer's 0x040B", (int?)0x040B, exception.NativeErrorCode);
-		context.CheckEqual("the printer got the job once", 1, fake.GetRequests(IppOperation.PrintJob).Count);
+		context.CheckEqual("the printer checked the job once, with Validate-Job (ADR 0033)", 1, fake.GetRequests(IppOperation.ValidateJob).Count);
+		context.CheckEqual("so it got no Print-Job, nor the document", 0, fake.GetRequests(IppOperation.PrintJob).Count);
 
 		// Give a spooler job, if there wrongly were one, time to reach the port
 		await Task.Delay(TimeSpan.FromSeconds(3), context.CancellationToken);

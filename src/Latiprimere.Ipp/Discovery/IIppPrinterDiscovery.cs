@@ -21,4 +21,14 @@ internal interface IIppPrinterDiscovery
 	/// <param name="cancellationToken">A token to stop listening early.</param>
 	/// <returns>The printer, or <see langword="null"/> if it didn't answer in time.</returns>
 	Task<DiscoveredIppPrinter?> ResolveAsync(string instanceName, TimeSpan timeout, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Searches the network for the printer announcing a UUID, as a Windows WSD queue records its printer's
+	/// (ADR 0036). Stops as soon as it is announced over plain IPP.
+	/// </summary>
+	/// <param name="uuid">The UUID, normalised by <see cref="DnsSdServiceMapper.NormalizeUuid"/>.</param>
+	/// <param name="timeout">How long to search at most.</param>
+	/// <param name="cancellationToken">A token to stop searching.</param>
+	/// <returns>The printer, or <see langword="null"/> if none announced that UUID in time.</returns>
+	Task<DiscoveredIppPrinter?> FindByUuidAsync(string uuid, TimeSpan timeout, CancellationToken cancellationToken);
 }

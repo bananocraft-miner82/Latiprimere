@@ -136,7 +136,7 @@ internal static class IppHttpClientFactory
 	/// </remarks>
 	private static HttpClient CreateClient(SocketsHttpHandler handler, IppConnectionSecurity security)
 	{
-		HttpMessageHandler outerHandler = !security.UseTls && security.Credentials is null
+		HttpMessageHandler outerHandler = !security.UseTls && !security.HasCredentials
 			? handler
 			: new IppConnectionHandler(security, handler);
 

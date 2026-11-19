@@ -81,6 +81,37 @@ internal interface IWinSpool
 	/// Reads a printer driver's capabilities and defaults.
 	/// </summary>
 	/// <param name="printerName">The printer name.</param>
+	/// <param name="includePrintSchema">Whether to read the driver's Print Capabilities and default Print Ticket as
+	/// well, which opens a Print Ticket session (ADR 0032).</param>
 	/// <returns>The capabilities, or <see langword="null"/> if no printer has that name.</returns>
-	WindowsCapabilitiesRecord? GetCapabilities(string printerName);
+	WindowsCapabilitiesRecord? GetCapabilities(string printerName, bool includePrintSchema);
+
+	/// <summary>
+	/// Reads the driver's default settings as a full Print Ticket (ADR 0032).
+	/// </summary>
+	/// <param name="printerName">The printer name.</param>
+	/// <returns>The ticket, as UTF-8 XML.</returns>
+	/// <exception cref="PrintException">The Print Ticket API failed, or isn't available for this printer.</exception>
+	/// <exception cref="PrinterNotFoundException">No printer has that name.</exception>
+	byte[] GetDefaultPrintTicket(string printerName);
+
+	/// <summary>
+	/// Reads the driver's Print Capabilities, for a starting DEVMODE with Print Tickets merged on (ADR 0032).
+	/// </summary>
+	/// <param name="printerName">The printer name.</param>
+	/// <param name="baseDevMode">The DEVMODE to start from, as a job's saved <c>windows:devmode</c>; or
+	/// <see langword="null"/> for the driver's defaults.</param>
+	/// <param name="printTickets">Tickets, as UTF-8 XML, whose choices constrain the options; may be empty.</param>
+	/// <returns>The Print Capabilities document, as UTF-8 XML.</returns>
+	/// <exception cref="ArgumentException">The driver finds a ticket malformed.</exception>
+	/// <exception cref="PrintException">The Print Ticket API failed, or isn't available for this printer.</exception>
+	/// <exception cref="PrinterNotFoundException">No printer has that name.</exception>
+	byte[] GetPrintCapabilities(string printerName, byte[]? baseDevMode, IReadOnlyList<byte[]> printTickets);
+
+	/// <summary>
+	/// Reads the printer UUID a WSD port records, which is the printer's IPP <c>printer-uuid</c> too (ADR 0036).
+	/// </summary>
+	/// <param name="portName">The port's name, such as <c>WSD-adb74ae8-…</c>.</param>
+	/// <returns>The UUID as recorded, or <see langword="null"/> if the port isn't a WSD port or records none.</returns>
+	string? GetWsdPrinterUuid(string portName);
 }

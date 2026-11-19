@@ -16,7 +16,7 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0008](0008-print-system-failure-isolation.md) | Isolate print system failures in the printer catalog | Accepted |
 | [0009](0009-windows-pdf-printing.md) | PDF printing on Windows through PDFium and GDI | Accepted |
 | [0010](0010-direct-ipp-adapter-design.md) | Direct IPP to network printers | Accepted |
-| [0011](0011-capability-model.md) | Capability model | Proposed |
+| [0011](0011-capability-model.md) | Capability model | Accepted |
 | [0012](0012-vendor-option-escape-hatch.md) | Vendor-specific option escape hatch | Accepted |
 | [0013](0013-target-net10-and-net11.md) | Target .NET 10 and .NET 11 | Accepted |
 | [0014](0014-resx-source-generator.md) | Resource classes from the ResX source generator | Accepted |
@@ -24,17 +24,27 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0016](0016-rename-to-latiprimere.md) | Rename CrossPrint to Latiprimere | Accepted |
 | [0017](0017-retry-busy-ipp-printers.md) | Resend jobs that a busy IPP printer turns away | Accepted |
 | [0018](0018-api-review-0-1.md) | Public API for 0.1.0-preview | Accepted |
-| [0019](0019-windows-error-mapping.md) | Windows error mapping | Proposed |
-| [0020](0020-cups-authentication.md) | CUPS authentication | Proposed |
+| [0019](0019-windows-error-mapping.md) | Windows error mapping | Accepted |
+| [0020](0020-cups-authentication.md) | CUPS authentication | Accepted |
 | [0021](0021-licence-text-before-first-package.md) | Licence text revised before the first package | Accepted |
-| [0022](0022-release-process.md) | Release process and package contents | Proposed; partly superseded by 0028 |
+| [0022](0022-release-process.md) | Release process and package contents | Accepted; partly superseded by 0028 |
 | [0023](0023-commercial-licence-price.md) | Commercial Licence price and terms | Accepted |
-| [0024](0024-known-ipp-printer-uris.md) | Look up only known IPP printer URIs and Windows printer names | Proposed |
-| [0025](0025-choose-paper-colour-and-tray.md) | Choose paper size, colour mode and tray | Proposed |
-| [0026](0026-vendor-options-in-detail.md) | Vendor options in detail | Proposed |
+| [0024](0024-known-ipp-printer-uris.md) | Look up only known IPP printer URIs and Windows printer names | Accepted |
+| [0025](0025-choose-paper-colour-and-tray.md) | Choose paper size, colour mode and tray | Accepted |
+| [0026](0026-vendor-options-in-detail.md) | Vendor options in detail | Accepted; print tickets in 0031 |
 | [0027](0027-direct-ipp-for-windows-queues.md) | Direct IPP for Windows queues | Accepted |
-| [0028](0028-automated-releases.md) | Automated releases from the release branch | Proposed |
+| [0028](0028-automated-releases.md) | Automated releases from the release branch | Accepted; build number superseded by 0030 |
 | [0029](0029-end-to-end-test-harness.md) | End-to-end test harness | Accepted |
+| [0030](0030-release-numbering.md) | Number releases after the latest one | Accepted |
+| [0031](0031-windows-print-tickets.md) | Print Tickets on Windows | Accepted; Print Capabilities in 0032 |
+| [0032](0032-vendor-options-in-capabilities.md) | Vendor options in the capabilities, and Windows Print Capabilities | Accepted |
+| [0033](0033-validate-job.md) | Validate-Job before Print-Job | Accepted |
+| [0034](0034-raster-encoders.md) | Raster encoders for printers without PDF | Accepted |
+| [0035](0035-printing-pdfs-as-raster.md) | Printing PDFs as raster over IPP | Accepted |
+| [0036](0036-wsd-queues-over-ipp.md) | Windows WSD queues over IPP, matched by UUID | Accepted |
+| [0037](0037-ipps-and-authentication.md) | IPPS and authentication for direct IPP | Accepted |
+| [0038](0038-remembered-addresses.md) | Remembered printer addresses that survive a restart | Accepted |
+| [0039](0039-api-reference.md) | API reference generated into committed pages | Accepted |
 
 ## Template
 

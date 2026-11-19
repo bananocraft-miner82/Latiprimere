@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- The API reference generator in tools/api-reference, which runs on .NET 10 only -->
+	<PropertyGroup>
+		<TargetFrameworks>net10.0</TargetFrameworks>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\tools\api-reference\Latiprimere.ApiReference.csproj" />
+	</ItemGroup>
+
+</Project>

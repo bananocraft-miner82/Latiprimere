@@ -8,10 +8,20 @@
 #   - ipp.submission.virtual-printer-options: a PDF straight to that printer with paper, tray, colour and vendor
 #     options, and a vendor value it must refuse, with LATIPRIMERE_TEST_IPP_PRINTER set;
 #   - windows.output.paper-and-orientation: Microsoft Print to PDF on A4, A5 and landscape, on Windows with that
-#     printer, its pages measured.
+#     printer, its pages measured;
+#   - windows.output.print-ticket: the same printer on A5 from a Print Ticket, which goes through prntvpt.dll by
+#     function pointers into COM, so it is worth checking natively (ADR 0031);
+#   - windows.vendor-options.listed-and-sent: that printer's Print Capabilities read, parsed and printed with
+#     (ADR 0032);
+#   - ipp.vendor-options.listed-and-sent: vendor options read from raw IPP attributes and sent back, against the
+#     scripted IPP printer, so on every runner (ADR 0032);
+#   - ipp.raster.apple-raster-two-sided: a PDF rendered by PDFium, turned, encoded as Apple raster, gzipped and
+#     streamed through a pipe to the scripted printer with the HP's profile, so on every runner (ADR 0035);
+#   - ipp.discovery.remembered-address: the address store's source-generated JSON read natively, and a printer
+#     found by name at its remembered address, against the scripted printer, so on every runner (ADR 0038).
 #
-# A scenario whose test printers this machine doesn't have is skipped; one that runs must pass. These are the checks
-# this script made with the CLI sample before the harness existed: CI runs only these (ADR 0029). Run every scenario
+# A scenario whose test printers this machine doesn't have is skipped; one that runs must pass. The first four are
+# the checks this script made with the CLI sample before the harness existed: CI runs only these (ADR 0029). Run every scenario
 # natively with tools/test-harness/run.ps1 -Aot or run.sh --aot.
 #
 # Usage: tools/aot-check/check-aot.sh [target-framework]   (default net10.0)
@@ -28,6 +38,11 @@ scenarios=(
 	cups.submission.vendor-options
 	ipp.submission.virtual-printer-options
 	windows.output.paper-and-orientation
+	windows.output.print-ticket
+	windows.vendor-options.listed-and-sent
+	ipp.vendor-options.listed-and-sent
+	ipp.raster.apple-raster-two-sided
+	ipp.discovery.remembered-address
 )
 
 # The ILCompiler finds the Windows linker through vswhere, which Git Bash may not have on its path
@@ -68,20 +83,28 @@ harness="$harness_directory/Latiprimere.TestHarness"
 [[ -f "$harness.exe" ]] && harness="$harness.exe"
 
 # On macOS, launchd starts CUPS on demand, and it exits after about a minute with nothing to do. Only its local
-# socket starts it again, not the TCP port Latiprimere connects to, and the publishes above leave it idle for
-# minutes. lpstat goes through that socket, so it wakes the scheduler; then wait for the port to answer.
+# socket starts it again, not the TCP port, and the publishes above leave it idle for minutes. lpstat goes through
+# that socket, so it wakes the scheduler. A server given as the socket's path (CI's, /private/var/run/cupsd) needs
+# nothing more, as Latiprimere connects through it too; one given as host:port also has to answer on that port.
 wake_macos_cups() {
 	local server="$LATIPRIMERE_TEST_CUPS_SERVER"
-	local host="${server%:*}"
-	local port="${server##*:}"
-	[[ "$server" == *:* ]] || port=631
+	local host=""
+	local port=""
+	local target="$server" # As shown if it never answers
 	local attempts=0
 
-	until lpstat -r 2> /dev/null | grep -q "scheduler is running" && nc -z "$host" "$port" 2> /dev/null; do
+	if [[ "$server" != /* ]]; then
+		host="${server%:*}"
+		port="${server##*:}"
+		[[ "$server" == *:* ]] || port=631
+		target="$host:$port"
+	fi
+
+	until lpstat -r 2> /dev/null | grep -q "scheduler is running" && { [[ -z "$host" ]] || nc -z "$host" "$port" 2> /dev/null; }; do
 		attempts=$((attempts + 1))
 
 		if [[ "$attempts" -ge 60 ]]; then
-			echo "The CUPS scheduler did not answer on $host:$port." >&2
+			echo "The CUPS scheduler did not answer on $target." >&2
 			exit 1
 		fi
 

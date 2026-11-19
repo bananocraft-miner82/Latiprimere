@@ -6,6 +6,39 @@ namespace Latiprimere.Ipp.Tests.DependencyInjection;
 public sealed class LatiprimereIppServiceCollectionExtensionsTests
 {
 	[Fact]
+	public void GivenLoggerFactoryInServicesWhenAddLatiprimereIppThenThePrintSystemLogsThroughIt()
+	{
+		// Arrange — the print systems log what they carry on without, such as vendor options that couldn't be read
+		ServiceCollection services = new ServiceCollection();
+		Latiprimere.Testing.Fakes.RecordingLoggerFactory loggerFactory = new Latiprimere.Testing.Fakes.RecordingLoggerFactory();
+		services.AddSingleton<Microsoft.Extensions.Logging.ILoggerFactory>(loggerFactory);
+
+		// Act
+		services.AddLatiprimereIpp();
+		using ServiceProvider serviceProvider = services.BuildServiceProvider();
+		IPrintSystem printSystem = Assert.Single(serviceProvider.GetServices<IPrintSystem>());
+
+		// Assert
+		Assert.Same(loggerFactory.Logger, Assert.IsType<IppNetworkPrintSystem>(printSystem).Logger);
+		Assert.Contains("Latiprimere.Ipp", loggerFactory.Categories);
+	}
+
+	[Fact]
+	public void GivenNoLoggerFactoryWhenAddLatiprimereIppThenThePrintSystemLogsNothing()
+	{
+		// Arrange
+		ServiceCollection services = new ServiceCollection();
+
+		// Act
+		services.AddLatiprimereIpp();
+		using ServiceProvider serviceProvider = services.BuildServiceProvider();
+		IPrintSystem printSystem = Assert.Single(serviceProvider.GetServices<IPrintSystem>());
+
+		// Assert
+		Assert.Same(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Assert.IsType<IppNetworkPrintSystem>(printSystem).Logger);
+	}
+
+	[Fact]
 	public async Task GivenConfiguredPrinterWhenAddLatiprimereIppThenResolvesPrintSystemUsingTheOptions()
 	{
 		// Arrange
@@ -56,5 +89,20 @@ public sealed class LatiprimereIppServiceCollectionExtensionsTests
 
 		// Assert
 		Assert.Throws<ArgumentNullException>(addIpp);
+	}
+
+	[Fact]
+	public void GivenAFingerprintThatIsntSha256WhenAddLatiprimereIppThenThrowsWithoutWaitingForTheCatalog()
+	{
+		// Arrange
+		ServiceCollection services = new ServiceCollection();
+
+		// Act
+		Action addIpp = () => services.AddLatiprimereIpp(options => options.TrustedCertificateFingerprints.Add("3A:7F:00"));
+
+		// Assert — nothing registered, so the mistake can't surface later instead
+		ArgumentException exception = Assert.Throws<ArgumentException>(addIpp);
+		Assert.Contains("SHA-256", exception.Message, StringComparison.Ordinal);
+		Assert.Empty(services);
 	}
 }

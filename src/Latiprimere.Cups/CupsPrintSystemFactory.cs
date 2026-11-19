@@ -3,6 +3,7 @@ using Latiprimere.Cups.Resources;
 using Latiprimere.Ipp;
 using Latiprimere.Ipp.Connections;
 using Latiprimere.Ipp.Mapping;
+using Microsoft.Extensions.Logging;
 
 namespace Latiprimere.Cups;
 
@@ -36,12 +37,15 @@ public static class CupsPrintSystemFactory
 	/// </summary>
 	/// <param name="options">How to connect to CUPS.</param>
 	/// <param name="environmentServer">The value of <c>CUPS_SERVER</c>, if set.</param>
+	/// <param name="loggerFactory">The application's logger factory, or <see langword="null"/> to log nothing.</param>
 	/// <returns>The print system.</returns>
 	/// <exception cref="ArgumentException">The configured server is not valid; or the credentials have no user name,
 	/// or one containing a colon.</exception>
 	/// <remarks>Tests pass the environment value in, as setting the variable would affect every test in the process.</remarks>
-	internal static IPrintSystem Create(CupsOptions options, string? environmentServer)
+	internal static IPrintSystem Create(CupsOptions options, string? environmentServer, ILoggerFactory? loggerFactory = null)
 	{
+		ILogger logger = IppLog.CreateLogger(loggerFactory);
+
 		// Work out where CUPS is, as libcups would
 		CupsPlatform platform = CupsPrintSystemFactory.GetCurrentPlatform();
 		CupsEndpoint endpoint = CupsEndpoint.Resolve(options.Server, environmentServer, File.Exists, platform);
@@ -55,7 +59,8 @@ public static class CupsPrintSystemFactory
 				Client             = new InvalidServerIppClient(endpoint.InvalidEnvironmentServer),
 				RequestingUserName   = CupsPrintSystemFactory.GetRequestingUserName(options),
 				DocumentFormats      = IppDocumentFormats.Cups,
-				VendorOptionPrefixes = IppVendorAttributeMapper.CupsPrefixes
+				VendorOptionPrefixes = IppVendorAttributeMapper.CupsPrefixes,
+				Logger               = logger
 			};
 
 			return new CupsPrintSystem(failingContext, endpoint, isSupported: true, ownedClient: null);
@@ -75,7 +80,8 @@ public static class CupsPrintSystemFactory
 			Client               = client,
 			RequestingUserName   = CupsPrintSystemFactory.GetRequestingUserName(options),
 			DocumentFormats      = IppDocumentFormats.Cups,
-			VendorOptionPrefixes = IppVendorAttributeMapper.CupsPrefixes
+			VendorOptionPrefixes = IppVendorAttributeMapper.CupsPrefixes,
+			Logger               = logger
 		};
 
 		bool isSupported = endpoint.IsExplicit || platform != CupsPlatform.Other;
@@ -116,6 +122,30 @@ public static class CupsPrintSystemFactory
 	}
 
 	/// <summary>
+	/// Checks the options as creating the print system does, without creating anything or looking for the scheduler;
+	/// so dependency injection can report a mistake when it is registered rather than when the catalog is first
+	/// resolved.
+	/// </summary>
+	/// <param name="options">The options.</param>
+	/// <exception cref="ArgumentException"><see cref="CupsOptions.Server"/> isn't a socket path or host[:port], or
+	/// the credentials have no user name, or one containing a colon.</exception>
+	internal static void ValidateOptions(CupsOptions options)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+
+		// Only the configured server is parsed: the environment's is reported per request, and no socket is looked for
+		if (!string.IsNullOrWhiteSpace(options.Server))
+		{
+			_ = CupsEndpoint.Resolve(options.Server, environmentServer: null, socketExists: _ => false, CupsPlatform.Other);
+		}
+
+		if (options.Credentials is not null)
+		{
+			CupsPrintSystemFactory.ValidateCredentials(options.Credentials);
+		}
+	}
+
+	/// <summary>
 	/// Works out the user name to send as <c>requesting-user-name</c>.
 	/// </summary>
 	/// <param name="options">The options.</param>
@@ -128,21 +158,19 @@ public static class CupsPrintSystemFactory
 	}
 
 	/// <summary>
-	/// Checks the credentials can be sent with HTTP Basic authentication.
+	/// Checks the credentials can be sent with HTTP Basic authentication, with messages naming
+	/// <see cref="CupsOptions"/>.
 	/// </summary>
 	/// <param name="credentials">The credentials.</param>
 	/// <exception cref="ArgumentException">The user name is missing or contains a colon.</exception>
 	private static void ValidateCredentials(NetworkCredential credentials)
 	{
-		if (string.IsNullOrWhiteSpace(credentials.UserName))
-		{
-			throw new ArgumentException(ExceptionMessages.CredentialsWithoutUserName, nameof(credentials));
-		}
-
-		if (credentials.UserName.Contains(':', StringComparison.Ordinal))
-		{
-			throw new ArgumentException(ExceptionMessages.CredentialsUserNameHasColon, nameof(credentials));
-		}
+		BasicAuthentication.ValidateCredentials
+		(
+			credentials,
+			ExceptionMessages.CredentialsWithoutUserName,
+			ExceptionMessages.CredentialsUserNameHasColon
+		);
 	}
 
 	/// <summary>

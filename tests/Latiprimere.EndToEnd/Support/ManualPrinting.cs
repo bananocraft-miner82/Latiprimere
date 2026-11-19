@@ -25,9 +25,10 @@ public static class ManualPrinting
 	/// (with <c>CUPS_SERVER</c> if set), the Windows spooler, and direct IPP with mDNS discovery.
 	/// </summary>
 	/// <param name="context">The scenario; the catalog is kept until it ends.</param>
+	/// <param name="configureWindows">Changes the Windows print system's options, or <see langword="null"/>.</param>
 	/// <returns>The printer.</returns>
 	/// <exception cref="ScenarioCheckFailedException">No printer was named.</exception>
-	public static async Task<IPrinter> GetPrinterAsync(ScenarioContext context)
+	public static async Task<IPrinter> GetPrinterAsync(ScenarioContext context, Action<Latiprimere.Windows.WindowsOptions>? configureWindows = null)
 	{
 		ArgumentNullException.ThrowIfNull(context);
 
@@ -55,7 +56,7 @@ public static class ManualPrinting
 
 				if (OperatingSystem.IsWindows())
 				{
-					services.AddLatiprimerePdfium().AddLatiprimereWindows();
+					services.AddLatiprimerePdfium().AddLatiprimereWindows(configureWindows);
 				}
 			}
 		);
@@ -105,6 +106,21 @@ public static class ManualPrinting
 	/// <returns>The job's final status.</returns>
 	public static async Task<PrintJobStatus> PrintAsync(ScenarioContext context, IPrinter printer, string documentName, PrintOptions options)
 	{
+		(_, PrintJobStatus status) = await ManualPrinting.PrintJobAsync(context, printer, documentName, options);
+
+		return status;
+	}
+
+	/// <summary>
+	/// Prints a test document once the person agrees, as <see cref="PrintAsync"/> does, and gives the job too.
+	/// </summary>
+	/// <param name="context">The scenario.</param>
+	/// <param name="printer">The printer.</param>
+	/// <param name="documentName">The test document's file name.</param>
+	/// <param name="options">How to print it.</param>
+	/// <returns>The job, and how it ended.</returns>
+	public static async Task<(IPrintJob Job, PrintJobStatus Status)> PrintJobAsync(ScenarioContext context, IPrinter printer, string documentName, PrintOptions options)
+	{
 		ArgumentNullException.ThrowIfNull(context);
 		ArgumentNullException.ThrowIfNull(printer);
 		ArgumentNullException.ThrowIfNull(options);
@@ -129,12 +145,12 @@ public static class ManualPrinting
 
 		using FileStream document = TestDocuments.Open(documentName);
 		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options with { JobName = options.JobName ?? "Latiprimere manual check" }, context.CancellationToken);
-		context.Note($"Submitted job {job.Id}.");
+		context.Note($"Submitted job {job.Id} ({job.GetType().Name}).");
 		IReadOnlyList<PrintJobStatus> changes = await JobFollower.FollowAsync(context, job, ManualPrinting.JobTimeout);
 		PrintJobStatus final = changes[^1];
 		context.CheckEqual("the job completes", PrintJobState.Completed, final.State);
 
-		return final;
+		return (job, final);
 	}
 
 	/// <summary>

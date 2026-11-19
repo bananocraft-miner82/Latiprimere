@@ -56,9 +56,10 @@ unset LATIPRIMERE_TEST_CUPS_SERVER LATIPRIMERE_TEST_CUPS_OUTPUT LATIPRIMERE_TEST
 started_container=false
 
 if [[ "$(uname)" == "Darwin" ]] && lpstat -p Raw > /dev/null 2>&1 && lpstat -p Virtual-IPP > /dev/null 2>&1; then
-	# A Mac with tools/macos-test-printers installed: its own CUPS, without CUPS-PDF and Secure
+	# A Mac with tools/macos-test-printers installed: its own CUPS, without CUPS-PDF and Secure. Through its socket,
+	# which launchd answers even after an idle cupsd has exited; 127.0.0.1:631 goes with it
 	echo "== Using this Mac's test queues"
-	export LATIPRIMERE_TEST_CUPS_SERVER=127.0.0.1:631
+	export LATIPRIMERE_TEST_CUPS_SERVER=/private/var/run/cupsd
 	export LATIPRIMERE_TEST_CUPS_SETUP=macos
 	export LATIPRIMERE_TEST_CUPS_OUTPUT=/Users/Shared/LatiprimereTestOutput
 	export LATIPRIMERE_TEST_IPP_PRINTER=ipp://127.0.0.1:8631/ipp/print

@@ -1,9 +1,13 @@
+using System.Xml;
 using Latiprimere.Ipp;
+using Latiprimere.Ipp.Discovery;
 using Latiprimere.Ipp.Mapping;
+using Latiprimere.Ipp.Raster;
 using Latiprimere.Rendering;
 using Latiprimere.Windows.DirectIpp;
 using Latiprimere.Windows.Gdi;
 using Latiprimere.Windows.Mapping;
+using Latiprimere.Windows.PrintTickets;
 using Latiprimere.Windows.Resources;
 using Latiprimere.Windows.Spooler;
 
@@ -23,14 +27,16 @@ namespace Latiprimere.Windows;
 /// With <see cref="WindowsOptions.PrintPdfOverIpp"/> on, a PDF job for a queue whose IPP printer is known and accepts
 /// PDF goes straight to the printer instead (ADR 0027).
 /// </remarks>
-internal sealed class WindowsPrinter : IPrinter
+internal sealed class WindowsPrinter : IWindowsPrinter
 {
 	private readonly WindowsPrintContext context; // Spooler, GDI and rasteriser
 	private readonly string printerName;          // The spooler's name for the printer
 	private readonly string? driverName;          // The printer's driver, if the spooler reported it
 	private readonly string? portName;            // The queue's port, which names the printer's URL for some queues
-	private IppPrinter? ippPrinter;               // The queue's IPP printer, once known to accept PDF
-	private bool ippPrinterRefusesPdf;            // Whether the queue's IPP printer said it doesn't accept PDF
+	private IppPrinter? ippPrinter;               // The queue's IPP printer, once known to accept PDF or raster
+	private string? ippPrinterUuid;               // The UUID it was found by, for a WSD queue; otherwise null
+	private bool ippPrinterRefusesPdf;            // Whether the queue's IPP printer said it takes neither
+	private bool lacksPrintTickets;               // Whether the driver turned out to have no Print Ticket support
 
 	/// <summary>
 	/// Initialises a new instance of the <see cref="WindowsPrinter"/> class.
@@ -53,6 +59,39 @@ internal sealed class WindowsPrinter : IPrinter
 	public PrinterInfo Info { get; }
 
 	/// <inheritdoc/>
+	public string QueueName
+	{
+		get
+		{
+			return this.printerName;
+		}
+	}
+
+	/// <inheritdoc/>
+	public Task<string> GetPrintCapabilitiesAsync(string? printTicket = null, CancellationToken cancellationToken = default)
+	{
+		// Checked here, so a bad ticket fails before any call to the driver
+		byte[][] tickets = printTicket is null ? [] : [WindowsVendorOptions.EncodePrintTicket(printTicket)];
+
+		// The Print Ticket API blocks, so run it off the caller's thread
+		return Task.Run
+		(
+			() => PrintSchemaText.ToText(this.context.Spool.GetPrintCapabilities(this.printerName, baseDevMode: null, tickets)),
+			cancellationToken
+		);
+	}
+
+	/// <inheritdoc/>
+	public Task<string> GetDefaultPrintTicketAsync(CancellationToken cancellationToken = default)
+	{
+		return Task.Run
+		(
+			() => PrintSchemaText.ToText(this.context.Spool.GetDefaultPrintTicket(this.printerName)),
+			cancellationToken
+		);
+	}
+
+	/// <inheritdoc/>
 	public async Task<IPrintJob> SubmitAsync(PrintContent content, PrintOptions options, CancellationToken cancellationToken = default)
 	{
 		ArgumentNullException.ThrowIfNull(content);
@@ -63,7 +102,7 @@ internal sealed class WindowsPrinter : IPrinter
 		string? outputFile = options.OutputFile is null ? null : Path.GetFullPath(options.OutputFile);
 
 		// Checked for raw jobs too, which don't use a DEVMODE, so an unsupported key is never ignored
-		byte[]? savedDevMode = WindowsVendorOptions.ReadDevMode(options.VendorOptions);
+		WindowsVendorSettings vendorSettings = WindowsVendorOptions.Read(options.VendorOptions);
 
 		// A PDF for a queue in front of an IPP printer may go straight to it (ADR 0027)
 		if (content.Format == DocumentFormat.Pdf)
@@ -80,7 +119,7 @@ internal sealed class WindowsPrinter : IPrinter
 		{
 			DocumentFormat.Raw => await this.SubmitRawAsync(content, options.Copies, documentName, outputFile, cancellationToken)
 											.ConfigureAwait(false),
-			DocumentFormat.Pdf => await this.SubmitPdfAsync(content, options, savedDevMode, documentName, outputFile, cancellationToken)
+			DocumentFormat.Pdf => await this.SubmitPdfAsync(content, options, vendorSettings, documentName, outputFile, cancellationToken)
 											.ConfigureAwait(false),
 			_ => throw WindowsPrinter.CreateFormatNotSupportedException(content.Format),
 		};
@@ -99,7 +138,9 @@ internal sealed class WindowsPrinter : IPrinter
 	public async Task<PrinterCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default)
 	{
 		// DeviceCapabilities and DocumentProperties block, so run them off the caller's thread
-		WindowsCapabilitiesRecord? record = await Task.Run(() => this.context.Spool.GetCapabilities(this.printerName), cancellationToken)
+		// A driver without Print Ticket support isn't asked again, so it costs one try and one log entry
+		bool includePrintSchema = !this.lacksPrintTickets;
+		WindowsCapabilitiesRecord? record = await Task.Run(() => this.context.Spool.GetCapabilities(this.printerName, includePrintSchema), cancellationToken)
 													  .ConfigureAwait(false);
 
 		if (record is null)
@@ -109,7 +150,42 @@ internal sealed class WindowsPrinter : IPrinter
 			throw new PrintException(message);
 		}
 
-		return WindowsCapabilitiesMapper.ToCapabilities(record);
+		return WindowsCapabilitiesMapper.ToCapabilities(record) with { VendorOptions = this.ReadVendorOptions(record) };
+	}
+
+	/// <summary>
+	/// Lists the driver's Print Capabilities as vendor options. They are an extra: a driver without Print Ticket
+	/// support, or with a document that can't be read, lists fewer or none, and that is logged (ADR 0032).
+	/// </summary>
+	/// <param name="record">The driver's capabilities.</param>
+	/// <returns>The vendor options.</returns>
+	private IReadOnlyList<VendorOption> ReadVendorOptions(WindowsCapabilitiesRecord record)
+	{
+		if (record.PrintSchemaFailure is not null)
+		{
+			this.lacksPrintTickets = record.PrintSchemaFailure is PrintException;
+			WindowsLog.PrintCapabilitiesUnavailable(this.context.Logger, this.printerName, record.PrintSchemaFailure);
+		}
+
+		try
+		{
+			return WindowsCapabilitiesMapper.ToVendorOptions(record, withDefaults: true);
+		}
+		catch (XmlException exception)
+		{
+			WindowsLog.PrintCapabilitiesUnreadable(this.context.Logger, this.printerName, exception);
+		}
+
+		// Perhaps only the default ticket was unreadable: the options can still be listed, without their defaults.
+		// A Print Capabilities document that can't be read was logged just now.
+		try
+		{
+			return WindowsCapabilitiesMapper.ToVendorOptions(record, withDefaults: false);
+		}
+		catch (XmlException)
+		{
+			return Array.Empty<VendorOption>();
+		}
 	}
 
 	/// <summary>
@@ -137,9 +213,27 @@ internal sealed class WindowsPrinter : IPrinter
 		{
 			return await printer.SubmitAsync(content, options, cancellationToken).ConfigureAwait(false);
 		}
-		catch (PrintException exception) when (documentStart is not null && IppConnectionErrors.IsConnectFailure(exception))
+		catch (PrintException exception) when (IppConnectionErrors.IsConnectFailure(exception))
 		{
+			// Moved or switched off since it was found: the next job asks afresh, searching again by UUID, rather than
+			// waiting for the same address to time out each time
+			this.ForgetIppPrinter();
+
+			if (documentStart is null)
+			{
+				throw;
+			}
+
 			// Nothing reached the printer, so the spooler can hold the job until it is back without printing it twice
+			document.Position = documentStart.Value;
+
+			return null;
+		}
+		catch (NotSupportedException exception) when (documentStart is not null)
+		{
+			// A raster job the printer's attributes don't allow, such as no paper size: nothing was sent, and the
+			// driver may still print it (ADR 0036)
+			WindowsLog.RasterNotPossible(this.context.Logger, this.printerName, exception);
 			document.Position = documentStart.Value;
 
 			return null;
@@ -171,44 +265,113 @@ internal sealed class WindowsPrinter : IPrinter
 			return this.ippPrinter;
 		}
 
-		Uri? printerUri = route.FindPrinterUri(this.printerName, this.portName);
+		// An exact URI, or a WSD queue's printer found by the UUID its port records (ADR 0036)
+		WindowsIppTarget? target = await route
+			.FindTargetAsync(this.printerName, this.portName, this.context.Spool, cancellationToken)
+			.ConfigureAwait(false);
 
-		if (printerUri is null)
+		if (target is null)
 		{
 			return null;
 		}
 
+		Uri printerUri = target.PrinterUri;
+
 		IReadOnlyCollection<string>? formats;
+		IReadOnlyCollection<SharpIpp.Protocol.Models.IppOperation>? operations;
 
 		try
 		{
 			SharpIpp.Protocol.Models.PrinterDescriptionAttributes? attributes = await IppPrinterQueries
-				.GetAttributesAsync(route.Context, printerUri, [IppRequestedAttributes.DocumentFormatSupported], cancellationToken)
+				.GetAttributesAsync
+				(
+					route.Context,
+					printerUri,
+					[IppRequestedAttributes.DocumentFormatSupported, IppRequestedAttributes.OperationsSupported, IppRequestedAttributes.PrinterUuid],
+					cancellationToken
+				)
 				.ConfigureAwait(false);
+
+			if (target.Uuid is not null && !WindowsPrinter.IsSamePrinter(target.Uuid, attributes))
+			{
+				// Gone from where it was found, or another printer answers there now: search again at the next job
+				WindowsLog.IppPrinterNotMatched(this.context.Logger, this.printerName, printerUri);
+				route.ForgetMatch(target.Uuid);
+
+				return null;
+			}
 
 			formats = attributes is null
 				? null
 				: IppValueReader.ReadReference(attributes.DocumentFormatSupported)?.Select(format => format.Value).ToList();
+
+			// Whether it can check a job before its upload (ADR 0033)
+			operations = attributes is null ? null : IppValueReader.ReadReference(attributes.OperationsSupported);
 		}
 		catch (PrintException)
 		{
-			// Unreachable, or wants a password: the spooler prints this job, and the next one asks again
+			// Unreachable, or wants a password: the spooler prints this job, and the next one asks again, searching
+			// afresh for a printer found by UUID, which may have moved
+			if (target.Uuid is not null)
+			{
+				route.ForgetMatch(target.Uuid);
+			}
+
 			return null;
 		}
 
 		string pdf = route.Context.DocumentFormats.GetMimeType(DocumentFormat.Pdf);
 
-		if (formats is null || !formats.Contains(pdf, StringComparer.OrdinalIgnoreCase))
+		// PDF as it is, or rendered to a raster format the printer takes when there is a rasteriser (ADR 0036)
+		bool takesPdf = formats?.Contains(pdf, StringComparer.OrdinalIgnoreCase) == true;
+		bool takesRaster = formats is not null && route.Context.PdfRasterizer is not null && RasterJobPlanner.ChooseFormat(formats) is not null;
+
+		if (!takesPdf && !takesRaster)
 		{
-			// No printer at that URI, or one that doesn't take PDF: that won't change while this object lives
+			// No printer at that URI, or one that takes neither: that won't change while this object lives
 			this.ippPrinterRefusesPdf = true;
 
 			return null;
 		}
 
-		this.ippPrinter = new IppPrinter(route.Context, printerUri, this.Info, formats);
+		if (target.Uuid is not null)
+		{
+			WindowsLog.IppPrinterMatched(this.context.Logger, this.printerName, printerUri);
+		}
+
+		this.ippPrinter = new IppPrinter(route.Context, printerUri, this.Info, formats, operations);
+		this.ippPrinterUuid = target.Uuid;
 
 		return this.ippPrinter;
+	}
+
+	/// <summary>
+	/// Forgets the queue's IPP printer, and the route's match for its UUID, so the next PDF job finds it again.
+	/// </summary>
+	private void ForgetIppPrinter()
+	{
+		string? uuid = this.ippPrinterUuid;
+
+		this.ippPrinter = null;
+		this.ippPrinterUuid = null;
+
+		if (uuid is not null)
+		{
+			this.context.IppRoute?.ForgetMatch(uuid);
+		}
+	}
+
+	/// <summary>
+	/// Checks that the printer found by a WSD queue's UUID reports that UUID itself as its <c>printer-uuid</c>.
+	/// </summary>
+	/// <param name="uuid">The normalised UUID the queue's port records.</param>
+	/// <param name="attributes">What the printer reported, or <see langword="null"/> if there was no printer there.</param>
+	/// <returns>Whether it is the queue's printer; one that doesn't report a UUID isn't trusted.</returns>
+	private static bool IsSamePrinter(string uuid, SharpIpp.Protocol.Models.PrinterDescriptionAttributes? attributes)
+	{
+		string? reported = attributes is null ? null : DnsSdServiceMapper.NormalizeUuid(IppValueReader.ReadReference(attributes.PrinterUUID));
+
+		return reported == uuid;
 	}
 
 	/// <summary>
@@ -281,8 +444,9 @@ internal sealed class WindowsPrinter : IPrinter
 	/// </summary>
 	/// <param name="content">The PDF.</param>
 	/// <param name="options">How to print it.</param>
-	/// <param name="savedDevMode">A DEVMODE from <c>windows:devmode</c> to start from instead of the driver's
-	/// defaults, or <see langword="null"/>.</param>
+	/// <param name="vendorSettings">A DEVMODE from <c>windows:devmode</c> to start from instead of the driver's
+	/// defaults, and a Print Ticket from <c>windows:print-ticket</c> to merge onto it; either may be
+	/// absent.</param>
 	/// <param name="documentName">The name shown in the print queue.</param>
 	/// <param name="outputFile">A file to print to instead of the device, or <see langword="null"/>.</param>
 	/// <param name="cancellationToken">A token to abandon spooling.</param>
@@ -291,12 +455,12 @@ internal sealed class WindowsPrinter : IPrinter
 	/// driver doesn't list the chosen paper size or tray.</exception>
 	private Task<int> SubmitPdfAsync
 	(
-		PrintContent      content,
-		PrintOptions      options,
-		byte[]?           savedDevMode,
-		string            documentName,
-		string?           outputFile,
-		CancellationToken cancellationToken
+		PrintContent          content,
+		PrintOptions          options,
+		WindowsVendorSettings vendorSettings,
+		string                documentName,
+		string?               outputFile,
+		CancellationToken     cancellationToken
 	)
 	{
 		// The driver would take the page images and then stop the queue with an error, so refuse before rendering
@@ -317,6 +481,9 @@ internal sealed class WindowsPrinter : IPrinter
 				// Before the document is opened, so a size or tray the driver lacks fails without rendering anything
 				(short? paperId, short? binId) = this.FindPaperAndBin(options);
 
+				// Also before, so a feature or option the printer lacks fails without rendering anything
+				List<byte[]> tickets = this.CreatePrintTickets(options, vendorSettings);
+
 				using IRasterDocument document = rasterizer.Open(content.Content);
 
 				GdiPrintRequest request = new GdiPrintRequest
@@ -328,13 +495,64 @@ internal sealed class WindowsPrinter : IPrinter
 					Options      = options,
 					PaperId      = paperId,
 					BinId        = binId,
-					SavedDevMode = savedDevMode
+					SavedDevMode = vendorSettings.DevMode,
+					PrintTickets = tickets
 				};
 
 				return this.context.Gdi.PrintRasterDocument(request, cancellationToken);
 			},
 			cancellationToken
 		);
+	}
+
+	/// <summary>
+	/// Lists the Print Tickets a PDF job merges onto its DEVMODE: the one from <c>windows:print-ticket</c>, then one
+	/// made from the <c>windows:feature:</c> and <c>windows:parameter:</c> keys, checked against the driver's Print
+	/// Capabilities for the job's starting DEVMODE and the settings the first ticket chooses (ADR 0032).
+	/// </summary>
+	/// <param name="options">The job's options.</param>
+	/// <param name="vendorSettings">The job's <c>windows:</c> vendor options.</param>
+	/// <returns>The tickets, in the order they are merged; empty if there are none.</returns>
+	/// <exception cref="ArgumentException">A feature, parameter or option isn't one the printer offers, or a typed
+	/// option sets it.</exception>
+	/// <exception cref="PrintException">The driver's Print Capabilities couldn't be read.</exception>
+	private List<byte[]> CreatePrintTickets(PrintOptions options, WindowsVendorSettings vendorSettings)
+	{
+		List<byte[]> tickets = [];
+
+		if (vendorSettings.PrintTicket is not null)
+		{
+			tickets.Add(vendorSettings.PrintTicket);
+		}
+
+		if (vendorSettings.Features.Count == 0)
+		{
+			return tickets;
+		}
+
+		// For the settings the job starts from, so an option a saved DEVMODE rules in or out is judged as printed
+		byte[] capabilities = this.context.Spool.GetPrintCapabilities(this.printerName, vendorSettings.DevMode, tickets.ToArray());
+		PrintCapabilitiesDocument document;
+
+		try
+		{
+			document = PrintCapabilitiesDocument.Parse(capabilities);
+		}
+		catch (XmlException exception)
+		{
+			string message = ExceptionMessages.FormatPrintCapabilitiesUnreadable(this.printerName, exception.Message);
+
+			throw new PrintException(message, exception);
+		}
+
+		byte[]? featureTicket = document.CreateTicket(this.printerName, vendorSettings.Features, options);
+
+		if (featureTicket is not null)
+		{
+			tickets.Add(featureTicket);
+		}
+
+		return tickets;
 	}
 
 	/// <summary>
@@ -352,7 +570,8 @@ internal sealed class WindowsPrinter : IPrinter
 			return (null, null);
 		}
 
-		WindowsCapabilitiesRecord record = this.context.Spool.GetCapabilities(this.printerName)
+		// Only the papers and trays are needed, so no Print Ticket session
+		WindowsCapabilitiesRecord record = this.context.Spool.GetCapabilities(this.printerName, includePrintSchema: false)
 			?? throw new PrintException(ExceptionMessages.FormatPrinterNoLongerAvailable(this.printerName));
 
 		short? paperId = null;

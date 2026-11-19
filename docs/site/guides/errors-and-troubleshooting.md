@@ -2,7 +2,7 @@
 title: Errors and troubleshooting
 description: What each Latiprimere exception means, how to log what the print systems are doing, and fixes for common problems.
 sidebar:
-  order: 4
+  order: 5
 ---
 
 Every Latiprimere exception derives from `PrintException`, so one `catch` handles them all. Catch the specific ones first when you want to respond differently.
@@ -12,12 +12,13 @@ Every Latiprimere exception derives from `PrintException`, so one `catch` handle
 | Exception                         | Thrown when                                                                  | What to do                                       |
 | --------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------ |
 | `PrinterNotFoundException`        | No print system knows the printer ID. `PrinterId` holds the ID.              | Let the user choose another printer.             |
-| `PrintAuthenticationException`    | A print server needs a user name and password, or refused the ones given.    | Ask for credentials and create the print system again. |
+| `PrintAuthenticationException`    | A CUPS server or network printer needs a user name and password, or refused the ones given; or a network printer asks for one over plain IPP, where it's never sent. | Ask for credentials and create the print system again; for a network printer, use its `ipps://` address. |
 | `PrintSystemUnavailableException` | No registered print system works on this machine, or its service isn't running. | Register the right print system, or start its service. |
-| `PrintException`                  | Anything else the print system reports: a rejected job, a printer that can't be reached, a timeout. | Show the message; `NativeErrorCode` helps diagnose it. |
+| `PrintException`                  | Anything else the print system reports: a rejected job, a printer that can't be reached, a timeout, a certificate that isn't trusted. | Show the message; `NativeErrorCode` helps diagnose it. |
 | `NotSupportedException`           | The printer can't take the document or option, such as raw data on a virtual printer, or a PDF on a text-only printer. | Change what you send.                           |
+| `ArgumentException`               | An option the print system refuses, such as a vendor option the printer doesn't offer, or settings that can't work, such as a malformed certificate fingerprint, when the print system is registered. | Fix the option or setting: the message says which. |
 
-`NotSupportedException` is .NET's own, not a `PrintException`, because it means the request itself can't work, rather than that printing failed.
+`NotSupportedException` and `ArgumentException` are .NET's own, not `PrintException`s, because they mean the request itself can't work, rather than that printing failed.
 
 `NativeErrorCode` holds the print system's own error code when there is one: a Windows error number, an IPP status code, or an HTTP status such as 401.
 
@@ -70,19 +71,7 @@ Looking a printer up by ID is different. The ID belongs to one print system, so 
 
 ## See what's happening
 
-The catalog logs which print systems it uses and which it skipped, with the reason. Register logging to see it. This uses the console logger from the `Microsoft.Extensions.Logging.Console` package:
-
-```csharp
-ServiceCollection services = new ServiceCollection();
-
-services.AddLogging(logging => logging.AddConsole().SetMinimumLevel(LogLevel.Debug));
-services.AddLatiprimere();
-services.AddLatiprimereCups();
-services.AddLatiprimereWindows();
-services.AddLatiprimerePdfium();
-```
-
-ASP.NET Core and the Generic Host set up logging already; the catalog uses it without any change.
+The catalog logs which print systems it uses and which it skipped, with the reason, and the print systems log what they carry on without, such as a PDF sent as raster or vendor options that couldn't be read. ASP.NET Core and the Generic Host set logging up already, so Latiprimere uses it without any change. [Logging](/docs/guides/logging/) shows how to turn it on elsewhere, and what each message means.
 
 ## Common problems
 
@@ -96,7 +85,10 @@ Add the `Latiprimere.Rendering.Pdfium` package and call `AddLatiprimerePdfium()`
 Check that the CUPS scheduler is running: `lpstat -r` should say so. In a container, CUPS usually isn't installed; point Latiprimere at a CUPS server with `AddLatiprimereCups(options => options.Server = "host:631")`, or print to network printers directly.
 
 **A network printer isn't found.**
-Discovery only sees printers on the same part of the network, and needs multicast DNS (UDP port 5353) to get through firewalls. Add the printer by its address instead: see [Network printers over IPP](/docs/print-systems/network-printers/).
+Discovery only sees printers on the same part of the network, and needs multicast DNS (UDP port 5353) to get through firewalls. Add the printer by its address instead: see [Network printers over IPP](/docs/print-systems/network-printers/). A printer that sleeps may not answer the search: `AddressStorePath` remembers where each printer was last seen.
+
+**A network printer's `ipps://` address "presented a certificate that isn't trusted".**
+Printers make their own certificates, which no computer trusts. Check the fingerprint in the message against the printer's web page, then pin it: see [Secure network printers](/docs/print-systems/secure-printers/).
 
 **Microsoft Print to PDF fails with "The printer driver's request was cancelled".**
 The driver wanted to show a Save dialog, which an app without a user interface can't. Set `PrintOptions.OutputFile`: see [CUPS servers and the Windows spooler](/docs/print-systems/cups-and-windows/).

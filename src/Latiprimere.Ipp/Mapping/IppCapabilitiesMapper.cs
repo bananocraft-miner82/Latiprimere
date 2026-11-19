@@ -182,7 +182,7 @@ internal static class IppCapabilitiesMapper
 			.Select(keyword => new InputTray
 			{
 				Id   = keyword,
-				Name = char.ToUpperInvariant(keyword[0]) + keyword[1..].Replace('-', ' ')
+				Name = IppKeywords.Describe(keyword)
 			})
 			.ToList();
 	}

@@ -56,6 +56,18 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 	}
 
 	/// <summary>
+	/// Gets how the HTTP client protects requests, when it chooses credentials per printer as direct IPP's does, so a
+	/// refusal can say whether credentials were sent; or <see langword="null"/> to go by the constructor's flag.
+	/// </summary>
+	internal Connections.IppConnectionSecurity? Security { get; init; }
+
+	/// <summary>
+	/// Gets the check of printers' certificates, which remembers the fingerprints it refuses, so a refusal can give
+	/// the fingerprint to pin (ADR 0037); or <see langword="null"/>.
+	/// </summary>
+	internal Connections.IppCertificateTrust? CertificateTrust { get; init; }
+
+	/// <summary>
 	/// Initialises a new instance of the <see cref="SharpIppClientAdapter"/> class with a response timeout.
 	/// </summary>
 	/// <param name="httpClient">The HTTP client to send requests with. The adapter takes ownership of it.</param>
@@ -112,6 +124,34 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 		(
 			request.OperationAttributes?.PrinterUri,
 			token => this.client.GetPrinterAttributesAsync(request, token),
+			isUpload: false,
+			cancellationToken
+		);
+	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<IppAttribute>> GetPrinterAttributeListAsync
+	(
+		GetPrinterAttributesRequest request,
+		CancellationToken cancellationToken
+	)
+	{
+		return this.SendAsync
+		(
+			request.OperationAttributes?.PrinterUri,
+			token => this.SendRawGetPrinterAttributesAsync(request, token),
+			isUpload: false,
+			cancellationToken
+		);
+	}
+
+	/// <inheritdoc/>
+	public Task ValidateJobAsync(ValidateJobRequest request, IppVendorAttributes vendorAttributes, CancellationToken cancellationToken)
+	{
+		return this.SendAsync
+		(
+			request.OperationAttributes?.PrinterUri,
+			token => this.SendRawValidateJobAsync(request, vendorAttributes, token),
 			isUpload: false,
 			cancellationToken
 		);
@@ -186,11 +226,60 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 		raw.JobAttributes.AddRange(vendorAttributes.Job);
 
 		Uri printerUri = request.OperationAttributes?.PrinterUri?.Value
-						 ?? throw new ArgumentException("The request has no printer-uri.", nameof(request));
+						 ?? throw new ArgumentException(ExceptionMessages.IppRequestWithoutPrinterUri, nameof(request));
 
 		IIppResponseMessage response = await this.client.SendAsync(printerUri, raw, cancellationToken).ConfigureAwait(false);
 
 		return SharpIppClientAdapter.ToPrintJobResponse(response);
+	}
+
+	/// <summary>
+	/// Sends a Validate-Job request in its raw form, with the vendor attributes added to their groups, as Print-Job
+	/// sends them, so the printer judges exactly what the job will carry.
+	/// </summary>
+	/// <param name="request">The typed request.</param>
+	/// <param name="vendorAttributes">The attributes to add.</param>
+	/// <param name="cancellationToken">A token to cancel the request.</param>
+	/// <returns>True, once the printer has accepted the attributes; SharpIppNext throws for a refusal.</returns>
+	private async Task<bool> SendRawValidateJobAsync
+	(
+		ValidateJobRequest  request,
+		IppVendorAttributes vendorAttributes,
+		CancellationToken   cancellationToken
+	)
+	{
+		IIppRequestMessage raw = this.client.CreateRawRequest(request);
+		raw.OperationAttributes.AddRange(vendorAttributes.Operation);
+		raw.JobAttributes.AddRange(vendorAttributes.Job);
+
+		Uri printerUri = request.OperationAttributes?.PrinterUri?.Value
+						 ?? throw new ArgumentException(ExceptionMessages.IppRequestWithoutPrinterUri, nameof(request));
+
+		await this.client.SendAsync(printerUri, raw, cancellationToken).ConfigureAwait(false);
+
+		return true;
+	}
+
+	/// <summary>
+	/// Sends a Get-Printer-Attributes request in its raw form, and reads the printer attributes as they came.
+	/// </summary>
+	/// <param name="request">The typed request.</param>
+	/// <param name="cancellationToken">A token to cancel the request.</param>
+	/// <returns>The printer attributes, from every printer attributes group.</returns>
+	private async Task<IReadOnlyList<IppAttribute>> SendRawGetPrinterAttributesAsync
+	(
+		GetPrinterAttributesRequest request,
+		CancellationToken           cancellationToken
+	)
+	{
+		IIppRequestMessage raw = this.client.CreateRawRequest(request);
+
+		Uri printerUri = request.OperationAttributes?.PrinterUri?.Value
+						 ?? throw new ArgumentException(ExceptionMessages.IppRequestWithoutPrinterUri, nameof(request));
+
+		IIppResponseMessage response = await this.client.SendAsync(printerUri, raw, cancellationToken).ConfigureAwait(false);
+
+		return response.PrinterAttributes.SelectMany(group => group).ToList();
 	}
 
 	/// <inheritdoc/>
@@ -298,8 +387,18 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 		}
 		catch (HttpRequestException exception) when (exception.HttpRequestError == HttpRequestError.SecureConnectionError)
 		{
-			// The TLS handshake failed, most often because the server's certificate isn't trusted
-			string message = ExceptionMessages.FormatIppSecureConnectionFailed(target);
+			// The TLS handshake failed, most often because the server's certificate isn't trusted: for a printer
+			// whose certificate was refused, say which, so it can be pinned
+			Connections.RefusedCertificate? refused = this.CertificateTrust is not null && Uri.TryCreate(target, UriKind.Absolute, out Uri? targetUri)
+				? this.CertificateTrust.FindRefusal(targetUri.Host)
+				: null;
+
+			string message = refused switch
+			{
+				null                         => ExceptionMessages.FormatIppSecureConnectionFailed(target),
+				{ IsTrustedBySystem: true }  => ExceptionMessages.FormatIppCertificateNotVouchedForCredentials(target, refused.Fingerprint),
+				_                            => ExceptionMessages.FormatIppCertificateNotTrusted(target, refused.Fingerprint),
+			};
 
 			throw new PrintException(message, exception);
 		}
@@ -482,9 +581,21 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 	/// <returns>The exception to throw.</returns>
 	private PrintAuthenticationException CreateAuthenticationException(string target, int nativeErrorCode, Exception innerException)
 	{
-		string message = this.sendsCredentials
+		bool sent = this.sendsCredentials;
+		bool withheld = false;
+
+		// Direct IPP chooses credentials per printer, and sends them only over TLS (ADR 0037)
+		if (this.Security is not null && Uri.TryCreate(target, UriKind.Absolute, out Uri? targetUri))
+		{
+			sent = this.Security.FindCredentialsToSend(targetUri) is not null;
+			withheld = !sent && this.Security.FindCredentials(targetUri) is not null;
+		}
+
+		string message = sent
 			? ExceptionMessages.FormatIppCredentialsRejected(target)
-			: ExceptionMessages.FormatIppAuthenticationRequired(target);
+			: withheld
+				? ExceptionMessages.FormatIppCredentialsNeedIpps(target)
+				: ExceptionMessages.FormatIppAuthenticationRequired(target);
 
 		return new PrintAuthenticationException(message, innerException)
 		{

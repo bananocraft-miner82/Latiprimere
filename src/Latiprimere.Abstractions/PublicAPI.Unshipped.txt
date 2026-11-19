@@ -1,1 +1,52 @@
 #nullable enable
+Latiprimere.PrinterCapabilities.VendorOptions.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.VendorOption!>!
+Latiprimere.PrinterCapabilities.VendorOptions.init -> void
+Latiprimere.Rendering.RasterBand.Rotation.get -> Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterBand.Rotation.init -> void
+Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterRotation.Anticlockwise90 = 3 -> Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterRotation.Clockwise90 = 1 -> Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterRotation.Half = 2 -> Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterRotation.None = 0 -> Latiprimere.Rendering.RasterRotation
+Latiprimere.VendorOption
+Latiprimere.VendorOption.<Clone>$() -> Latiprimere.VendorOption!
+Latiprimere.VendorOption.AllowsSeveralValues.get -> bool
+Latiprimere.VendorOption.AllowsSeveralValues.init -> void
+Latiprimere.VendorOption.Choices.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.VendorOptionChoice!>!
+Latiprimere.VendorOption.Choices.init -> void
+Latiprimere.VendorOption.DefaultValue.get -> string?
+Latiprimere.VendorOption.DefaultValue.init -> void
+Latiprimere.VendorOption.DisplayName.get -> string!
+Latiprimere.VendorOption.DisplayName.init -> void
+Latiprimere.VendorOption.Equals(Latiprimere.VendorOption? other) -> bool
+Latiprimere.VendorOption.Key.get -> string!
+Latiprimere.VendorOption.Key.init -> void
+Latiprimere.VendorOption.Kind.get -> Latiprimere.VendorOptionKind
+Latiprimere.VendorOption.Kind.init -> void
+Latiprimere.VendorOption.MaximumValue.get -> long?
+Latiprimere.VendorOption.MaximumValue.init -> void
+Latiprimere.VendorOption.MinimumValue.get -> long?
+Latiprimere.VendorOption.MinimumValue.init -> void
+Latiprimere.VendorOption.VendorOption() -> void
+Latiprimere.VendorOptionChoice
+Latiprimere.VendorOptionChoice.<Clone>$() -> Latiprimere.VendorOptionChoice!
+Latiprimere.VendorOptionChoice.DisplayName.get -> string!
+Latiprimere.VendorOptionChoice.DisplayName.init -> void
+Latiprimere.VendorOptionChoice.Equals(Latiprimere.VendorOptionChoice? other) -> bool
+Latiprimere.VendorOptionChoice.Value.get -> string!
+Latiprimere.VendorOptionChoice.Value.init -> void
+Latiprimere.VendorOptionChoice.VendorOptionChoice() -> void
+Latiprimere.VendorOptionKind
+Latiprimere.VendorOptionKind.Choice = 0 -> Latiprimere.VendorOptionKind
+Latiprimere.VendorOptionKind.Number = 1 -> Latiprimere.VendorOptionKind
+Latiprimere.VendorOptionKind.Text = 2 -> Latiprimere.VendorOptionKind
+override Latiprimere.VendorOption.Equals(object? obj) -> bool
+override Latiprimere.VendorOption.GetHashCode() -> int
+override Latiprimere.VendorOption.ToString() -> string!
+override Latiprimere.VendorOptionChoice.Equals(object? obj) -> bool
+override Latiprimere.VendorOptionChoice.GetHashCode() -> int
+override Latiprimere.VendorOptionChoice.ToString() -> string!
+static Latiprimere.VendorOption.operator !=(Latiprimere.VendorOption? left, Latiprimere.VendorOption? right) -> bool
+static Latiprimere.VendorOption.operator ==(Latiprimere.VendorOption? left, Latiprimere.VendorOption? right) -> bool
+static Latiprimere.VendorOptionChoice.operator !=(Latiprimere.VendorOptionChoice? left, Latiprimere.VendorOptionChoice? right) -> bool
+static Latiprimere.VendorOptionChoice.operator ==(Latiprimere.VendorOptionChoice? left, Latiprimere.VendorOptionChoice? right) -> bool

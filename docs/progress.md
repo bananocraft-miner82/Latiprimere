@@ -6,11 +6,314 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 | Item | Value |
 |---|---|
-| Phase | 2: PDF and capabilities, begun; Phase 1's open items remain (Phase 0 decided: **Go**, 2026-11-12) |
-| Released | `0.1.0-preview` on nuget.org, 2026-11-15 |
-| State | Phase 1 under way. The public API for 0.1 is settled and applied ([ADR 0018](decisions/0018-api-review-0-1.md)), guarded by the public API analyzer. Windows errors now map to explained exceptions ([ADR 0019](decisions/0019-windows-error-mapping.md), proposed), and raw data to Microsoft Print to PDF is refused. CUPS servers that need a password can be used, over TLS ([ADR 0020](decisions/0020-cups-authentication.md), proposed). Integration tests against the virtual printers are wired into CI on all three runners: the CUPS container on Ubuntu, the runner's own CUPS on macOS, and the spooler test printers on Windows. The first Ubuntu run found a permissions bug in the test container, now fixed; none has passed in CI yet. Direct IPP resends jobs a busy printer turns away; IPP connections give up after 10 s and try IPv6 and IPv4 together. Still open from Phase 0: the Mac checks (Spikes 1 and 4). |
-| Next step | Owner: review `feature/print-media-options`: [ADR 0025](decisions/0025-choose-paper-colour-and-tray.md) (choosing paper, colour and tray), `WindowsOptions.MaxRenderDpi`, [ADR 0026](decisions/0026-vendor-options-in-detail.md) (vendor options), the Native AOT check in CI, and direct IPP for Windows queues ([ADR 0027](decisions/0027-direct-ipp-for-windows-queues.md), accepted); then push for CI. Phase 2's checklist is done. If anyone has a Windows 11 PC with a driverless IPP queue, its `Get-Printer` and `Get-PrinterPort` output would settle ADR 0027's last open point. Still proposed and waiting for review: ADRs [0011](decisions/0011-capability-model.md), [0019](decisions/0019-windows-error-mapping.md), [0020](decisions/0020-cups-authentication.md), [0022](decisions/0022-release-process.md) and [0024](decisions/0024-known-ipp-printer-uris.md). |
+| Phase | 3: Direct IPP and v1.0, begun ([phase-3-plan.md](phase-3-plan.md), accepted 2026-11-18); P3-1, P3-2 and P3-6 done; P3-3, P3-4 and P3-5 built (their checks on the HP wait). Phase 1's open item: the end-to-end harness's mDNS trial in CI. Phase 0's: the Mac checks (Spikes 1 and 4) |
+| Released | `11.0.5-preview` on nuget.org, 2026-11-17. The next release is `11.0.6-preview` ([ADR 0030](decisions/0030-release-numbering.md)) |
+| State | Every Phase 2 item is done. Windows PDF jobs take a Print Ticket in `windows:print-ticket` ([ADR 0031](decisions/0031-windows-print-tickets.md)). `PrinterCapabilities.VendorOptions` lists every IPP job attribute and Windows driver feature a printer offers, ready to set, and `IWindowsPrinter` reads a driver's Print Capabilities ([ADR 0032](decisions/0032-vendor-options-in-capabilities.md)). CI was green on all three runners on 2026-11-17 (owner). Releases are numbered after the latest one, and a merge with nothing new releases nothing. Every ADR is accepted (owner, 2026-11-18). |
+| Next step | P3-7: docs, samples and API reference, then P3-9 for 1.0. When the HP is on: the manual checks of P3-1, P3-3, P3-4 and P3-5 (about six sheets, each only when you say). Owner: delete the leftover branch `post-release/v11.0.4-preview`. |
 | Blockers | None |
+
+---
+
+## 2026-11-18: P3-6, remembered addresses that survive a restart
+
+**Done** (owner: "Yes, start P3-6")
+- **`IppNetworkOptions.AddressStorePath`** ([ADR 0038](decisions/0038-remembered-addresses.md)) keeps each discovered printer's name, address, IPPS address, UUID, make and location in a JSON file:
+  - read when the print system is created;
+  - written, through a temporary file, whenever a listing or lookup finds a new address, IPPS address or UUID;
+  - a missing, damaged or unwritable file is logged, never an error, and nonsensical entries are skipped;
+  - a remembered address is still used only while the printer there reports its UUID.
+- **Native AOT:** the JSON goes through a source-generated `System.Text.Json` context. CI's AOT check now also runs `ipp.discovery.remembered-address` natively.
+- **Tests:**
+  - 9 new unit tests, including a restart in which a printer silent on mDNS is found without a search, and one in which another printer answers at the address and isn't used;
+  - the harness scenario `ipp.discovery.remembered-address`, through the public API: it passes.
+
+**Not done**
+- **Trust on first use,** which could keep its pins in the same file, isn't built: it's opt-in and no one has asked for it.
+- **Not checked on the HP asleep;** the restart is checked against the scripted printer.
+
+---
+
+## 2026-11-18: P3-5, IPPS and authentication for direct IPP
+
+**Done** (owner: "Yes, start P3-5")
+- **Certificates** ([ADR 0037](decisions/0037-ipps-and-authentication.md)): the system's trust, then fingerprints pinned in `IppNetworkOptions.TrustedCertificateFingerprints`, then `ServerCertificateValidationCallback`. A refused certificate's `PrintException` gives its SHA-256 fingerprint, taken from the TLS handshake, and says where to pin it.
+- **Credentials:** `IppNetworkOptions.Credentials` for every printer, and `PrinterCredentials` for one, are sent as HTTP Basic only over TLS. A printer asking for a password over plain IPP is refused, saying to use its `ipps://` address.
+- **IPPS preferred once trust is configured (D4):** discovery keeps a printer's IPPS address as well, and lookups by name try it first, falling back to plain IPP when its certificate is refused.
+- **Tests:**
+  - 26 new unit tests;
+  - harness: `ipp.security.pinned-certificate`, `ipp.security.password-over-ipps` and `ipp.security.password-not-sent-in-clear` are new, and `ipp.security.untrusted-certificate` checks the fingerprint. All five security scenarios pass over real TLS;
+  - an integration test for `ippeveprinter` over IPPS: refused with a fingerprint, pinned, printed. It passed here against the scripted printer serving TLS; CI runs it against the container, and it skips, saying why, if that `ippeveprinter` doesn't offer TLS.
+
+**Not done**
+- **The HP over `ipps://…:443`** with its certificate pinned (the plan's "done when"): it needs the printer on. It prints a test page only when you say.
+- **Trust on first use** waits for P3-6's store. **`uri-authentication-supported`** isn't read. **The Windows route** still uses the system's trust only.
+
+---
+
+## 2026-11-18: CI fixes after the Phase 3 push
+
+**Done** (owner: "The macos and ubuntu ci jobs failed")
+- **The raster integration tests** sent straight through the client, or through a context without busy retries. CI runs each target framework's tests at once against one `ippeveprinter`, which takes one job at a time, so one got `server-error-busy`. Both tests now resend for up to two minutes, as the print system does. Checked against the scripted printer turning three jobs away as busy.
+- **Every CUPS integration test on macOS** was refused at `127.0.0.1:631`. The runner's CUPS log showed why:
+  - launchd starts cupsd on demand, and cupsd exits after a minute with nothing to do ("will restart on demand");
+  - launchd then starts it again only for its socket, `/private/var/run/cupsd`, not for TCP;
+  - the build took longer than that minute, so the tests found nothing listening.
+
+  The tests now reach a Mac's CUPS through the socket: CI, `tools/test-harness/run.sh`, the macOS printers README and CONTRIBUTING. That's what Latiprimere does on a Mac by default, so applications aren't affected; only the test settings forced TCP.
+- **The Native AOT check then failed on macOS:** `check-aot.sh` wakes cupsd before the native harness runs, and also waited for the server to answer on its port. It read `/private/var/run/cupsd` as a host and port and waited for `/private/var/run/cupsd:631`. A socket path now needs only the scheduler to answer through it; a `host:port` server is still checked on its port. Checked locally with stand-ins for `lpstat` and `nc`.
+
+**Not done**
+- **Not run on a Mac here;** the next CI run checks it.
+
+---
+
+## 2026-11-18: P3-4, Windows WSD queues over IPP
+
+**Done** (owner: "Start P3-4")
+- **WSD queues matched by UUID** ([ADR 0036](decisions/0036-wsd-queues-over-ipp.md)): with `PrintPdfOverIpp` on, a queue without an exactly known URI routes when:
+  - its WSD port's `Printer UUID`, read from the registry, is announced over mDNS by a printer;
+  - and that printer reports the same `printer-uuid` when asked.
+
+  The route remembers each printer found and forgets it when it stops answering or reports another UUID. A UUID nobody announced isn't searched for again for five minutes. A failed search leaves the job with the driver.
+- **Raster through the route:** the route gets the Windows rasteriser and `MaxRenderDpi`, so a printer that takes PWG raster or Apple raster but not PDF routes too. A raster job that can't be planned, such as a printer whose default paper has no size, prints through the driver instead.
+- **Seen on this PC:** the HP's WSD queue is gone; the Canon TS7500i's WSD port records `Printer UUID = 00000000-0000-1000-8000-00117d58570e`, read without administrator rights. No IPP printer answered mDNS during the session.
+- **Tests:**
+  - 28 new unit tests: the route's matching, remembering and five-minute wait, routed PDF and Apple raster jobs, mismatched and missing UUIDs, an unreachable match, a raster job that can't be planned, port-name checks, and mDNS's UUID pick;
+  - a read of every WSD port's UUID on the machine, checked against the registry;
+  - a manual harness scenario, `manual.windows-queue-over-ipp`, for the HP;
+  - harness: `windows.ipp-route.raster-to-printer` is new, and `windows.ipp-route.fallback-no-pdf`'s printer now takes neither PDF nor a raster format.
+- **Fixed, from P3-1:** `windows.ipp-route.refusal-not-resent` still expected the refused job's Print-Job, which Validate-Job now prevents. It runs only with the Windows test printers switched on (`LATIPRIMERE_TEST_WINDOWS_OUTPUT`), which P3-1's run didn't have. It now checks for one Validate-Job and no Print-Job.
+- **Results:**
+  - 2,054 tests, 1 failed, 204 skipped. The failure is the connection-racing test `GivenLoserConnectsAfterWinnerWhenConnectThenLoserConnectionIsClosed`: it passed 3 runs out of 3 on its own, its code is unchanged, and its 250 ms margin between the two addresses can be lost under the full run's load;
+  - every harness scenario this PC can run passes with the Windows test printers on: 46 passed, 19 skipped;
+  - the Native AOT check publishes without warnings and passes 6 scenarios. Routing a WSD queue isn't among them: it needs a real WSD queue and printer.
+
+**Not done**
+- **The HP's queue printing over IPP** (the plan's "done when"): the HP's WSD queue is no longer on this PC, and the HP was off. With the printer on and its queue re-added, run the manual scenario. It prints 2 sheets, and only after you say yes:
+
+  ```powershell
+  dotnet run --project tests/Latiprimere.TestHarness -- manual --printer "windows:HP ENVY 5640 series" manual.windows-queue-over-ipp
+  ```
+- **Microsoft's IPP Class Driver queues:** unexamined, since none is available.
+- **Standard TCP/IP ports** aren't matched: a host alone doesn't identify a printer.
+
+---
+
+## 2026-11-18: P3-3, printing PDFs as raster
+
+**Done** (owner: "Yes, start P3-3")
+- **PDFs to direct IPP printers that can't take PDF** go as PWG raster, or else Apple raster, when a PDF rasteriser is registered ([ADR 0035](decisions/0035-printing-pdfs-as-raster.md)):
+  - settings come from the job's options and the printer's raster attributes, read when the job is submitted: resolution (the printer's default, limited by the new `IppNetworkOptions.MaxRenderDpi`), colour space, paper, sides and back-side turns;
+  - `orientation-requested` isn't sent, as the pages are already turned;
+  - pages render on a worker thread into a pipe that is Print-Job's document, uploaded chunked and gzipped when the printer offers it;
+  - a busy printer gets the pages rendered again; a rendering failure is thrown as itself.
+- **Public API:** `IppNetworkOptions.MaxRenderDpi`, and `IppNetworkPrintSystemFactory.Create(IPdfRasterizer?, IppNetworkOptions?)`. `AddLatiprimereIpp()` uses a rasteriser registered with `AddLatiprimerePdfium()`. Without one, the job is refused, naming Latiprimere.Rendering.Pdfium.
+- **Page sizes as libcups makes them:** pixels and points are worked out from hundredths of a millimetre, rounded down, so A4 at 600 dpi is 4,960 × 7,015. The first harness run caught the encoder making it 4,961 wide, a pixel more than CUPS and Apple send; P3-2's encoder and tests are corrected.
+- **Tests:**
+  - planning, with the HP's real `urf-supported` and `ippeveprinter`'s attributes;
+  - the printer with a fake client, decoding what arrives page by page;
+  - four harness scenarios on the scripted printer, over real HTTP: `ipp.raster.pwg-pages`, `ipp.raster.apple-raster-two-sided`, `ipp.raster.busy-renders-again` and `ipp.raster.no-rasterizer-refused`;
+  - an integration test through the real client that the real `ippeveprinter` must read. It passes here against the scripted printer, standing in, and runs against `ippeveprinter` in CI.
+- **Docs:** [network-printers.md](site/print-systems/network-printers.md) has a section on printers that don't take PDF, and the example registers PDFium.
+- **Native AOT:** CI's check now also runs `ipp.raster.apple-raster-two-sided` natively, on every runner.
+
+**Not done**
+- **The HP on paper** (the plan's "done when"): a test page, colour and grey, A4, two-sided. Not printed: it needs the printer on and your go-ahead (D9).
+- **`ippeveprinter` reading the streamed raster** wasn't checked here, because Docker wasn't running. CI runs it.
+- **Windows queues** in front of raster-only printers still print through their driver, until P3-4.
+
+---
+
+## 2026-11-18: P3-2, raster encoders
+
+**Done** (owner: "Yes, start P3-2")
+- **PWG raster and Apple raster encoders** ([ADR 0034](decisions/0034-raster-encoders.md)), internal in `Latiprimere.Ipp/Raster`:
+  - `RasterDocumentEncoder` streams an `IRasterDocument` to either format in 1-bit black (PWG raster only, Bayer-dithered), 8-bit grey or sRGB, at any square resolution;
+  - each page is fitted, centred and never enlarged, onto the paper, and turned a quarter for landscape;
+  - two-sided jobs' back sides are flipped or rotated as the printer's `pwg-raster-document-sheet-back` or `DM1` to `DM4` asks;
+  - bands are capped at 16 MiB and repeated lines are folded, so a blank A4 page at 600 dpi is under 4 KB.
+- **Public API:** `RasterBand.Rotation` and the `RasterRotation` enum. PDFium renders the page turned, with no extra memory.
+- **Tests:**
+  - `RasterDocumentReader` in Latiprimere.Testing decodes both formats, written apart from the encoder;
+  - line encoding with known bytes and 200 random lines;
+  - a synthetic four-quadrant document for every turn, fit, back side, band split and colour space;
+  - three real PDFs through PDFium in both formats, grey and colour, matching PDFium's own render pixel for pixel;
+  - `ippeveprinter` integration tests print PWG raster from a three-page PDF in grey at 300 dpi and black at 600 dpi, and expect the job to complete.
+- **Results:**
+  - 1,910 tests, 0 failed, 192 skipped;
+  - the Native AOT check publishes without warnings and passes 5 scenarios (2 skipped: no CUPS or `ippeveprinter` container here). Nothing public reaches the encoders until P3-3, so for now the trimming analysers at build vouch for them, not the published harness.
+
+**Not done**
+- **The `ippeveprinter` tests** didn't run here: Docker wasn't running. They run in CI.
+- **Paper:** no real printer has printed the encoders' output yet; P3-3 prints Apple raster to the HP.
+
+---
+
+## 2026-11-18: Phase 3 planned; P3-1, Validate-Job
+
+**Done** (owner: "Let's make a start on phase three. Put together a plan for the work first", then "Yes, start P3-1")
+- **[phase-3-plan.md](phase-3-plan.md):**
+  - work packages P3-1 to P3-9, with what already exists for each, an order, risks, and decisions D1 to D9, all accepted as recommended;
+  - recorded on the way: the HP takes Apple raster (`urf-supported`: `RS300-600`, `W8`, `SRGB24`, `DM3`) and PCLm but not PDF, and `ippeveprinter` takes PWG raster (`black_1`, `sgray_8`);
+  - `IRasterDocument.RenderBand` already gives what the raster encoders need.
+- **Validate-Job** ([ADR 0033](decisions/0033-validate-job.md)):
+  - `IppPrinter` sends Validate-Job, vendor attributes included, before Print-Job when the context asks for it and the printer lists the operation, which is now read at lookup (`operations-supported`);
+  - an IPP client error refuses the job before the upload; a server error such as busy skips the check, logged at Debug;
+  - `IppNetworkOptions.ValidateJobs` (default `true`); Windows queues routed to IPP always validate; CUPS never does;
+  - `IIppClient.ValidateJobAsync` sends it raw, as Print-Job with vendor attributes is.
+- **The harness's `ipp.submission.unsupported-value-refused`** now checks that the refusal comes from Validate-Job and that no Print-Job is sent.
+- **Fixed in passing, in the harness:** two CUPS-only example scenarios ran without a CUPS server and failed. `DescribeMissing` reported the missing container only when a CUPS server was set; it now says there's no CUPS test server.
+- **Results:**
+  - 1,842 tests, 0 failed, 188 skipped;
+  - every harness scenario this PC can run passes;
+  - the Native AOT harness publishes without warnings and passes the Validate-Job, busy and Windows-route scenarios.
+
+**Not done**
+- **The real HP:** not checked, because it was off: neither its link-local address nor mDNS answered. Validate-Job alone prints nothing, so the check is safe whenever it's on.
+
+---
+
+## 2026-11-18: Second review's fixes
+
+**Done** (owner: "Let's run another sweep through", then "Fix all seven")
+- **The CLI** reports `ArgumentException`s (a vendor option the printer lacks, a ticket that isn't one) and files it can't read as messages, exiting with code 64, instead of crashing; `print-capabilities --ticket` with no file says so.
+- **Remembered refusals:**
+  - an IPP printer that refuses the vendor option request, with a client error or an unreadable answer, isn't asked again by the same `IPrinter`;
+  - a Windows driver without Print Ticket support isn't tried again;
+  - so each costs one round trip and one log entry, not one per capabilities read;
+  - looking up a job's paper and tray no longer opens a Print Ticket session.
+- **The queue report:**
+  - lists queues with a plain `Get-Printer`, which doesn't ask print servers;
+  - reads each queue's details in its own try, so one that fails is recorded with its error rather than stopping the report;
+  - matches `-PrinterName` exactly, warning about names it doesn't find.
+- **IPP text values** aren't offered as choices, since they'd go back as names.
+- **`PrintTicketSession.Dispose`** runs once, however often it is called.
+- **Tests:**
+  - each of the three AddLatiprimere… methods passes DI's logger factory on, and logs nothing without one;
+  - a refusal is remembered and a connection failure isn't;
+  - a double Dispose leaves COM working, checked with Microsoft Print to PDF.
+- **Docs:** the guide's example shows limits that aren't reported as "any", and the guide says what isn't listed and what's refused.
+- **Results:** 1,830 tests, 0 failed, 188 skipped. The Native AOT harness publishes without warnings and passes the vendor option scenarios.
+
+---
+
+## 2026-11-18: Review fixes for the vendor option work
+
+**Done** (owner: "Let's run a sweep for bugs, potential performance, security issues etc.", then "Fix all ten")
+- **IPP:**
+  - resolution values are inferred only for attributes ending in `-resolution`, so `cups:resolution` = `600dpi` is sent as a name, as before;
+  - the vendor option request runs after the typed one, not alongside it, since some printers take one connection at a time; if it fails, the capabilities list no vendor options and the failure is logged, instead of the whole capabilities read failing.
+- **Windows:**
+  - a missing `prntvpt.dll` is a `PrintException` at the interop boundary, so capabilities still work without it;
+  - parameters the driver expects encrypted, such as Print to PDF's PDF passwords, aren't listed;
+  - options the device or an administrator rules out are refused, as they aren't listed;
+  - feature keys are checked against the Print Capabilities for the job's saved `windows:devmode`;
+  - copied features carry namespace declarations made below the document's root;
+  - the default DEVMODE is read once per capabilities read.
+- **Logging:** `Latiprimere.Ipp`, `Latiprimere.Cups` and `Latiprimere.Windows` now reference `Microsoft.Extensions.Logging.Abstractions`. Their contexts carry a logger from DI's `ILoggerFactory`; the public factories log nothing. What used to be swallowed is now logged.
+- **Conventions:** messages come from resources, literals are named constants, the XML reader settings and the keyword naming are each written once (`PrintSchemaText.CreateReaderSettings`, `IppKeywords.Describe`), and the tests share one `RecordingLogger` in Latiprimere.Testing.
+- **CONTRIBUTING.md:** the dependency rule now names `Latiprimere.Ipp` as the one adapter the others may reference (ADRs 0006 and 0027), and the AOT note points to the scenario list in `check-aot.sh`.
+- **Tests:** 1,808, 0 failed, 188 skipped. The Native AOT publishes for both targets have no trimming or AOT warnings, and the vendor option scenarios pass natively.
+
+**Learned**
+- **`cups:Resolution`, as first reported, was never accepted:** vendor option names must be lowercase IPP keywords, so CUPS's capitalised PPD option names can't be set through `cups:`. That's an existing limit of ADR 0026, worth knowing for drivers whose options are all PPD-named.
+
+**Not done**
+- A Windows capabilities read still opens a Print Ticket session, which for a queue shared from a print server may go to the server. It isn't cached, since the driver's settings can change between reads.
+
+---
+
+## 2026-11-18: Vendor options in the capabilities, Windows Print Capabilities, and the queue report
+
+**Done** (owner: "Build both, but also include 2B and 2C rather than waiting for someone to ask for it. Let's go as fully featured as we can.")
+- **The queue report** ([tools/windows-queue-report](../tools/windows-queue-report/README.md)): a read-only PowerShell script that records each Windows queue as JSON, in about 15 seconds:
+  - `Get-Printer`, `Get-PrinterPort` and `Get-PrinterDriver`, every property;
+  - the spooler and port monitor registry keys;
+  - the queue's Plug and Play device and the other devices of the same printer.
+
+  The first version looked each device's container up one at a time and took minutes; one batched call fixed it.
+- **What it found** (ADR 0027, "Follow-up"):
+  - Windows had set up a queue for the HP itself, `HPA495A2 (HP ENVY 5540 series)`, on a WSD port with HP's inbox class driver, not Microsoft's IPP Class Driver;
+  - the WSD port's registry key records `Printer UUID = 1c852a4d-…`;
+  - asked over IPP, the printer's `printer-uuid` is `urn:uuid:` and the same value.
+
+  So WSD queues can be matched exactly to IPP printers found over mDNS. That's left for Phase 3, since this printer doesn't take PDF over IPP.
+- **Vendor options in `PrinterCapabilities`** ([ADR 0032](decisions/0032-vendor-options-in-capabilities.md)): `VendorOption` and `VendorOptionChoice` records and a `VendorOptionKind` enum in Latiprimere.Abstractions. Every key and value listed can be set in `PrintOptions.VendorOptions` as it is.
+  - **IPP:**
+    - a raw Get-Printer-Attributes request for the `job-template` group, alongside the typed one, through the new `IIppClient.GetPrinterAttributeListAsync`;
+    - attributes from `job-creation-attributes-supported`, minus what the typed options send;
+    - collections skipped by their nesting, since the flattened encoding names a member's values after the member (`media-type` turned up from `media-col-database`);
+    - resolutions written `600dpi`, which the vendor option encoder now sends as `resolution`.
+  - **Windows:**
+    - the driver's Print Capabilities and default ticket read in one Print Ticket session, with features as `windows:feature:` keys and parameters as `windows:parameter:` keys, under the document's own prefixes;
+    - options without names identified by their scored properties (`psk:PagesPerSheet=4`);
+    - at print time the keys are checked against the Print Capabilities and copied into a second delta ticket, merged after `windows:print-ticket`.
+- **`IWindowsPrinter`** (public, in Latiprimere.Windows): `QueueName`, `GetPrintCapabilitiesAsync(printTicket)` and `GetDefaultPrintTicketAsync()`.
+  - The Print Ticket code moved into a `PrintTicketSession` class: one provider and one COM initialisation, used on one thread.
+  - `SafeComStreamHandle` gained `Read`, through the vtable as before.
+- **Tools:**
+  - the CLI's `caps` lists vendor options; `print-capabilities` writes the driver's documents; `print --ticket FILE` sends a ticket file;
+  - the harness gained `ipp.vendor-options.listed-and-sent` and `windows.vendor-options.listed-and-sent`, both in CI's Native AOT check;
+  - manual mode saves the vendor options and, on Windows, the driver's documents;
+  - the docs' capabilities guide gained vendor option and Print Capabilities sections, with examples that run in the examples sample.
+- **Tests:**
+  - the solution: 1,790 tests, 0 failed, 188 skipped (no spooler test printers or CUPS container on this PC);
+  - IPP vendor options against four captured responses (HP ENVY 5640, `ippeveprinter`, two CUPS 2.4 queues), each listed value sent back with the tag it was listed with;
+  - Windows Print Capabilities against a document modelled on the HP and XPS drivers;
+  - the five related harness scenarios, normally and as Native AOT builds for both targets, with no trimming or AOT warnings.
+
+**Learned**
+- **Microsoft Print to PDF's vendor namespace includes its driver version** (`…/Microsoft_Print To PDF/10.0.26100.9974/`), while the Print Ticket API's prefix for it is `ns0000`. Keys use prefixes, so a driver update doesn't break saved settings.
+- **Through the HP's own driver,** pages per sheet 4, Best quality and HP Premium Plus Photo paper were merged and read back from the DEVMODE; nothing was printed.
+- **XPS Document Writer keeps an image compression choice in its DEVMODE,** but its output files held the same images either way: page images drawn through GDI aren't recompressed. It's a poor printer for checking that a feature takes effect.
+- **`print-quality` on IPP printers** came out as Draft, Normal and High for every capture. CUPS queues add `job-priority` (1 to 100), `job-sheets`, `number-up` and `job-hold-until`.
+
+**Not done**
+- Nothing committed or pushed.
+- No vendor option has been printed on paper.
+- Nested Print Schema features and IPP collections aren't listed; `windows:print-ticket` still reaches nested features.
+- A queue on Microsoft's IPP Class Driver hasn't been examined.
+
+---
+
+## 2026-11-18: Print Tickets on Windows, and release numbering
+
+**Done** (owner: "Let's continue with phase 2", "the release process is incrementing the version number twice rather than once … Can you also investigate that", and "Consider those ADRs accepted")
+- **Why 11.0.4 was skipped:**
+  - the build number was the Release workflow's run number;
+  - pull request #6 merged `main` into `release` when `main` had nothing new but 11.0.3's post-release commit, so the merged commit had exactly `v11.0.3-preview`'s files;
+  - that push started run 4, which pushed `post-release/v11.0.4-preview` and was then cancelled;
+  - the next real release was run 5, so 11.0.5.
+- **Fixed** ([ADR 0030](decisions/0030-release-numbering.md)):
+  - [next-version.sh](../tools/releasing/next-version.sh) numbers a release one after the highest build number on nuget.org or in the tags, so failed and cancelled runs leave no gap; it prints `11.0.6-preview` now;
+  - a new first job, `check`, stops a release whose files are exactly the latest release tag's ([anything-to-release.sh](../tools/releasing/anything-to-release.sh));
+  - [published-versions.sh](../tools/releasing/published-versions.sh) reads nuget.org once for all three scripts.
+- **A second gap, in the changelog:**
+  - 11.0.5's notes had been added under the released `## 11.0.3-preview` heading, so 11.0.5 had no entry;
+  - the next release would have refused to start: prepare-release.sh looked for a dated heading for the previous version, while a release without notes is allowed;
+  - now prepare-release.sh checks that the previous release's tag is in the merged commit's history;
+  - it refuses a changelog that changed since that tag without a `## Unreleased` heading;
+  - the three 11.0.5 notes have their own entry.
+
+  A dry run in a scratch worktree on main's tip prepared 11.0.6-preview. On the commit before 11.0.5's post-release merge, it stopped as it should.
+- **ADRs accepted:** 0011, 0019, 0020, 0022, 0024, 0025, 0026 and 0028 (0028's build number now superseded by 0030).
+- **Phase 2's last items:**
+  - the capability model and Windows PDF printing via PDFium were already done: reading in Spike 5, choosing on 2026-11-16, real paper on 2026-11-17; ticked;
+  - `windows:print-ticket` is built ([ADR 0031](decisions/0031-windows-print-tickets.md)). The value must be XML with a `psf:PrintTicket` root, and is re-encoded as UTF-8. PDF jobs merge it onto the driver's defaults, or onto `windows:devmode`, through `prntvpt.dll`, and the typed options are applied after it.
+- **Tests:**
+  - 12 new unit test cases;
+  - 3 integration tests with Microsoft Print to PDF: a merged A5 ticket gives a DEVMODE with paper 11, the driver refuses a malformed ticket with `ArgumentException`, and a PDF printed with the ticket comes out A5;
+  - the end-to-end scenario `windows.output.print-ticket`, which the Native AOT check now runs as well.
+  - The whole solution: 1,686 tests, 0 failed, 182 skipped (no spooler test printers or CUPS container on this PC).
+  - The CLI sample and the harness published with Native AOT without trimming or AOT warnings. The native harness passed `windows.output.print-ticket` and `windows.output.paper-and-orientation`.
+
+**Learned**
+- **COM without COM interop:** the Print Ticket API wants `IStream`s. Streams from `CreateStreamOnHGlobal`, with `Write`, `Seek` and `Release` called through unmanaged function pointers on the vtable, need no generated COM wrappers, and work under Native AOT.
+- **A delta ticket can be tiny:** naming `psk:ISOA5` alone was enough. Microsoft Print to PDF's driver filled in the size's properties.
+
+**Not done**
+- Nothing pushed or committed; the leftover remote branch `post-release/v11.0.4-preview` is still there.
+- The Print Ticket hasn't been tried with a vendor driver's own features, or on real paper.
 
 ---
 

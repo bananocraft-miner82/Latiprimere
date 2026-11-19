@@ -8,8 +8,14 @@ internal sealed record DiscoveredIppPrinter
 	/// <summary>Gets the service instance name, which is the printer's display name, such as "Office Laser".</summary>
 	public required string InstanceName { get; init; }
 
-	/// <summary>Gets the URI to send IPP requests to.</summary>
+	/// <summary>Gets the URI to send IPP requests to: over plain IPP if announced, otherwise over IPPS.</summary>
 	public required Uri PrinterUri { get; init; }
+
+	/// <summary>
+	/// Gets the printer's IPPS URI when it announced both, for use instead of <see cref="PrinterUri"/> once its
+	/// certificate is trusted (ADR 0037); or <see langword="null"/> when it announced one only.
+	/// </summary>
+	public Uri? SecureUri { get; init; }
 
 	/// <summary>Gets the make and model from the <c>ty</c> TXT key, if announced.</summary>
 	public string? MakeAndModel { get; init; }

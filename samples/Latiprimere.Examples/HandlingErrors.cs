@@ -2,8 +2,6 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Latiprimere;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace LatiprimereExamples;
 
@@ -52,22 +50,5 @@ internal static class HandlingErrors
 		}
 
 		return false;
-	}
-
-	/// <summary>
-	/// Registers Latiprimere with console logging, so skipped print systems and their errors are logged.
-	/// </summary>
-	/// <returns>The service provider, which the caller disposes.</returns>
-	public static ServiceProvider BuildServiceProviderWithLogging()
-	{
-		ServiceCollection services = new ServiceCollection();
-
-		services.AddLogging(logging => logging.AddConsole().SetMinimumLevel(LogLevel.Debug));
-		services.AddLatiprimere();
-		services.AddLatiprimereCups();
-		services.AddLatiprimereWindows();
-		services.AddLatiprimerePdfium();
-
-		return services.BuildServiceProvider();
 	}
 }

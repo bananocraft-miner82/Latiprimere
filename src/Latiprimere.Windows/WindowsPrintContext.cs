@@ -2,6 +2,8 @@ using Latiprimere.Rendering;
 using Latiprimere.Windows.DirectIpp;
 using Latiprimere.Windows.Gdi;
 using Latiprimere.Windows.Spooler;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Latiprimere.Windows;
 
@@ -22,6 +24,10 @@ internal sealed record WindowsPrintContext
 
 	/// <summary>Gets the clock used to timestamp job statuses.</summary>
 	public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
+	/// <summary>Gets where to log what the caller isn't told, such as a driver's Print Capabilities that couldn't
+	/// be read.</summary>
+	public ILogger Logger { get; init; } = NullLogger.Instance;
 
 	/// <summary>
 	/// Gets a value indicating whether a printer name may name any printer, not only a listed one, when it has a

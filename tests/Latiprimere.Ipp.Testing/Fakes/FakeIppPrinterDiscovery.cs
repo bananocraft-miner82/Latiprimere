@@ -21,7 +21,8 @@ public sealed class FakeIppPrinterDiscovery : IIppPrinterDiscovery
 	/// <param name="instanceName">The announced name.</param>
 	/// <param name="printerUri">The printer URI.</param>
 	/// <param name="uuid">The announced UUID, or <see langword="null"/> for none.</param>
-	public void AddPrinter(string instanceName, Uri printerUri, string? uuid = null)
+	/// <param name="secureUri">Its IPPS URI when it announces both, or <see langword="null"/>.</param>
+	public void AddPrinter(string instanceName, Uri printerUri, string? uuid = null, Uri? secureUri = null)
 	{
 		this.printers.Add
 		(
@@ -29,6 +30,7 @@ public sealed class FakeIppPrinterDiscovery : IIppPrinterDiscovery
 			{
 				InstanceName = instanceName,
 				PrinterUri   = printerUri,
+				SecureUri    = secureUri,
 				MakeAndModel = "Test Printer",
 				Location     = "Test lab",
 				Uuid         = uuid
@@ -64,6 +66,31 @@ public sealed class FakeIppPrinterDiscovery : IIppPrinterDiscovery
 
 	/// <summary>Gets the names looked up with <c>ResolveAsync</c>, in order.</summary>
 	public List<string> ResolvedNames { get; } = new List<string>();
+
+	/// <summary>Gets the UUIDs searched for, in order.</summary>
+	public List<string> SearchedUuids { get; } = new List<string>();
+
+	/// <summary>Gets or sets what searching by UUID throws, if anything.</summary>
+	public Exception? UuidSearchFailure { get; set; }
+
+	/// <inheritdoc/>
+	Task<DiscoveredIppPrinter?> IIppPrinterDiscovery.FindByUuidAsync
+	(
+		string            uuid,
+		TimeSpan          timeout,
+		CancellationToken cancellationToken
+	)
+	{
+		this.SearchedUuids.Add(uuid);
+
+		if (this.UuidSearchFailure is not null)
+		{
+			return Task.FromException<DiscoveredIppPrinter?>(this.UuidSearchFailure);
+		}
+		DiscoveredIppPrinter? printer = this.printers.FirstOrDefault(candidate => candidate.Uuid == uuid);
+
+		return Task.FromResult(printer);
+	}
 
 	/// <inheritdoc/>
 	Task<DiscoveredIppPrinter?> IIppPrinterDiscovery.ResolveAsync
