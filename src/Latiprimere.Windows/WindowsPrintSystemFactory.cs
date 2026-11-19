@@ -79,6 +79,42 @@ public static class WindowsPrintSystemFactory
 	}
 
 	/// <summary>
+	/// Makes the checks <see cref="Create(IPdfRasterizer?, WindowsOptions?, ILoggerFactory?)"/> makes of the options,
+	/// under the same conditions, without creating anything; so dependency injection can report a mistake when it is
+	/// registered rather than when the catalog is first resolved.
+	/// </summary>
+	/// <param name="options">The options.</param>
+	/// <exception cref="ArgumentException">A URI in <see cref="WindowsOptions.IppPrinterUris"/> isn't one IPP can
+	/// use, on Windows with <see cref="WindowsOptions.PrintPdfOverIpp"/> on.</exception>
+	internal static void ValidateOptions(WindowsOptions options)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+
+		if (OperatingSystem.IsWindows() && options.PrintPdfOverIpp)
+		{
+			WindowsPrintSystemFactory.ValidateIppPrinterUris(options);
+		}
+	}
+
+	/// <summary>
+	/// Checks every URI in <see cref="WindowsOptions.IppPrinterUris"/> is one IPP can use.
+	/// </summary>
+	/// <param name="options">The options.</param>
+	/// <exception cref="ArgumentException">A URI isn't an absolute ipp, ipps, http or https URI.</exception>
+	private static void ValidateIppPrinterUris(WindowsOptions options)
+	{
+		foreach (KeyValuePair<string, Uri> configured in options.IppPrinterUris)
+		{
+			_ = WindowsIppRoute.ToIppUri(configured.Value)
+				?? throw new ArgumentException
+				(
+					Resources.ExceptionMessages.FormatIppPrinterUriInvalid(configured.Key, configured.Value),
+					nameof(options)
+				);
+		}
+	}
+
+	/// <summary>
 	/// Creates the route for PDF jobs straight to IPP printers, with the same settings as direct IPP printing.
 	/// </summary>
 	/// <param name="options">The options, with the configured URIs.</param>
@@ -90,15 +126,7 @@ public static class WindowsPrintSystemFactory
 	private static WindowsIppRoute CreateIppRoute(WindowsOptions options, IPdfRasterizer? pdfRasterizer, ILoggerFactory? loggerFactory, ILogger logger)
 	{
 		// Checked before the connection pool exists, so a bad URI leaves nothing to dispose
-		foreach (KeyValuePair<string, Uri> configured in options.IppPrinterUris)
-		{
-			_ = WindowsIppRoute.ToIppUri(configured.Value)
-				?? throw new ArgumentException
-				(
-					Resources.ExceptionMessages.FormatIppPrinterUriInvalid(configured.Key, configured.Value),
-					nameof(options)
-				);
-		}
+		WindowsPrintSystemFactory.ValidateIppPrinterUris(options);
 
 		IppPrintContext ippContext = new IppPrintContext
 		{

@@ -14,6 +14,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Latiprimere.Abstractions.Tests/Latiprimere.Abstractions.Tests.csproj" />
+    <Project Path="tests/Latiprimere.ApiReference.Tests/Latiprimere.ApiReference.Tests.csproj" />
     <Project Path="tests/Latiprimere.Cups.Tests/Latiprimere.Cups.Tests.csproj" />
     <Project Path="tests/Latiprimere.EndToEnd/Latiprimere.EndToEnd.csproj" />
     <Project Path="tests/Latiprimere.EndToEnd.Tests/Latiprimere.EndToEnd.Tests.csproj" />
@@ -25,5 +26,8 @@
     <Project Path="tests/Latiprimere.TestHarness/Latiprimere.TestHarness.csproj" />
     <Project Path="tests/Latiprimere.Tests/Latiprimere.Tests.csproj" />
     <Project Path="tests/Latiprimere.Windows.Tests/Latiprimere.Windows.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/api-reference/Latiprimere.ApiReference.csproj" />
   </Folder>
 </Solution>

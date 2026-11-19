@@ -139,6 +139,13 @@ internal sealed class CupsPrintSystem : IPrintSystem
 	/// <returns>The printer, or <see langword="null"/> if CUPS has no such queue.</returns>
 	private async Task<IPrinter?> FindQueueAsync(string queueName, bool? isDefault, CancellationToken cancellationToken)
 	{
+		// No queue has these names, and as path segments they would leave /printers/: ".." would name the server
+		// itself, which CUPS takes as its default destination, so cups:.. would print there
+		if (queueName is "." or "..")
+		{
+			return null;
+		}
+
 		Uri printerUri = this.endpoint.GetPrinterUri(queueName);
 
 		PrinterDescriptionAttributes? attributes = await IppPrinterQueries

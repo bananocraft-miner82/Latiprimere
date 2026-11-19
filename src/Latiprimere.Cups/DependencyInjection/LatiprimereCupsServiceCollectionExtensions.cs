@@ -17,6 +17,8 @@ public static class LatiprimereCupsServiceCollectionExtensions
 	/// <param name="configure">Configures how to connect to CUPS, or <see langword="null"/> for the defaults.</param>
 	/// <returns>The same service collection, for chaining.</returns>
 	/// <exception cref="ArgumentNullException"><paramref name="services"/> is <see langword="null"/>.</exception>
+	/// <exception cref="ArgumentException"><see cref="CupsOptions.Server"/> isn't a socket path or host[:port], or
+	/// <see cref="CupsOptions.Credentials"/> has no user name, or one containing a colon.</exception>
 	public static IServiceCollection AddLatiprimereCups(this IServiceCollection services, Action<CupsOptions>? configure = null)
 	{
 		ArgumentNullException.ThrowIfNull(services);
@@ -24,6 +26,9 @@ public static class LatiprimereCupsServiceCollectionExtensions
 		// Capture the options now, so later changes to the delegate's state don't affect the registration
 		CupsOptions options = new CupsOptions();
 		configure?.Invoke(options);
+
+		// Checked now, where the mistake was made, rather than when the catalog is first resolved
+		CupsPrintSystemFactory.ValidateOptions(options);
 
 		// Register once, even if called more than once; the container disposes the print system on shutdown
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IPrintSystem, CupsPrintSystem>

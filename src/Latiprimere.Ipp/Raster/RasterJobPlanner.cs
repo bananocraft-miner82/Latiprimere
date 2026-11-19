@@ -19,6 +19,15 @@ internal static class RasterJobPlanner
 	/// <summary>Without a default from the printer, the highest resolution used: finer costs time for little gain.</summary>
 	internal const int PreferredMaxDpi = 600;
 
+	/// <summary>
+	/// The highest resolution ever used, whatever the printer lists or <see cref="IppNetworkOptions.MaxRenderDpi"/>
+	/// allows: the printer's answer is untrusted, and pages grow with the square of the resolution.
+	/// </summary>
+	internal const int MaxDpi = 2400;
+
+	/// <summary>The most pixels a page may be across or down, so a page size can't make rendering run without end.</summary>
+	internal const int MaxPagePixels = 100_000;
+
 	/// <summary>The printer attributes a raster job is planned from.</summary>
 	internal static readonly string[] Attributes =
 	[
@@ -107,6 +116,8 @@ internal static class RasterJobPlanner
 			BackSide    = format == RasterFormat.PwgRaster ? RasterJobPlanner.PwgBackSide(byName) : RasterJobPlanner.UrfBackSide(urf),
 			Orientation = options.Orientation
 		};
+
+		RasterJobPlanner.EnsurePageFits(settings.Media, settings.Dpi);
 
 		return new RasterJobPlan
 		{
@@ -296,13 +307,13 @@ internal static class RasterJobPlanner
 		return keyword[2..]
 			.Split('-', StringSplitOptions.RemoveEmptyEntries)
 			.Select(value => int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int dpi) ? dpi : 0)
-			.Where(dpi => dpi > 0)
+			.Where(dpi => dpi is > 0 and <= RasterJobPlanner.MaxDpi)
 			.Distinct()
 			.ToList();
 	}
 
 	/// <summary>
-	/// Reads an attribute's square resolutions, in dots per inch; others are left out.
+	/// Reads an attribute's square resolutions, in dots per inch, up to <see cref="MaxDpi"/>; others are left out.
 	/// </summary>
 	/// <param name="byName">The printer's attributes, by name.</param>
 	/// <param name="name">The attribute.</param>
@@ -311,13 +322,40 @@ internal static class RasterJobPlanner
 	{
 		const double centimetresPerInch = 2.54;
 
+		// Converted as double, as a printer's huge dots per centimetre would overflow an int
 		return byName.GetValueOrDefault(name, [])
 			.Select(attribute => attribute.Value)
 			.OfType<Resolution>()
 			.Where(resolution => resolution.Width == resolution.Height && resolution.Width > 0)
 			.Select(resolution => resolution.Units == ResolutionUnit.DotsPerCm
-				? (int)Math.Round(resolution.Width * centimetresPerInch, MidpointRounding.AwayFromZero)
-				: resolution.Width);
+				? Math.Round(resolution.Width * centimetresPerInch, MidpointRounding.AwayFromZero)
+				: resolution.Width)
+			.Where(dpi => dpi <= RasterJobPlanner.MaxDpi)
+			.Select(dpi => (int)dpi);
+	}
+
+	/// <summary>
+	/// Checks a page can be rendered: no more than <see cref="MaxPagePixels"/> across or down.
+	/// </summary>
+	/// <param name="media">The paper, chosen by the application or the printer's default.</param>
+	/// <param name="dpi">The resolution.</param>
+	/// <exception cref="NotSupportedException">The page would be larger.</exception>
+	private static void EnsurePageFits(MediaSize media, int dpi)
+	{
+		const double millimetresPerInch = 25.4;
+
+		// As double, since a printer's paper size, or the application's, could overflow integer pixels
+		double longest = Math.Max(media.WidthMillimetres, media.HeightMillimetres) / millimetresPerInch * dpi;
+
+		if (!(longest <= RasterJobPlanner.MaxPagePixels))
+		{
+			string message = ExceptionMessages.FormatRasterPageTooLarge
+			(
+				media.WidthMillimetres, media.HeightMillimetres, dpi, RasterJobPlanner.MaxPagePixels
+			);
+
+			throw new NotSupportedException(message);
+		}
 	}
 
 	/// <summary>

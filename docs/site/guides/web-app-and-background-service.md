@@ -2,7 +2,7 @@
 title: Printing from a web app or background service
 description: Accept print requests in ASP.NET Core, queue them, and print them in a background service that follows each job.
 sidebar:
-  order: 5
+  order: 7
 ---
 
 Printing takes time: a printer may be busy, asleep or slow to answer. A web request shouldn't wait for that. This guide builds an ASP.NET Core app that accepts PDFs, puts them in a queue and answers straight away, while a background service prints them one at a time and logs what happened to each.

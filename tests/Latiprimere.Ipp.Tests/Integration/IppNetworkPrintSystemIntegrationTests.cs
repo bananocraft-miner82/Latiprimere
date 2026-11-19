@@ -89,6 +89,50 @@ public sealed class IppNetworkPrintSystemIntegrationTests
 	}
 
 	[Fact]
+	public async Task GivenIppsAddressWhenItsCertificateIsRefusedThenPinnedThenTheJobCompletesOverIpps()
+	{
+		// Arrange — ippeveprinter takes TLS on its own port, with a certificate it makes itself (ADR 0037)
+		Uri plainUri = IppNetworkPrintSystemIntegrationTests.GetPrinterUri();
+		Uri secureUri = new UriBuilder(plainUri) { Scheme = "ipps" }.Uri;
+		string printerId = IppNetworkPrintSystemIntegrationTests.GetPrinterId(secureUri);
+		string? fingerprint;
+
+		await using (CatalogFixture untrusted = IppNetworkPrintSystemIntegrationTests.CreateCatalog(secureUri))
+		{
+			PrintException refused = await Assert.ThrowsAnyAsync<PrintException>
+			(
+				() => untrusted.Catalog.GetPrinterAsync(printerId, TestContext.Current.CancellationToken)
+			);
+
+			fingerprint = System.Text.RegularExpressions.Regex.Match(refused.Message, "([0-9A-F]{2}:){31}[0-9A-F]{2}").Value;
+			Assert.SkipWhen(fingerprint.Length == 0, $"This ippeveprinter didn't offer TLS: {refused.Message}");
+		}
+
+		await using CatalogFixture pinned = new CatalogFixture
+		(
+			services => services.AddLatiprimereIpp
+			(
+				options =>
+				{
+					options.EnableDiscovery = false;
+					options.PrinterUris.Add(secureUri);
+					options.TrustedCertificateFingerprints.Add(fingerprint);
+				}
+			)
+		);
+
+		IPrinter printer = await pinned.Catalog.GetPrinterAsync(printerId, TestContext.Current.CancellationToken);
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), new PrintOptions { JobName = "Latiprimere over IPPS" }, TestContext.Current.CancellationToken);
+		PrintJobStatus status = await PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(PrintJobState.Completed, status.State);
+	}
+
+	[Fact]
 	public async Task GivenPdfWhenPrintedThenJobCompletes()
 	{
 		// Arrange

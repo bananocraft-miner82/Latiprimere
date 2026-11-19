@@ -21,7 +21,8 @@ public sealed class FakeIppPrinterDiscovery : IIppPrinterDiscovery
 	/// <param name="instanceName">The announced name.</param>
 	/// <param name="printerUri">The printer URI.</param>
 	/// <param name="uuid">The announced UUID, or <see langword="null"/> for none.</param>
-	public void AddPrinter(string instanceName, Uri printerUri, string? uuid = null)
+	/// <param name="secureUri">Its IPPS URI when it announces both, or <see langword="null"/>.</param>
+	public void AddPrinter(string instanceName, Uri printerUri, string? uuid = null, Uri? secureUri = null)
 	{
 		this.printers.Add
 		(
@@ -29,6 +30,7 @@ public sealed class FakeIppPrinterDiscovery : IIppPrinterDiscovery
 			{
 				InstanceName = instanceName,
 				PrinterUri   = printerUri,
+				SecureUri    = secureUri,
 				MakeAndModel = "Test Printer",
 				Location     = "Test lab",
 				Uuid         = uuid

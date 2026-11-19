@@ -25,6 +25,67 @@ public sealed class MdnsIppPrinterDiscoveryTests
 	}
 
 	[Fact]
+	public void GivenPrinterAnnouncedAsIppAndIppsWhenToPrintersThenKeepsBothAddresses()
+	{
+		// Arrange — and another announced over IPPS only
+		DnsSdService[] services =
+		[
+			MdnsIppPrinterDiscoveryTests.CreateService("Office", "_ipps._tcp", "192.168.1.20", 443),
+			MdnsIppPrinterDiscoveryTests.CreateService("Office", "_ipp._tcp", "192.168.1.20", 631),
+			MdnsIppPrinterDiscoveryTests.CreateService("Secure only", "_ipps._tcp", "192.168.1.30", 631),
+		];
+
+		// Act
+		List<DiscoveredIppPrinter> printers = MdnsIppPrinterDiscovery.ToPrinters(services);
+
+		// Assert
+		DiscoveredIppPrinter office = Assert.Single(printers, printer => printer.InstanceName == "Office");
+		Assert.Equal(new Uri("ipp://192.168.1.20:631/ipp/print"), office.PrinterUri);
+		Assert.Equal(new Uri("ipps://192.168.1.20:443/ipp/print"), office.SecureUri);
+
+		DiscoveredIppPrinter secureOnly = Assert.Single(printers, printer => printer.InstanceName == "Secure only");
+		Assert.Equal("ipps", secureOnly.PrinterUri.Scheme);
+		Assert.Null(secureOnly.SecureUri);
+	}
+
+	[Fact]
+	public void GivenIppsAnnouncementOfTheSameNameFromAnotherHostWhenToPrintersThenItIsntThePrintersIppsAddress()
+	{
+		// Arrange — anyone can announce an IPPS service with the name of another's IPP one
+		DnsSdService[] services =
+		[
+			MdnsIppPrinterDiscoveryTests.CreateService("Office", "_ipps._tcp", "192.168.1.66", 443),
+			MdnsIppPrinterDiscoveryTests.CreateService("Office", "_ipp._tcp", "192.168.1.20", 631),
+		];
+
+		// Act
+		List<DiscoveredIppPrinter> printers = MdnsIppPrinterDiscovery.ToPrinters(services);
+
+		// Assert
+		DiscoveredIppPrinter office = Assert.Single(printers);
+		Assert.Equal(new Uri("ipp://192.168.1.20:631/ipp/print"), office.PrinterUri);
+		Assert.Null(office.SecureUri);
+	}
+
+	[Fact]
+	public void GivenIppsAnnouncementWithAnotherUuidWhenToPrintersThenItIsntThePrintersIppsAddress()
+	{
+		// Arrange — the same host, but announcing another printer's UUID
+		DnsSdService[] services =
+		[
+			MdnsIppPrinterDiscoveryTests.CreateService("Office", "_ipps._tcp", "192.168.1.20", 443) with { Txt = ["UUID=11111111-2222-3333-4444-555555555555"] },
+			MdnsIppPrinterDiscoveryTests.CreateService("Office", "_ipp._tcp", "192.168.1.20", 631) with { Txt = ["UUID=00000000-0000-1000-8000-00117d58570e"] },
+		];
+
+		// Act
+		List<DiscoveredIppPrinter> printers = MdnsIppPrinterDiscovery.ToPrinters(services);
+
+		// Assert
+		DiscoveredIppPrinter office = Assert.Single(printers);
+		Assert.Null(office.SecureUri);
+	}
+
+	[Fact]
 	public void GivenRenamedDuplicatesWithSameUriWhenToPrintersThenKeepsShortestName()
 	{
 		// Arrange — the same printer re-announced as "Office (2)" after a name conflict

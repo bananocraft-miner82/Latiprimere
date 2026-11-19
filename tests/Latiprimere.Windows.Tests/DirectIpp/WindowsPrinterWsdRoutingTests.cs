@@ -140,6 +140,30 @@ public sealed class WindowsPrinterWsdRoutingTests : IDisposable
 	}
 
 	[Fact]
+	public async Task GivenTheMatchedPrinterStopsAnsweringWhenAPdfIsSubmittedThenTheDriverPrintsItAndTheNextJobSearchesAgain()
+	{
+		// Arrange — found and printed to once, then gone from that address, as after a new DHCP lease
+		this.AddPrinter(WindowsPrinterWsdRoutingTests.Uuid, "application/pdf");
+		WindowsPrinter printer = this.CreatePrinter();
+		using MemoryStream first = WindowsPrinterWsdRoutingTests.CreatePdf();
+		using MemoryStream second = WindowsPrinterWsdRoutingTests.CreatePdf();
+		using MemoryStream third = WindowsPrinterWsdRoutingTests.CreatePdf();
+
+		IPrintJob firstJob = await printer.SubmitAsync(PrintContent.FromPdf(first), PrintOptions.Default, TestContext.Current.CancellationToken);
+		this.client.PrintJobFailureToThrow = new PrintException("Could not connect.", new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused."));
+
+		// Act — the third job finds it answering again
+		IPrintJob secondJob = await printer.SubmitAsync(PrintContent.FromPdf(second), PrintOptions.Default, TestContext.Current.CancellationToken);
+		this.client.PrintJobFailureToThrow = null;
+		IPrintJob thirdJob = await printer.SubmitAsync(PrintContent.FromPdf(third), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert — the driver printed the second, and the third was searched for afresh and sent over IPP
+		Assert.Equal(("88", "5", "88"), (firstJob.Id, secondJob.Id, thirdJob.Id));
+		Assert.NotNull(this.gdi.LastRequest);
+		Assert.Equal(2, this.discovery.SearchedUuids.Count);
+	}
+
+	[Fact]
 	public async Task GivenTheFoundPrinterIsUnreachableWhenAPdfIsSubmittedThenTheDriverPrintsItAndTheMatchIsForgotten()
 	{
 		// Arrange

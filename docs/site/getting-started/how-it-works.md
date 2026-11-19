@@ -58,7 +58,7 @@ An `IPrinter` sends documents to one printer. Its `Info` holds the description r
 
 Latiprimere prints two kinds of document:
 
-- **PDF**, made with `PrintContent.FromPdf`. CUPS and network printers take the PDF as it is: CUPS converts it for the printer, and a network printer that doesn't accept PDFs is refused with `NotSupportedException` before anything is sent. The Windows spooler can't print PDFs, so `Latiprimere.Rendering.Pdfium` draws each page and the printer's driver prints the pages.
+- **PDF**, made with `PrintContent.FromPdf`. CUPS takes the PDF as it is and converts it for the printer. A network printer that accepts PDF gets it as it is too; one that doesn't is sent its pages as images, PWG or Apple raster, rendered by `Latiprimere.Rendering.Pdfium`, or refused with `NotSupportedException` before anything is sent if that isn't registered. The Windows spooler can't print PDFs, so `Latiprimere.Rendering.Pdfium` draws each page and the printer's driver prints the pages.
 - **Raw printer data**, made with `PrintContent.FromRaw`: ZPL for label printers, ESC/POS for receipt printers, or PCL. It goes to the printer untouched, so it must be in the printer's own language. See [Labels and receipts](/docs/guides/labels-and-receipts/).
 
 You own the stream and dispose it once the job is sent. Latiprimere reads it from its current position to the end. Prefer a stream that can seek, such as a file or memory stream: a busy network printer turns a job away, and only a stream that can seek can be sent again.
@@ -108,6 +108,6 @@ Every Latiprimere exception derives from `PrintException`, and print systems are
 ## Safe by default
 
 - **Only known printers.** A printer ID can reach only printers the catalog already knows, so an ID that comes from a web request can't make your server connect somewhere else. `AllowAnyPrinterUri` and `AllowAnyPrinterName` relax this, and are off by default.
-- **Passwords travel encrypted.** When you give a CUPS server a user name and password, Latiprimere connects over TLS and checks the server's certificate.
+- **Passwords travel encrypted.** When you give a CUPS server a user name and password, Latiprimere connects over TLS and checks the server's certificate. A network printer gets its password only over IPPS, once you have pinned its certificate or it's one the computer trusts.
 
-See [Network printers over IPP](/docs/print-systems/network-printers/) and [CUPS servers and the Windows spooler](/docs/print-systems/cups-and-windows/) for the settings.
+See [Network printers over IPP](/docs/print-systems/network-printers/), [Secure network printers](/docs/print-systems/secure-printers/) and [CUPS servers and the Windows spooler](/docs/print-systems/cups-and-windows/) for the settings.

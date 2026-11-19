@@ -81,4 +81,24 @@ public sealed class LatiprimereCupsServiceCollectionExtensionsTests
 		// Assert
 		Assert.Throws<ArgumentNullException>(addCups);
 	}
+
+	[Theory]
+	[InlineData("ann@printserver", "ann")]
+	[InlineData("printserver:631", "ann:smith")]
+	public void GivenAServerOrCredentialsThatCantBeUsedWhenAddLatiprimereCupsThenThrowsWithoutWaitingForTheCatalog(string server, string userName)
+	{
+		// Arrange — a user name isn't part of a server, and HTTP Basic can't carry a colon in one
+		ServiceCollection services = new ServiceCollection();
+
+		// Act
+		Action addCups = () => services.AddLatiprimereCups(options =>
+		{
+			options.Server = server;
+			options.Credentials = new System.Net.NetworkCredential(userName, "secret");
+		});
+
+		// Assert
+		Assert.Throws<ArgumentException>(addCups);
+		Assert.Empty(services);
+	}
 }

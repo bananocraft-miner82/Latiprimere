@@ -8,6 +8,14 @@ Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` 
 
 ### Added
 
+- **Printers found on the network are remembered across restarts** with the new `IppNetworkOptions.AddressStorePath`. A printer that stops answering mDNS while asleep is still found by name at its last address, as long as it still reports the UUID it announced. The file is JSON; a missing or damaged one is logged, never an error.
+
+- **Secure printers over IPPS:** direct IPP can now trust a printer's own certificate and send it a password.
+  - **Pinning:** add the certificate's SHA-256 fingerprint to `IppNetworkOptions.TrustedCertificateFingerprints`, or decide in `ServerCertificateValidationCallback`. A refused certificate's `PrintException` gives the fingerprint to pin.
+  - **Passwords:** `IppNetworkOptions.Credentials`, or `PrinterCredentials` for one printer, are sent over IPPS only, never in clear text. A printer that asks for one over plain IPP is refused with a `PrintAuthenticationException` saying to use its `ipps://` address.
+  - **Who gets the shared password:** while `Credentials` is set, a certificate the system trusts is enough only for printers configured in `PrinterUris` or `PrinterCredentials`. A printer found on the network needs its certificate pinned or accepted by the callback, since anyone on the network can announce a printer at a host with a public certificate.
+  - **IPPS preferred once trusted:** with trust configured, printers found on the network that announce IPPS are reached over it, falling back to plain IPP if their certificate isn't trusted or nothing answers there.
+
 - **Windows WSD queues print PDFs over IPP without configuration,** when `WindowsOptions.PrintPdfOverIpp` is on. A queue Windows set up itself on a WSD port records its printer's UUID. The printer announcing that UUID over mDNS, and confirming it when asked, gets the queue's PDF jobs straight over IPP, so each job reports how it ended. Before, such queues needed their address in `IppPrinterUris`.
   - **Printers that don't take PDF:** routed queues send PDFs to such printers as PWG raster or Apple raster, rendered with the Windows print system's rasteriser at the printer's resolution, limited by `WindowsOptions.MaxRenderDpi`. Before, they stayed on their driver.
   - **Finding the printer:** the first PDF job to a WSD queue listens for up to two seconds. A printer not found isn't searched for again for five minutes, and its jobs go through the driver as before.
@@ -28,6 +36,15 @@ Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` 
 ### Changed
 
 - **Network printers check a job's settings before the document is sent.** A job asking for something the printer can't do, such as two-sided printing on a one-sided printer, is refused with Validate-Job before its document is uploaded, with the same `PrintException` and IPP status as before. It's one short request per job, sent only to printers that list Validate-Job, and a printer too busy to answer it gets the job anyway. `IppNetworkOptions.ValidateJobs = false` turns it off. Windows queues routed straight to their IPP printer check the same way.
+- **`AddLatiprimereIpp`, `AddLatiprimereCups` and `AddLatiprimereWindows` check their options when called,** with the same `ArgumentException` as before, rather than when the catalog is first resolved. A bad fingerprint, credential, CUPS server or IPP printer URI is now reported where it was configured, instead of failing the whole catalog later.
+
+### Fixed
+
+- **A Windows queue routed over IPP whose printer stops answering is found again.** Once its printer had been found, a moved or switched-off printer made every later PDF job wait for the connection to time out before the driver printed it. Now the first such job forgets the printer, and the next one looks for it afresh, by its UUID for a WSD queue.
+- **`cups:..` and `cups:.` find no printer.** No queue has those names, and `..` reached the CUPS server itself, which prints to its default destination.
+
+- **A configured printer that also announces itself is listed once,** under its configured identifier, when its URI in `IppNetworkOptions.PrinterUris` leaves out IPP's port 631. Before, it was listed twice: by URI and by name.
+- **PDFs printed as raster are never rendered above 2400 dpi,** nor as pages more than 100,000 pixels across or down, whatever the printer reports. A printer listing only higher resolutions, or a paper too large, is refused with `NotSupportedException` instead of rendering without end.
 
 ## 11.0.5-preview - 2026-11-17
 

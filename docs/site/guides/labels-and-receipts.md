@@ -2,7 +2,7 @@
 title: Labels and receipts
 description: Send raw printer data, such as ZPL to a Zebra label printer or ESC/POS to a receipt printer.
 sidebar:
-  order: 3
+  order: 4
 ---
 
 Label and receipt printers usually have their own languages: ZPL for Zebra label printers, ESC/POS for most receipt printers. To use one, build the commands yourself and send them with `PrintContent.FromRaw`. Latiprimere passes the bytes to the printer unchanged.

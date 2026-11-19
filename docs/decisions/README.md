@@ -42,6 +42,9 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0034](0034-raster-encoders.md) | Raster encoders for printers without PDF | Accepted |
 | [0035](0035-printing-pdfs-as-raster.md) | Printing PDFs as raster over IPP | Accepted |
 | [0036](0036-wsd-queues-over-ipp.md) | Windows WSD queues over IPP, matched by UUID | Accepted |
+| [0037](0037-ipps-and-authentication.md) | IPPS and authentication for direct IPP | Accepted |
+| [0038](0038-remembered-addresses.md) | Remembered printer addresses that survive a restart | Accepted |
+| [0039](0039-api-reference.md) | API reference generated into committed pages | Accepted |
 
 ## Template
 

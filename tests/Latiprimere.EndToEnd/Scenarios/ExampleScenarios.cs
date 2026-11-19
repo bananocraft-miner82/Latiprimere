@@ -37,6 +37,30 @@ public static class ExampleScenarios
 	};
 
 	/// <summary>
+	/// "Vendor options and Windows Print Capabilities".
+	/// </summary>
+	public static readonly Scenario VendorOptions = new Scenario
+	{
+		Id = "samples.examples.vendor-options",
+		Area = ScenarioArea.Samples,
+		Title = "The vendor options example runs against a test printer and lists its options under that print system's prefix",
+		Needs = TargetNeeds.None,
+		RunAsync = ExampleScenarios.VendorOptionsAsync
+	};
+
+	/// <summary>
+	/// "Logging", with and without dependency injection.
+	/// </summary>
+	public static readonly Scenario Logging = new Scenario
+	{
+		Id = "samples.examples.logging",
+		Area = ScenarioArea.Samples,
+		Title = "The logging examples, with and without dependency injection, log the catalog's print systems at Debug and list printers",
+		Needs = TargetNeeds.None,
+		RunAsync = ExampleScenarios.LoggingAsync
+	};
+
+	/// <summary>
 	/// "Your first print job", which prints to the default printer.
 	/// </summary>
 	public static readonly Scenario FirstPrintJob = new Scenario
@@ -152,6 +176,45 @@ public static class ExampleScenarios
 		SampleRun run = await Samples.RunAsync(context, Samples.Examples, ["capabilities", printerId]);
 		context.CheckEqual("it exits with 0", 0, run.ExitCode);
 		context.Check("it shows the paper sizes, A4 among them", run.Output.Contains("Paper sizes:", StringComparison.Ordinal) && run.Output.Contains("A4", StringComparison.Ordinal));
+	}
+
+	/// <summary>
+	/// Runs <see cref="VendorOptions"/>.
+	/// </summary>
+	/// <param name="context">The scenario's context.</param>
+	/// <returns>A task that completes when the scenario has run.</returns>
+	private static async Task VendorOptionsAsync(ScenarioContext context)
+	{
+		// CUPS-PDF lists ipp: keys; Microsoft Print to PDF lists its driver's windows: features
+		(string PrinterId, string Prefix)? target = context.Targets.Available.HasFlag(TargetNeeds.CupsContainer) ? (TestPrinters.CupsPdf, "ipp:")
+			: context.Targets.HasMicrosoftPrintToPdf ? (TestPrinters.MicrosoftPrintToPdf, "windows:feature:")
+			: null;
+
+		if (target is null)
+		{
+			context.Skip("no test printer to read: needs the CUPS test container or Microsoft Print to PDF");
+		}
+
+		SampleRun run = await Samples.RunAsync(context, Samples.Examples, ["vendor-options", target.Value.PrinterId]);
+		context.CheckEqual("it exits with 0", 0, run.ExitCode);
+		context.Check($"it lists options as {target.Value.Prefix} keys", run.Output.Contains(Environment.NewLine + target.Value.Prefix, StringComparison.Ordinal) || run.Output.StartsWith(target.Value.Prefix, StringComparison.Ordinal));
+		context.Check("it says which best quality it would choose", run.Output.Contains("Best quality:", StringComparison.Ordinal));
+	}
+
+	/// <summary>
+	/// Runs <see cref="Logging"/>.
+	/// </summary>
+	/// <param name="context">The scenario's context.</param>
+	/// <returns>A task that completes when the scenario has run.</returns>
+	private static async Task LoggingAsync(ScenarioContext context)
+	{
+		foreach (string example in new[] { "logging", "logging-without-di" })
+		{
+			SampleRun run = await Samples.RunAsync(context, Samples.Examples, [example]);
+			context.CheckEqual($"'{example}' exits with 0", 0, run.ExitCode);
+			context.Check($"'{example}' logs under Latiprimere.PrinterCatalog", run.Output.Contains("Latiprimere.PrinterCatalog", StringComparison.Ordinal));
+			context.Check($"'{example}' logs which print systems are available", run.Output.Contains("is available.", StringComparison.Ordinal));
+		}
 	}
 
 	/// <summary>

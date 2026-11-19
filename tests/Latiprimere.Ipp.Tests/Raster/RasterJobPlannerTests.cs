@@ -243,6 +243,71 @@ public sealed class RasterJobPlannerTests
 		Assert.Same(RasterJobPlannerTests.A5, chosen.Settings.Media);
 	}
 
+	[Fact]
+	public void GivenAPrinterDefaultAbove2400DpiWhenPlannedThenItIsLeftOut()
+	{
+		// Arrange — a printer, hostile or broken, whose default and highest resolution is absurd
+		List<IppAttribute> attributes = RasterJobPlannerTests.PwgAttributes("sgray_8");
+		attributes.Add(new IppAttribute(Tag.Resolution, string.Empty, new Resolution(100_000, 100_000, ResolutionUnit.DotsPerInch)));
+		attributes.Add(new IppAttribute(Tag.Resolution, "printer-resolution-default", new Resolution(100_000, 100_000, ResolutionUnit.DotsPerInch)));
+
+		// Act
+		RasterJobPlan plan = RasterJobPlanner.Plan(RasterFormat.PwgRaster, attributes, PrintOptions.Default, maxRenderDpi: null);
+
+		// Assert
+		Assert.Equal(300, plan.Settings.Dpi);
+	}
+
+	[Theory]
+	[InlineData((int)RasterFormat.PwgRaster)]
+	[InlineData((int)RasterFormat.AppleRaster)]
+	public void GivenOnlyResolutionsAbove2400DpiWhenPlannedThenNotSupported(int formatValue)
+	{
+		// Arrange — in dots per centimetre, one that would overflow an int as dots per inch
+		RasterFormat format = (RasterFormat)formatValue;
+		List<IppAttribute> attributes =
+		[
+			new IppAttribute(Tag.Resolution, "pwg-raster-document-resolution-supported", new Resolution(int.MaxValue, int.MaxValue, ResolutionUnit.DotsPerCm)),
+			new IppAttribute(Tag.Resolution, string.Empty, new Resolution(4800, 4800, ResolutionUnit.DotsPerInch)),
+			new IppAttribute(Tag.Keyword, "pwg-raster-document-type-supported", "sgray_8"),
+			new IppAttribute(Tag.Keyword, "urf-supported", "W8"),
+			new IppAttribute(Tag.Keyword, string.Empty, "RS4800-2147483647"),
+			new IppAttribute(Tag.Keyword, "media-default", "iso_a4_210x297mm"),
+		];
+
+		// Act
+		Action plan = () => RasterJobPlanner.Plan(format, attributes, PrintOptions.Default, maxRenderDpi: null);
+
+		// Assert
+		NotSupportedException exception = Assert.Throws<NotSupportedException>(plan);
+		Assert.Contains("2400", exception.Message, StringComparison.Ordinal);
+	}
+
+	[Theory]
+	[InlineData("custom_huge_999999x999999mm", null)]
+	[InlineData("iso_a4_210x297mm", 1e300)]
+	public void GivenAPageTooLargeToRenderWhenPlannedThenNotSupported(string mediaDefault, double? chosenMillimetres)
+	{
+		// Arrange — the printer's default paper, or the application's own (provided by InlineData above)
+		List<IppAttribute> attributes = RasterJobPlannerTests.PwgAttributes("sgray_8");
+		attributes.RemoveAll(attribute => attribute.Name == "media-default");
+		attributes.Add(new IppAttribute(Tag.Keyword, "media-default", mediaDefault));
+
+		PrintOptions options = chosenMillimetres is null
+			? PrintOptions.Default
+			: new PrintOptions
+			{
+				MediaSize = new MediaSize { Name = "huge", DisplayName = "Huge", WidthMillimetres = chosenMillimetres.Value, HeightMillimetres = chosenMillimetres.Value }
+			};
+
+		// Act
+		Action plan = () => RasterJobPlanner.Plan(RasterFormat.PwgRaster, attributes, options, maxRenderDpi: null);
+
+		// Assert
+		NotSupportedException exception = Assert.Throws<NotSupportedException>(plan);
+		Assert.Contains("100000", exception.Message, StringComparison.Ordinal);
+	}
+
 	/// <summary>
 	/// The HP ENVY 5640's raster attributes, as it reports them (Data/hp-envy-5640-printer-attributes.ipp).
 	/// </summary>

@@ -85,7 +85,7 @@ jobs:
           $outputDirectory = Join-Path $env:ProgramData 'Latiprimere\TestOutput'
           ./tools/windows-test-printers/Install-TestPrinters.ps1 -OutputDirectory $outputDirectory
           "LATIPRIMERE_TEST_WINDOWS_OUTPUT=$outputDirectory" >> $env:GITHUB_ENV
-          Get-Printer | Format-Table Name, DriverName, PortName -AutoSize
+          Get-Printer | Format-Table Name, DriverName, PortName, KeepPrintedJobs -AutoSize
 
       - name: Restore
         run: dotnet restore
@@ -95,6 +95,20 @@ jobs:
 
       - name: Test
         run: dotnet test --no-build --configuration Release
+
+      # The API reference in docs/site/reference is generated from the public types and their documentation
+      # comments by tools/api-reference. It's committed, so each release tag carries the reference for its own API,
+      # which the website reads; this fails when the committed pages no longer match the code.
+      - name: Check the API reference
+        if: runner.os == 'Linux'
+        run: |
+          dotnet run --project tools/api-reference --no-build --configuration Release
+          if [ -n "$(git status --porcelain -- docs/site/reference)" ]; then
+            git status --short -- docs/site/reference
+            git diff --stat -- docs/site/reference
+            echo "::error::docs/site/reference doesn't match the code. Run 'dotnet run --project tools/api-reference' and commit the pages."
+            exit 1
+          fi
 
       # Native AOT needs the platform's linker: the runners have Visual Studio's C++ tools and Xcode, and Linux needs
       # clang and zlib

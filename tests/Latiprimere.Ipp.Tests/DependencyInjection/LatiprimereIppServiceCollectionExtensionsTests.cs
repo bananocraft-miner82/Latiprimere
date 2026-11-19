@@ -90,4 +90,19 @@ public sealed class LatiprimereIppServiceCollectionExtensionsTests
 		// Assert
 		Assert.Throws<ArgumentNullException>(addIpp);
 	}
+
+	[Fact]
+	public void GivenAFingerprintThatIsntSha256WhenAddLatiprimereIppThenThrowsWithoutWaitingForTheCatalog()
+	{
+		// Arrange
+		ServiceCollection services = new ServiceCollection();
+
+		// Act
+		Action addIpp = () => services.AddLatiprimereIpp(options => options.TrustedCertificateFingerprints.Add("3A:7F:00"));
+
+		// Assert — nothing registered, so the mistake can't surface later instead
+		ArgumentException exception = Assert.Throws<ArgumentException>(addIpp);
+		Assert.Contains("SHA-256", exception.Message, StringComparison.Ordinal);
+		Assert.Empty(services);
+	}
 }

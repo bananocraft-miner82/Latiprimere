@@ -171,8 +171,8 @@ Broken into work packages P3-1 to P3-9, with what exists and the decisions taken
 - [ ] Direct IPP adapter with mDNS discovery (started in Spike 4)
 - [x] Validate-Job before submitting to network printers. Done 2026-11-18 (P3-1, [ADR 0033](decisions/0033-validate-job.md)): on by default for printers that list it, `IppNetworkOptions.ValidateJobs` to turn it off; Windows queues routed to IPP check too. Still to do: a check on the real HP, which was off
 - [ ] Print PDFs to printers that don't accept PDF, by rendering with PDFium to Apple raster (`image/urf`), PCLm or PWG raster. The HP ENVY 5640 is one: over IPP it takes PCL, JPEG, PCLm, Apple raster and octet-stream, but not PDF. Encoders done 2026-11-18 (P3-2, [ADR 0034](decisions/0034-raster-encoders.md)): PWG raster and Apple raster, grey, colour and 1-bit black, with back-side transforms. Printing with them over direct IPP built 2026-11-18 (P3-3, [ADR 0035](decisions/0035-printing-pdfs-as-raster.md)); Windows WSD queues route to such printers too, matched by UUID over mDNS (P3-4, [ADR 0036](decisions/0036-wsd-queues-over-ipp.md)); the checks on the HP's paper remain
-- [ ] IPPS (TLS) and authentication
-- [ ] Optionally persist the remembered addresses of name IDs, so a printer that stops answering mDNS while asleep is still found after a restart (the HP ENVY did this on 2026-11-12)
+- [ ] IPPS (TLS) and authentication. Built 2026-11-18 (P3-5, [ADR 0037](decisions/0037-ipps-and-authentication.md)): pinned certificates by SHA-256 fingerprint or a callback, credentials sent only over IPPS, and IPPS preferred for discovered printers once trust is configured. Checked over real TLS on the scripted printer; the HP over `ipps://` waits for the manual check
+- [x] Optionally persist the remembered addresses of name IDs, so a printer that stops answering mDNS while asleep is still found after a restart (the HP ENVY did this on 2026-11-12). Done 2026-11-18 (P3-6, [ADR 0038](decisions/0038-remembered-addresses.md)): `IppNetworkOptions.AddressStorePath`
 - [ ] Documentation site and samples (console, ASP.NET Core, worker service)
 - [ ] macOS verification on real hardware
 - [ ] `1.0.0` release

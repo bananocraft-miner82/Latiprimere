@@ -21,6 +21,7 @@ internal sealed class FakeIppClient : IIppClient, IDisposable
 		new List<GetPrinterAttributesRequest>(); // Get-Printer-Attributes requests received
 	private readonly HashSet<string> unreachableUris = new HashSet<string>(); // URIs that fail to connect
 	private readonly HashSet<string> unresponsiveUris = new HashSet<string>(); // URIs that never answer
+	private readonly HashSet<string> untrustedUris = new HashSet<string>();    // URIs whose TLS handshake fails
 	private readonly List<byte[]> receivedDocuments = new List<byte[]>(); // Document bytes of each Print-Job, in order
 
 	/// <summary>Gets or sets the printers returned by CUPS-Get-Printers.</summary>
@@ -108,12 +109,22 @@ internal sealed class FakeIppClient : IIppClient, IDisposable
 	}
 
 	/// <summary>
-	/// Makes Get-Printer-Attributes for a printer URI fail as if nothing could be connected to there.
+	/// Makes Get-Printer-Attributes for a printer URI fail as if nothing could be connected to there, with the
+	/// connection error <see cref="SharpIppClientAdapter"/> reports then.
 	/// </summary>
 	/// <param name="printerUri">The printer URI.</param>
 	public void AddUnreachable(Uri printerUri)
 	{
 		this.unreachableUris.Add(printerUri.ToString());
+	}
+
+	/// <summary>
+	/// Makes a URI's printer refuse the encrypted connection, as when its certificate isn't trusted.
+	/// </summary>
+	/// <param name="printerUri">The printer's ipps URI.</param>
+	public void AddUntrusted(Uri printerUri)
+	{
+		this.untrustedUris.Add(printerUri.ToString());
 	}
 
 	/// <summary>
@@ -196,7 +207,12 @@ internal sealed class FakeIppClient : IIppClient, IDisposable
 
 		if (this.unreachableUris.Contains(printerUri))
 		{
-			throw new PrintException("Could not connect.");
+			throw new PrintException("Could not connect.", new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused."));
+		}
+
+		if (this.untrustedUris.Contains(printerUri))
+		{
+			throw new PrintException("Could not open an encrypted connection.", new HttpRequestException(HttpRequestError.SecureConnectionError, "The certificate isn't trusted."));
 		}
 
 		if (!this.printersByUri.TryGetValue(printerUri, out PrinterDescriptionAttributes? attributes))
@@ -261,7 +277,7 @@ internal sealed class FakeIppClient : IIppClient, IDisposable
 
 		if (this.unreachableUris.Contains(printerUri))
 		{
-			throw new PrintException("Could not connect.");
+			throw new PrintException("Could not connect.", new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused."));
 		}
 
 		if (!this.printersByUri.ContainsKey(printerUri))

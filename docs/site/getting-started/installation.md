@@ -14,7 +14,7 @@ Latiprimere is split into small packages: one that finds printers, and one for e
 | `Latiprimere`                  | The printer catalog, which finds printers across every print system. Always install it. |
 | `Latiprimere.Cups`             | Prints through CUPS: on Linux and macOS, or with a CUPS server from any platform.   |
 | `Latiprimere.Windows`          | Prints through the Windows print spooler.                                           |
-| `Latiprimere.Rendering.Pdfium` | Lets the Windows spooler print PDFs.                                                |
+| `Latiprimere.Rendering.Pdfium` | Lets the Windows spooler print PDFs, and renders PDFs for network printers that can't take them. |
 | `Latiprimere.Ipp`              | Prints straight to network printers, without CUPS or the spooler, on any platform.  |
 
 `Latiprimere.Abstractions`, with the interfaces and types, comes with them. Reference it on its own only from a library that should depend on the interfaces and nothing else.
@@ -41,7 +41,7 @@ ServiceCollection services = new ServiceCollection();
 services.AddLatiprimere();         // The printer catalog
 services.AddLatiprimereCups();     // Linux and macOS
 services.AddLatiprimereWindows();  // Windows
-services.AddLatiprimerePdfium();   // PDFs on Windows
+services.AddLatiprimerePdfium();   // PDFs on Windows and for printers without PDF
 services.AddLatiprimereIpp();      // Network printers, on every platform
 
 using ServiceProvider provider = services.BuildServiceProvider();
@@ -74,8 +74,8 @@ foreach (PrinterInfo printer in printers)
 ```
 
 - **Dispose the print systems** when you've finished with them, as the `using` statements do. They hold connections. The catalog never disposes them.
-- **Pass a PDF rasteriser to the Windows factory** to print PDFs. Without one, the Windows spooler can print raw data only.
-- **Each factory takes the same settings** as its `Add…` method, for example `CupsPrintSystemFactory.Create(new CupsOptions { Server = "printserver:631" })`.
+- **Pass a PDF rasteriser to the Windows factory** to print PDFs. Without one, the Windows spooler can print raw data only. `IppNetworkPrintSystemFactory.Create(new PdfiumRasterizer(), options)` takes one too, for network printers that can't take PDF.
+- **Each factory takes the same settings** as its `Add…` method, for example `CupsPrintSystemFactory.Create(new CupsOptions { Server = "printserver:631" })`. Only print systems created through dependency injection log: see [Logging](/docs/guides/logging/#without-dependency-injection).
 
 The code on this page is in [Installation.cs](https://github.com/bananocraft-miner82/Latiprimere/blob/main/samples/Latiprimere.Examples/Installation.cs).
 
