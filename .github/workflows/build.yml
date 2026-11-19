@@ -85,7 +85,7 @@ jobs:
           $outputDirectory = Join-Path $env:ProgramData 'Latiprimere\TestOutput'
           ./tools/windows-test-printers/Install-TestPrinters.ps1 -OutputDirectory $outputDirectory
           "LATIPRIMERE_TEST_WINDOWS_OUTPUT=$outputDirectory" >> $env:GITHUB_ENV
-          Get-Printer | Format-Table Name, DriverName, PortName -AutoSize
+          Get-Printer | Format-Table Name, DriverName, PortName, KeepPrintedJobs -AutoSize
 
       - name: Restore
         run: dotnet restore

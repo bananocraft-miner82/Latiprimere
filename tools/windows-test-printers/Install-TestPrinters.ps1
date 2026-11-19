@@ -55,14 +55,22 @@ Add-TestPrinter -Name 'Latiprimere Raw' -PortName (Join-Path $OutputDirectory 'L
 Add-TestPrinter -Name 'Latiprimere Retained' -PortName (Join-Path $OutputDirectory 'Latiprimere-Retained.prn')
 Add-TestPrinter -Name 'Latiprimere Paused' -PortName 'nul:'
 
-# Keep finished jobs on the Retained printer, so their final status can be read
-& rundll32.exe printui.dll,PrintUIEntry /Xs /n 'Latiprimere Retained' attributes +KeepPrintedJobs
-Start-Sleep -Seconds 1
+# Keep finished jobs on the Retained printer, so their final status can be read. Set through CIM, which waits and
+# throws if it fails; printui through rundll32 did neither, since PowerShell doesn't wait for a GUI program
+$retainedFilter = "Name='Latiprimere Retained'"
+Get-CimInstance -ClassName Win32_Printer -Filter $retainedFilter |
+	Set-CimInstance -Property @{ KeepPrintedJobs = $true }
+
+# Checked here, since without it the retained-job tests fail with a job that has left the queue
+if (-not (Get-CimInstance -ClassName Win32_Printer -Filter $retainedFilter).KeepPrintedJobs)
+{
+	throw "'Latiprimere Retained' didn't keep the 'Keep printed documents' setting."
+}
 
 # Pause the Paused printer so jobs stay in the queue
 Get-CimInstance -ClassName Win32_Printer -Filter "Name='Latiprimere Paused'" |
 	Invoke-CimMethod -MethodName Pause |
 	Out-Null
 
-Get-Printer -Name 'Latiprimere *' | Format-Table Name, DriverName, PortName, PrinterStatus -AutoSize
+Get-Printer -Name 'Latiprimere *' | Format-Table Name, DriverName, PortName, PrinterStatus, KeepPrintedJobs -AutoSize
 Write-Host "Output files are written to $OutputDirectory"
