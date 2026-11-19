@@ -1,22 +1,35 @@
 #nullable enable
 Latiprimere.Ipp.IppNetworkOptions
+Latiprimere.Ipp.IppNetworkOptions.AddressStorePath.get -> string?
+Latiprimere.Ipp.IppNetworkOptions.AddressStorePath.set -> void
 Latiprimere.Ipp.IppNetworkOptions.AllowAnyPrinterUri.get -> bool
 Latiprimere.Ipp.IppNetworkOptions.AllowAnyPrinterUri.set -> void
 Latiprimere.Ipp.IppNetworkOptions.BusyRetryDuration.get -> System.TimeSpan
 Latiprimere.Ipp.IppNetworkOptions.BusyRetryDuration.set -> void
 Latiprimere.Ipp.IppNetworkOptions.ConnectTimeout.get -> System.TimeSpan
 Latiprimere.Ipp.IppNetworkOptions.ConnectTimeout.set -> void
+Latiprimere.Ipp.IppNetworkOptions.Credentials.get -> System.Net.NetworkCredential?
+Latiprimere.Ipp.IppNetworkOptions.Credentials.set -> void
 Latiprimere.Ipp.IppNetworkOptions.DiscoveryDuration.get -> System.TimeSpan
 Latiprimere.Ipp.IppNetworkOptions.DiscoveryDuration.set -> void
 Latiprimere.Ipp.IppNetworkOptions.EnableDiscovery.get -> bool
 Latiprimere.Ipp.IppNetworkOptions.EnableDiscovery.set -> void
 Latiprimere.Ipp.IppNetworkOptions.IppNetworkOptions() -> void
+Latiprimere.Ipp.IppNetworkOptions.MaxRenderDpi.get -> int?
+Latiprimere.Ipp.IppNetworkOptions.MaxRenderDpi.set -> void
+Latiprimere.Ipp.IppNetworkOptions.PrinterCredentials.get -> System.Collections.Generic.IDictionary<System.Uri!, System.Net.NetworkCredential!>!
 Latiprimere.Ipp.IppNetworkOptions.PrinterUris.get -> System.Collections.Generic.IList<System.Uri!>!
+Latiprimere.Ipp.IppNetworkOptions.ServerCertificateValidationCallback.get -> System.Net.Security.RemoteCertificateValidationCallback?
+Latiprimere.Ipp.IppNetworkOptions.ServerCertificateValidationCallback.set -> void
+Latiprimere.Ipp.IppNetworkOptions.TrustedCertificateFingerprints.get -> System.Collections.Generic.IList<string!>!
 Latiprimere.Ipp.IppNetworkOptions.UserName.get -> string?
 Latiprimere.Ipp.IppNetworkOptions.UserName.set -> void
+Latiprimere.Ipp.IppNetworkOptions.ValidateJobs.get -> bool
+Latiprimere.Ipp.IppNetworkOptions.ValidateJobs.set -> void
 Latiprimere.Ipp.IppNetworkPrintSystemFactory
 Microsoft.Extensions.DependencyInjection.LatiprimereIppServiceCollectionExtensions
 static Latiprimere.Ipp.IppNetworkPrintSystemFactory.Create(Latiprimere.Ipp.IppNetworkOptions? options = null) -> Latiprimere.IPrintSystem!
+static Latiprimere.Ipp.IppNetworkPrintSystemFactory.Create(Latiprimere.Rendering.IPdfRasterizer? pdfRasterizer, Latiprimere.Ipp.IppNetworkOptions? options) -> Latiprimere.IPrintSystem!
 static Microsoft.Extensions.DependencyInjection.LatiprimereIppServiceCollectionExtensions.AddLatiprimereIpp(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Latiprimere.Ipp.IppNetworkOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static readonly Latiprimere.Ipp.IppNetworkOptions.DefaultBusyRetryDuration -> System.TimeSpan
 static readonly Latiprimere.Ipp.IppNetworkOptions.DefaultConnectTimeout -> System.TimeSpan
