@@ -1,14 +1,1 @@
 #nullable enable
-Latiprimere.Ipp.IppNetworkOptions.ValidateJobs.get -> bool
-Latiprimere.Ipp.IppNetworkOptions.ValidateJobs.set -> void
-Latiprimere.Ipp.IppNetworkOptions.MaxRenderDpi.get -> int?
-Latiprimere.Ipp.IppNetworkOptions.MaxRenderDpi.set -> void
-static Latiprimere.Ipp.IppNetworkPrintSystemFactory.Create(Latiprimere.Rendering.IPdfRasterizer? pdfRasterizer, Latiprimere.Ipp.IppNetworkOptions? options) -> Latiprimere.IPrintSystem!
-Latiprimere.Ipp.IppNetworkOptions.Credentials.get -> System.Net.NetworkCredential?
-Latiprimere.Ipp.IppNetworkOptions.Credentials.set -> void
-Latiprimere.Ipp.IppNetworkOptions.PrinterCredentials.get -> System.Collections.Generic.IDictionary<System.Uri!, System.Net.NetworkCredential!>!
-Latiprimere.Ipp.IppNetworkOptions.ServerCertificateValidationCallback.get -> System.Net.Security.RemoteCertificateValidationCallback?
-Latiprimere.Ipp.IppNetworkOptions.ServerCertificateValidationCallback.set -> void
-Latiprimere.Ipp.IppNetworkOptions.TrustedCertificateFingerprints.get -> System.Collections.Generic.IList<string!>!
-Latiprimere.Ipp.IppNetworkOptions.AddressStorePath.get -> string?
-Latiprimere.Ipp.IppNetworkOptions.AddressStorePath.set -> void

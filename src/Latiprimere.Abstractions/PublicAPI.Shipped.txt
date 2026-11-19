@@ -139,6 +139,8 @@ Latiprimere.PrinterCapabilities.MediaSizes.init -> void
 Latiprimere.PrinterCapabilities.Orientations.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.PageOrientation>!
 Latiprimere.PrinterCapabilities.Orientations.init -> void
 Latiprimere.PrinterCapabilities.PrinterCapabilities() -> void
+Latiprimere.PrinterCapabilities.VendorOptions.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.VendorOption!>!
+Latiprimere.PrinterCapabilities.VendorOptions.init -> void
 Latiprimere.PrinterInfo
 Latiprimere.PrinterInfo.<Clone>$() -> Latiprimere.PrinterInfo!
 Latiprimere.PrinterInfo.Description.get -> string?
@@ -196,10 +198,49 @@ Latiprimere.Rendering.RasterBand.PageWidth.get -> int
 Latiprimere.Rendering.RasterBand.PageWidth.init -> void
 Latiprimere.Rendering.RasterBand.RasterBand() -> void
 Latiprimere.Rendering.RasterBand.RasterBand(int PageWidth, int PageHeight, int Top, int Height, int Stride) -> void
+Latiprimere.Rendering.RasterBand.Rotation.get -> Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterBand.Rotation.init -> void
 Latiprimere.Rendering.RasterBand.Stride.get -> int
 Latiprimere.Rendering.RasterBand.Stride.init -> void
 Latiprimere.Rendering.RasterBand.Top.get -> int
 Latiprimere.Rendering.RasterBand.Top.init -> void
+Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterRotation.Anticlockwise90 = 3 -> Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterRotation.Clockwise90 = 1 -> Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterRotation.Half = 2 -> Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterRotation.None = 0 -> Latiprimere.Rendering.RasterRotation
+Latiprimere.VendorOption
+Latiprimere.VendorOption.<Clone>$() -> Latiprimere.VendorOption!
+Latiprimere.VendorOption.AllowsSeveralValues.get -> bool
+Latiprimere.VendorOption.AllowsSeveralValues.init -> void
+Latiprimere.VendorOption.Choices.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.VendorOptionChoice!>!
+Latiprimere.VendorOption.Choices.init -> void
+Latiprimere.VendorOption.DefaultValue.get -> string?
+Latiprimere.VendorOption.DefaultValue.init -> void
+Latiprimere.VendorOption.DisplayName.get -> string!
+Latiprimere.VendorOption.DisplayName.init -> void
+Latiprimere.VendorOption.Equals(Latiprimere.VendorOption? other) -> bool
+Latiprimere.VendorOption.Key.get -> string!
+Latiprimere.VendorOption.Key.init -> void
+Latiprimere.VendorOption.Kind.get -> Latiprimere.VendorOptionKind
+Latiprimere.VendorOption.Kind.init -> void
+Latiprimere.VendorOption.MaximumValue.get -> long?
+Latiprimere.VendorOption.MaximumValue.init -> void
+Latiprimere.VendorOption.MinimumValue.get -> long?
+Latiprimere.VendorOption.MinimumValue.init -> void
+Latiprimere.VendorOption.VendorOption() -> void
+Latiprimere.VendorOptionChoice
+Latiprimere.VendorOptionChoice.<Clone>$() -> Latiprimere.VendorOptionChoice!
+Latiprimere.VendorOptionChoice.DisplayName.get -> string!
+Latiprimere.VendorOptionChoice.DisplayName.init -> void
+Latiprimere.VendorOptionChoice.Equals(Latiprimere.VendorOptionChoice? other) -> bool
+Latiprimere.VendorOptionChoice.Value.get -> string!
+Latiprimere.VendorOptionChoice.Value.init -> void
+Latiprimere.VendorOptionChoice.VendorOptionChoice() -> void
+Latiprimere.VendorOptionKind
+Latiprimere.VendorOptionKind.Choice = 0 -> Latiprimere.VendorOptionKind
+Latiprimere.VendorOptionKind.Number = 1 -> Latiprimere.VendorOptionKind
+Latiprimere.VendorOptionKind.Text = 2 -> Latiprimere.VendorOptionKind
 override Latiprimere.InputTray.Equals(object? obj) -> bool
 override Latiprimere.InputTray.GetHashCode() -> int
 override Latiprimere.InputTray.ToString() -> string!
@@ -220,6 +261,12 @@ override Latiprimere.PrinterInfo.GetHashCode() -> int
 override Latiprimere.PrinterInfo.ToString() -> string!
 override Latiprimere.Rendering.PageSize.GetHashCode() -> int
 override Latiprimere.Rendering.RasterBand.GetHashCode() -> int
+override Latiprimere.VendorOption.Equals(object? obj) -> bool
+override Latiprimere.VendorOption.GetHashCode() -> int
+override Latiprimere.VendorOption.ToString() -> string!
+override Latiprimere.VendorOptionChoice.Equals(object? obj) -> bool
+override Latiprimere.VendorOptionChoice.GetHashCode() -> int
+override Latiprimere.VendorOptionChoice.ToString() -> string!
 static Latiprimere.InputTray.operator !=(Latiprimere.InputTray? left, Latiprimere.InputTray? right) -> bool
 static Latiprimere.InputTray.operator ==(Latiprimere.InputTray? left, Latiprimere.InputTray? right) -> bool
 static Latiprimere.MediaSize.operator !=(Latiprimere.MediaSize? left, Latiprimere.MediaSize? right) -> bool
@@ -240,6 +287,10 @@ static Latiprimere.Rendering.PageSize.operator ==(Latiprimere.Rendering.PageSize
 static Latiprimere.Rendering.RasterBand.Create(int pageWidth, int pageHeight, int top, int height) -> Latiprimere.Rendering.RasterBand
 static Latiprimere.Rendering.RasterBand.operator !=(Latiprimere.Rendering.RasterBand left, Latiprimere.Rendering.RasterBand right) -> bool
 static Latiprimere.Rendering.RasterBand.operator ==(Latiprimere.Rendering.RasterBand left, Latiprimere.Rendering.RasterBand right) -> bool
+static Latiprimere.VendorOption.operator !=(Latiprimere.VendorOption? left, Latiprimere.VendorOption? right) -> bool
+static Latiprimere.VendorOption.operator ==(Latiprimere.VendorOption? left, Latiprimere.VendorOption? right) -> bool
+static Latiprimere.VendorOptionChoice.operator !=(Latiprimere.VendorOptionChoice? left, Latiprimere.VendorOptionChoice? right) -> bool
+static Latiprimere.VendorOptionChoice.operator ==(Latiprimere.VendorOptionChoice? left, Latiprimere.VendorOptionChoice? right) -> bool
 static readonly Latiprimere.PrintOptions.Default -> Latiprimere.PrintOptions!
 static readonly Latiprimere.PrintOptions.MinimumCopies -> int
 static readonly Latiprimere.Rendering.PageSize.PointsPerInch -> double
