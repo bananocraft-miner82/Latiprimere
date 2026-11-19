@@ -55,6 +55,28 @@ internal static class CupsAndWindows
 	}
 
 	/// <summary>
+	/// Registers the Windows spooler so that PDF jobs go straight to a queue's printer over IPP when it can be found,
+	/// and through the queue's driver otherwise.
+	/// </summary>
+	/// <returns>The service provider, which the caller disposes.</returns>
+	public static ServiceProvider BuildServiceProviderWithPdfOverIpp()
+	{
+		ServiceCollection services = new ServiceCollection();
+
+		services.AddLatiprimere();
+		services.AddLatiprimerePdfium(); // Draws PDFs through drivers, and renders them for printers that can't take PDF
+		services.AddLatiprimereWindows(options =>
+		{
+			options.PrintPdfOverIpp = true;
+
+			// A queue on a Standard TCP/IP port doesn't say where its printer's IPP is
+			options.IppPrinterUris["Warehouse Laser"] = new Uri("ipp://192.168.20.15/ipp/print");
+		});
+
+		return services.BuildServiceProvider();
+	}
+
+	/// <summary>
 	/// Prints a document to a file with Microsoft Print to PDF, which works in a service with no user interface.
 	/// </summary>
 	/// <param name="catalog">The printer catalog.</param>

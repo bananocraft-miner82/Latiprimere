@@ -6,11 +6,47 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 | Item | Value |
 |---|---|
-| Phase | 3: Direct IPP and v1.0, begun ([phase-3-plan.md](phase-3-plan.md), accepted 2026-11-18); P3-1 and P3-2 done, P3-3 and P3-4 built (their checks on the HP's paper wait). Phase 1's open item: the end-to-end harness's mDNS trial in CI. Phase 0's: the Mac checks (Spikes 1 and 4) |
+| Phase | 3: Direct IPP and v1.0, begun ([phase-3-plan.md](phase-3-plan.md), accepted 2026-11-18); P3-1, P3-2 and P3-6 done; P3-3, P3-4 and P3-5 built (their checks on the HP wait). Phase 1's open item: the end-to-end harness's mDNS trial in CI. Phase 0's: the Mac checks (Spikes 1 and 4) |
 | Released | `11.0.5-preview` on nuget.org, 2026-11-17. The next release is `11.0.6-preview` ([ADR 0030](decisions/0030-release-numbering.md)) |
 | State | Every Phase 2 item is done. Windows PDF jobs take a Print Ticket in `windows:print-ticket` ([ADR 0031](decisions/0031-windows-print-tickets.md)). `PrinterCapabilities.VendorOptions` lists every IPP job attribute and Windows driver feature a printer offers, ready to set, and `IWindowsPrinter` reads a driver's Print Capabilities ([ADR 0032](decisions/0032-vendor-options-in-capabilities.md)). CI was green on all three runners on 2026-11-17 (owner). Releases are numbered after the latest one, and a merge with nothing new releases nothing. Every ADR is accepted (owner, 2026-11-18). |
-| Next step | P3-2: raster encoders (PWG raster and Apple raster), then P3-3: printing PDFs as raster to printers without PDF, such as the HP ENVY. When the HP is on: check Validate-Job against it (prints nothing). Owner: delete the leftover branch `post-release/v11.0.4-preview`. |
+| Next step | P3-7: docs, samples and API reference, then P3-9 for 1.0. When the HP is on: the manual checks of P3-1, P3-3, P3-4 and P3-5 (about six sheets, each only when you say). Owner: delete the leftover branch `post-release/v11.0.4-preview`. |
 | Blockers | None |
+
+---
+
+## 2026-11-18: P3-6, remembered addresses that survive a restart
+
+**Done** (owner: "Yes, start P3-6")
+- **`IppNetworkOptions.AddressStorePath`** ([ADR 0038](decisions/0038-remembered-addresses.md)) keeps each discovered printer's name, address, IPPS address, UUID, make and location in a JSON file:
+  - read when the print system is created;
+  - written, through a temporary file, whenever a listing or lookup finds a new address, IPPS address or UUID;
+  - a missing, damaged or unwritable file is logged, never an error, and nonsensical entries are skipped;
+  - a remembered address is still used only while the printer there reports its UUID.
+- **Native AOT:** the JSON goes through a source-generated `System.Text.Json` context. CI's AOT check now also runs `ipp.discovery.remembered-address` natively.
+- **Tests:**
+  - 9 new unit tests, including a restart in which a printer silent on mDNS is found without a search, and one in which another printer answers at the address and isn't used;
+  - the harness scenario `ipp.discovery.remembered-address`, through the public API: it passes.
+
+**Not done**
+- **Trust on first use,** which could keep its pins in the same file, isn't built: it's opt-in and no one has asked for it.
+- **Not checked on the HP asleep;** the restart is checked against the scripted printer.
+
+---
+
+## 2026-11-18: P3-5, IPPS and authentication for direct IPP
+
+**Done** (owner: "Yes, start P3-5")
+- **Certificates** ([ADR 0037](decisions/0037-ipps-and-authentication.md)): the system's trust, then fingerprints pinned in `IppNetworkOptions.TrustedCertificateFingerprints`, then `ServerCertificateValidationCallback`. A refused certificate's `PrintException` gives its SHA-256 fingerprint, taken from the TLS handshake, and says where to pin it.
+- **Credentials:** `IppNetworkOptions.Credentials` for every printer, and `PrinterCredentials` for one, are sent as HTTP Basic only over TLS. A printer asking for a password over plain IPP is refused, saying to use its `ipps://` address.
+- **IPPS preferred once trust is configured (D4):** discovery keeps a printer's IPPS address as well, and lookups by name try it first, falling back to plain IPP when its certificate is refused.
+- **Tests:**
+  - 26 new unit tests;
+  - harness: `ipp.security.pinned-certificate`, `ipp.security.password-over-ipps` and `ipp.security.password-not-sent-in-clear` are new, and `ipp.security.untrusted-certificate` checks the fingerprint. All five security scenarios pass over real TLS;
+  - an integration test for `ippeveprinter` over IPPS: refused with a fingerprint, pinned, printed. It passed here against the scripted printer serving TLS; CI runs it against the container, and it skips, saying why, if that `ippeveprinter` doesn't offer TLS.
+
+**Not done**
+- **The HP over `ipps://…:443`** with its certificate pinned (the plan's "done when"): it needs the printer on. It prints a test page only when you say.
+- **Trust on first use** waits for P3-6's store. **`uri-authentication-supported`** isn't read. **The Windows route** still uses the system's trust only.
 
 ---
 

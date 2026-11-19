@@ -16,7 +16,9 @@
 #   - ipp.vendor-options.listed-and-sent: vendor options read from raw IPP attributes and sent back, against the
 #     scripted IPP printer, so on every runner (ADR 0032);
 #   - ipp.raster.apple-raster-two-sided: a PDF rendered by PDFium, turned, encoded as Apple raster, gzipped and
-#     streamed through a pipe to the scripted printer with the HP's profile, so on every runner (ADR 0035).
+#     streamed through a pipe to the scripted printer with the HP's profile, so on every runner (ADR 0035);
+#   - ipp.discovery.remembered-address: the address store's source-generated JSON read natively, and a printer
+#     found by name at its remembered address, against the scripted printer, so on every runner (ADR 0038).
 #
 # A scenario whose test printers this machine doesn't have is skipped; one that runs must pass. The first four are
 # the checks this script made with the CLI sample before the harness existed: CI runs only these (ADR 0029). Run every scenario
@@ -40,6 +42,7 @@ scenarios=(
 	windows.vendor-options.listed-and-sent
 	ipp.vendor-options.listed-and-sent
 	ipp.raster.apple-raster-two-sided
+	ipp.discovery.remembered-address
 )
 
 # The ILCompiler finds the Windows linker through vswhere, which Git Bash may not have on its path

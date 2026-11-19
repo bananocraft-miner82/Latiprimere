@@ -29,4 +29,70 @@ internal sealed record IppConnectionSecurity
 	/// trusted certificate authorities and the host name.
 	/// </summary>
 	public RemoteCertificateValidationCallback? ServerCertificateValidationCallback { get; init; }
+
+	/// <summary>
+	/// Gets credentials for particular printers, by <c>host:port</c> in lower case (see <see cref="ToHostPort"/>), used
+	/// in place of <see cref="Credentials"/> for requests to them; or <see langword="null"/> for none.
+	/// </summary>
+	public IReadOnlyDictionary<string, NetworkCredential>? PrinterCredentials { get; init; }
+
+	/// <summary>
+	/// Gets a value indicating whether credentials are sent only over TLS, as direct IPP does (ADR 0037); CUPS sends
+	/// them as <c>CupsOptions.Encryption</c> says.
+	/// </summary>
+	public bool SendsCredentialsOnlyOverTls { get; init; }
+
+	/// <summary>
+	/// Gets a value indicating whether any credentials are configured.
+	/// </summary>
+	public bool HasCredentials
+	{
+		get
+		{
+			return this.Credentials is not null || this.PrinterCredentials is { Count: > 0 };
+		}
+	}
+
+	/// <summary>
+	/// Makes the key of <see cref="PrinterCredentials"/> for a URI: its host, without IPv6 brackets, and port, in
+	/// lower case. An <c>ipp</c> or <c>ipps</c> URI without a port has IPP's 631.
+	/// </summary>
+	/// <param name="uri">An absolute <c>ipp</c>, <c>ipps</c>, <c>http</c> or <c>https</c> URI.</param>
+	/// <returns>The key, such as <c>192.168.1.20:631</c>.</returns>
+	public static string ToHostPort(Uri uri)
+	{
+		ArgumentNullException.ThrowIfNull(uri);
+
+		const int ippPort = 631; // The default port of both ipp and ipps (RFC 8010, RFC 7472)
+		int port = uri.Port >= 0 ? uri.Port : ippPort;
+
+		return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{uri.IdnHost.Trim('[', ']').ToLowerInvariant()}:{port}");
+	}
+
+	/// <summary>
+	/// Finds the credentials configured for a URI, whether or not they would be sent over its scheme.
+	/// </summary>
+	/// <param name="uri">The printer's or the request's URI.</param>
+	/// <returns>Its own credentials, else <see cref="Credentials"/>, else <see langword="null"/>.</returns>
+	public NetworkCredential? FindCredentials(Uri uri)
+	{
+		ArgumentNullException.ThrowIfNull(uri);
+
+		return this.PrinterCredentials?.GetValueOrDefault(IppConnectionSecurity.ToHostPort(uri)) ?? this.Credentials;
+	}
+
+	/// <summary>
+	/// Finds the credentials to send with a request: <see cref="FindCredentials"/>, unless they are kept to TLS and
+	/// the request isn't encrypted.
+	/// </summary>
+	/// <param name="uri">The printer's or the request's URI.</param>
+	/// <returns>The credentials, or <see langword="null"/> to send none.</returns>
+	public NetworkCredential? FindCredentialsToSend(Uri uri)
+	{
+		ArgumentNullException.ThrowIfNull(uri);
+
+		bool isEncrypted = this.UseTls || uri.Scheme is "https" or "ipps";
+
+		return this.SendsCredentialsOnlyOverTls && !isEncrypted ? null : this.FindCredentials(uri);
+	}
 }

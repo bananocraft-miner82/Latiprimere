@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Writes the API reference in docs/site/reference from every package's public types and XML documentation. The
+	     pages are committed, so each release tag carries the reference for its own API, and CI fails when they no
+	     longer match the code (docs/site/reference/index.md says how to regenerate them). -->
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFrameworks>net10.0</TargetFrameworks>
+		<IsPackable>false</IsPackable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Latiprimere.Abstractions\Latiprimere.Abstractions.csproj" />
+		<ProjectReference Include="..\..\src\Latiprimere\Latiprimere.csproj" />
+		<ProjectReference Include="..\..\src\Latiprimere.Ipp\Latiprimere.Ipp.csproj" />
+		<ProjectReference Include="..\..\src\Latiprimere.Cups\Latiprimere.Cups.csproj" />
+		<ProjectReference Include="..\..\src\Latiprimere.Windows\Latiprimere.Windows.csproj" />
+		<ProjectReference Include="..\..\src\Latiprimere.Rendering.Pdfium\Latiprimere.Rendering.Pdfium.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Latiprimere.ApiReference.Tests" />
+	</ItemGroup>
+
+</Project>

@@ -308,6 +308,17 @@ Two exceptions, both enforced by the build:
 - **Test methods** are documented by their GivenWhenThen names. Builders, fakes and fixtures in test projects are
   documented like production code.
 
+The public types' comments are also the website's API reference: `tools/api-reference` writes them as pages in
+[docs/site/reference/](docs/site/reference/index.md), which are committed. After changing a public type or its
+comments, run it and commit the pages it changes:
+
+```bash
+dotnet run --project tools/api-reference
+```
+
+CI fails while the committed pages don't match the code. Write public comments for the people using the packages:
+they don't see ADRs or the plan, so don't cite them there.
+
 ---
 
 ### End-of-Line Comments
@@ -837,19 +848,17 @@ Latiprimere is split into packages with a strict, one-way dependency hierarchy. 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  Consumers — applications, samples, future UI add-ons        │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ references ↓
-┌──────────────────────────────▼───────────────────────────────┐
-│  Latiprimere — services, platform selection, DI registration  │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ references ↓
-┌──────────────────────────────▼───────────────────────────────┐
-│  Platform adapters (Latiprimere.*)                            │
-│  .Windows · .Cups · .Ipp · .Rendering.Pdfium                 │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ references ↓
-┌──────────────────────────────▼───────────────────────────────┐
-│  Latiprimere.Abstractions — interfaces, records, enums,       │
+└──────────────┬─────────────────────────────────┬─────────────┘
+               │ references ↓                    │ references ↓
+┌──────────────▼──────────────┐ ┌────────────────▼─────────────┐
+│  Latiprimere — the catalog  │ │  Platform adapters           │
+│  and its DI registration    │ │  (Latiprimere.*): .Windows,  │
+│                             │ │  .Cups, .Ipp,                │
+│                             │ │  .Rendering.Pdfium           │
+└──────────────┬──────────────┘ └────────────────┬─────────────┘
+               │ references ↓                    │ references ↓
+┌──────────────▼─────────────────────────────────▼─────────────┐
+│  Latiprimere.Abstractions — interfaces, records, enums,      │
 │  exception types. No implementations, no dependencies.       │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -865,7 +874,10 @@ Latiprimere is split into packages with a strict, one-way dependency hierarchy. 
   ([ADR 0027](docs/decisions/0027-direct-ipp-for-windows-queues.md)). Nothing references `Latiprimere.Cups` or
   `Latiprimere.Windows`, and `Latiprimere.Ipp` references no other adapter. Shared code goes in `Latiprimere.Ipp`'s
   internals (`InternalsVisibleTo`), not in a public API.
-- **`Latiprimere`** references the abstractions and the adapters it selects between.
+- **`Latiprimere`** references only `Latiprimere.Abstractions`, with the logging and dependency injection
+  abstractions, and no adapter. Each adapter registers its print system through its own `AddLatiprimere…()`
+  extension, and the catalog uses every registered print system that reports `IsSupported`; so an application
+  references the adapters it wants, alongside `Latiprimere`. Adapters don't reference `Latiprimere` either.
 - No package references a higher layer. Third-party types (for example, SharpIppNext or PDFium types) must never
   appear in a public API.
 

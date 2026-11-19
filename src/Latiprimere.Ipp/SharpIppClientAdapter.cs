@@ -56,6 +56,18 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 	}
 
 	/// <summary>
+	/// Gets how the HTTP client protects requests, when it chooses credentials per printer as direct IPP's does, so a
+	/// refusal can say whether credentials were sent; or <see langword="null"/> to go by the constructor's flag.
+	/// </summary>
+	internal Connections.IppConnectionSecurity? Security { get; init; }
+
+	/// <summary>
+	/// Gets the check of printers' certificates, which remembers the fingerprints it refuses, so a refusal can give
+	/// the fingerprint to pin (ADR 0037); or <see langword="null"/>.
+	/// </summary>
+	internal Connections.IppCertificateTrust? CertificateTrust { get; init; }
+
+	/// <summary>
 	/// Initialises a new instance of the <see cref="SharpIppClientAdapter"/> class with a response timeout.
 	/// </summary>
 	/// <param name="httpClient">The HTTP client to send requests with. The adapter takes ownership of it.</param>
@@ -214,7 +226,7 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 		raw.JobAttributes.AddRange(vendorAttributes.Job);
 
 		Uri printerUri = request.OperationAttributes?.PrinterUri?.Value
-						 ?? throw new ArgumentException("The request has no printer-uri.", nameof(request));
+						 ?? throw new ArgumentException(ExceptionMessages.IppRequestWithoutPrinterUri, nameof(request));
 
 		IIppResponseMessage response = await this.client.SendAsync(printerUri, raw, cancellationToken).ConfigureAwait(false);
 
@@ -241,7 +253,7 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 		raw.JobAttributes.AddRange(vendorAttributes.Job);
 
 		Uri printerUri = request.OperationAttributes?.PrinterUri?.Value
-						 ?? throw new ArgumentException("The request has no printer-uri.", nameof(request));
+						 ?? throw new ArgumentException(ExceptionMessages.IppRequestWithoutPrinterUri, nameof(request));
 
 		await this.client.SendAsync(printerUri, raw, cancellationToken).ConfigureAwait(false);
 
@@ -263,7 +275,7 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 		IIppRequestMessage raw = this.client.CreateRawRequest(request);
 
 		Uri printerUri = request.OperationAttributes?.PrinterUri?.Value
-						 ?? throw new ArgumentException("The request has no printer-uri.", nameof(request));
+						 ?? throw new ArgumentException(ExceptionMessages.IppRequestWithoutPrinterUri, nameof(request));
 
 		IIppResponseMessage response = await this.client.SendAsync(printerUri, raw, cancellationToken).ConfigureAwait(false);
 
@@ -375,8 +387,18 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 		}
 		catch (HttpRequestException exception) when (exception.HttpRequestError == HttpRequestError.SecureConnectionError)
 		{
-			// The TLS handshake failed, most often because the server's certificate isn't trusted
-			string message = ExceptionMessages.FormatIppSecureConnectionFailed(target);
+			// The TLS handshake failed, most often because the server's certificate isn't trusted: for a printer
+			// whose certificate was refused, say which, so it can be pinned
+			Connections.RefusedCertificate? refused = this.CertificateTrust is not null && Uri.TryCreate(target, UriKind.Absolute, out Uri? targetUri)
+				? this.CertificateTrust.FindRefusal(targetUri.Host)
+				: null;
+
+			string message = refused switch
+			{
+				null                         => ExceptionMessages.FormatIppSecureConnectionFailed(target),
+				{ IsTrustedBySystem: true }  => ExceptionMessages.FormatIppCertificateNotVouchedForCredentials(target, refused.Fingerprint),
+				_                            => ExceptionMessages.FormatIppCertificateNotTrusted(target, refused.Fingerprint),
+			};
 
 			throw new PrintException(message, exception);
 		}
@@ -559,9 +581,21 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 	/// <returns>The exception to throw.</returns>
 	private PrintAuthenticationException CreateAuthenticationException(string target, int nativeErrorCode, Exception innerException)
 	{
-		string message = this.sendsCredentials
+		bool sent = this.sendsCredentials;
+		bool withheld = false;
+
+		// Direct IPP chooses credentials per printer, and sends them only over TLS (ADR 0037)
+		if (this.Security is not null && Uri.TryCreate(target, UriKind.Absolute, out Uri? targetUri))
+		{
+			sent = this.Security.FindCredentialsToSend(targetUri) is not null;
+			withheld = !sent && this.Security.FindCredentials(targetUri) is not null;
+		}
+
+		string message = sent
 			? ExceptionMessages.FormatIppCredentialsRejected(target)
-			: ExceptionMessages.FormatIppAuthenticationRequired(target);
+			: withheld
+				? ExceptionMessages.FormatIppCredentialsNeedIpps(target)
+				: ExceptionMessages.FormatIppAuthenticationRequired(target);
 
 		return new PrintAuthenticationException(message, innerException)
 		{

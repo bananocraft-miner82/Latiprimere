@@ -102,6 +102,23 @@ public sealed class CupsPrintSystemTests
 		Assert.Empty(client.GetPrinterAttributesRequests);
 	}
 
+	[Theory]
+	[InlineData("cups:..")]
+	[InlineData("cups:.")]
+	public async Task GivenADotSegmentAsTheQueueNameWhenFindPrinterThenReturnsNullWithoutAskingCups(string printerId)
+	{
+		// Arrange — ".." would make the printer URI the server's, which CUPS takes as its default destination
+		FakeIppClient client = new FakeIppClient();
+		using CupsPrintSystem printSystem = CupsPrintSystemTests.CreatePrintSystem(client);
+
+		// Act
+		IPrinter? printer = await printSystem.FindPrinterAsync(printerId, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Null(printer);
+		Assert.Empty(client.GetPrinterAttributesRequests);
+	}
+
 	[Fact]
 	public async Task GivenUnknownQueueWhenFindPrinterThenReturnsNull()
 	{

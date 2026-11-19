@@ -1,5 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Net;
+using Latiprimere.Ipp.Connections;
 using Latiprimere.Ipp.Discovery;
+using Latiprimere.Ipp.Resources;
 using Latiprimere.Rendering;
 using Microsoft.Extensions.Logging;
 
@@ -18,6 +21,9 @@ public static class IppNetworkPrintSystemFactory
 	/// The print system. It holds an HTTP connection, so dispose it, for example with <c>using</c>, when it
 	/// is no longer needed.
 	/// </returns>
+	/// <exception cref="ArgumentException">A fingerprint in <see cref="IppNetworkOptions.TrustedCertificateFingerprints"/>
+	/// isn't 32 bytes in hexadecimal; a credential has no user name, or one containing a colon; or a URI in
+	/// <see cref="IppNetworkOptions.PrinterCredentials"/> isn't an absolute ipp or ipps URI.</exception>
 	[SuppressMessage
 	(
 		"ApiDesign",
@@ -42,6 +48,9 @@ public static class IppNetworkPrintSystemFactory
 	/// The print system. It holds an HTTP connection, so dispose it, for example with <c>using</c>, when it
 	/// is no longer needed.
 	/// </returns>
+	/// <exception cref="ArgumentException">A fingerprint in <see cref="IppNetworkOptions.TrustedCertificateFingerprints"/>
+	/// isn't 32 bytes in hexadecimal; a credential has no user name, or one containing a colon; or a URI in
+	/// <see cref="IppNetworkOptions.PrinterCredentials"/> isn't an absolute ipp or ipps URI.</exception>
 	public static IPrintSystem Create(IPdfRasterizer? pdfRasterizer, IppNetworkOptions? options)
 	{
 		return IppNetworkPrintSystemFactory.Create(options, pdfRasterizer, loggerFactory: null);
@@ -54,11 +63,20 @@ public static class IppNetworkPrintSystemFactory
 	/// <param name="pdfRasterizer">The PDF rasteriser for printers that can't take PDF, or <see langword="null"/>.</param>
 	/// <param name="loggerFactory">The application's logger factory, or <see langword="null"/> to log nothing.</param>
 	/// <returns>The print system.</returns>
+	/// <exception cref="ArgumentException">The options' trust or credentials are invalid.</exception>
 	internal static IPrintSystem Create(IppNetworkOptions? options, IPdfRasterizer? pdfRasterizer, ILoggerFactory? loggerFactory)
 	{
 		options ??= new IppNetworkOptions();
 
-		SharpIppClientAdapter client = new SharpIppClientAdapter(IppHttpClientFactory.CreateForTcp(options.ConnectTimeout));
+		// Certificates: the system's trust, then pinned fingerprints, then the application's check (ADR 0037)
+		IppCertificateTrust trust = IppNetworkPrintSystemFactory.CreateCertificateTrust(options);
+		IppConnectionSecurity security = IppNetworkPrintSystemFactory.CreateConnectionSecurity(options, trust);
+
+		SharpIppClientAdapter client = new SharpIppClientAdapter(IppHttpClientFactory.CreateForTcp(options.ConnectTimeout, security))
+		{
+			Security         = security,
+			CertificateTrust = trust
+		};
 
 		IppPrintContext context = new IppPrintContext
 		{
@@ -73,6 +91,107 @@ public static class IppNetworkPrintSystemFactory
 			Logger             = IppLog.CreateLogger(loggerFactory)
 		};
 
-		return new IppNetworkPrintSystem(context, new MdnsIppPrinterDiscovery(), options, client);
+		return new IppNetworkPrintSystem(context, new MdnsIppPrinterDiscovery(), options, client)
+		{
+			PrefersIpps = trust.TrustsBeyondSystem
+		};
+	}
+
+	/// <summary>
+	/// Makes the checks <see cref="Create(IppNetworkOptions?, IPdfRasterizer?, ILoggerFactory?)"/> makes of the
+	/// options, without creating anything; so dependency injection can report a mistake when it is registered rather
+	/// than when the catalog is first resolved.
+	/// </summary>
+	/// <param name="options">The options.</param>
+	/// <exception cref="ArgumentException">The options' trust or credentials are invalid.</exception>
+	internal static void ValidateOptions(IppNetworkOptions options)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+
+		_ = IppNetworkPrintSystemFactory.CreateConnectionSecurity(options, IppNetworkPrintSystemFactory.CreateCertificateTrust(options));
+	}
+
+	/// <summary>
+	/// Works out how requests to printers are protected: certificates checked by the trust, and credentials sent
+	/// only over IPPS (ADR 0037).
+	/// </summary>
+	/// <param name="options">The options.</param>
+	/// <param name="trust">The check of printers' certificates.</param>
+	/// <returns>The connection security.</returns>
+	/// <exception cref="ArgumentException">A credential has no user name, or one containing a colon; or a printer
+	/// credential's URI isn't an absolute ipp or ipps URI.</exception>
+	internal static IppConnectionSecurity CreateConnectionSecurity(IppNetworkOptions options, IppCertificateTrust trust)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+		ArgumentNullException.ThrowIfNull(trust);
+
+		if (options.Credentials is not null)
+		{
+			IppNetworkPrintSystemFactory.ValidateCredentials(options.Credentials);
+		}
+
+		Dictionary<string, NetworkCredential> printerCredentials = new Dictionary<string, NetworkCredential>(StringComparer.Ordinal);
+
+		foreach (KeyValuePair<Uri, NetworkCredential> printer in options.PrinterCredentials)
+		{
+			if (printer.Key is null || !printer.Key.IsAbsoluteUri || printer.Key.Scheme is not ("ipp" or "ipps"))
+			{
+				throw new ArgumentException(ExceptionMessages.FormatIppPrinterCredentialsUriInvalid(printer.Key), nameof(options));
+			}
+
+			ArgumentNullException.ThrowIfNull(printer.Value, nameof(options));
+			IppNetworkPrintSystemFactory.ValidateCredentials(printer.Value);
+			printerCredentials[IppConnectionSecurity.ToHostPort(printer.Key)] = printer.Value;
+		}
+
+		return new IppConnectionSecurity
+		{
+			Credentials                         = options.Credentials,
+			PrinterCredentials                  = printerCredentials,
+			SendsCredentialsOnlyOverTls         = true,
+			ServerCertificateValidationCallback = trust.Validate
+		};
+	}
+
+	/// <summary>
+	/// Creates the check of printers' certificates. With a shared password, a certificate the system trusts is enough
+	/// only for the hosts the application named, in <see cref="IppNetworkOptions.PrinterUris"/> or
+	/// <see cref="IppNetworkOptions.PrinterCredentials"/>: a printer found on the network could be announced at any
+	/// host, including one with a certificate from a public authority, so its certificate must be pinned or accepted
+	/// by the application's callback before the password goes to it (ADR 0037).
+	/// </summary>
+	/// <param name="options">The options.</param>
+	/// <returns>The check.</returns>
+	/// <exception cref="ArgumentException">A fingerprint isn't 32 bytes in hexadecimal.</exception>
+	internal static IppCertificateTrust CreateCertificateTrust(IppNetworkOptions options)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+
+		// Relative URIs are left to CreateConnectionSecurity, which refuses them
+		IEnumerable<string>? systemTrustHosts = options.Credentials is null
+			? null
+			: options.PrinterUris
+				.Concat(options.PrinterCredentials.Keys)
+				.Where(uri => uri is { IsAbsoluteUri: true })
+				.Select(uri => uri.IdnHost)
+				.ToList();
+
+		return new IppCertificateTrust(options.TrustedCertificateFingerprints, options.ServerCertificateValidationCallback, systemTrustHosts);
+	}
+
+	/// <summary>
+	/// Checks credentials can be sent with HTTP Basic authentication, with messages naming
+	/// <see cref="IppNetworkOptions"/>.
+	/// </summary>
+	/// <param name="credentials">The credentials.</param>
+	/// <exception cref="ArgumentException">They have no user name, or one containing a colon.</exception>
+	private static void ValidateCredentials(NetworkCredential credentials)
+	{
+		BasicAuthentication.ValidateCredentials
+		(
+			credentials,
+			ExceptionMessages.IppCredentialsWithoutUserName,
+			ExceptionMessages.IppCredentialsUserNameHasColon
+		);
 	}
 }

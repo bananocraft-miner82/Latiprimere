@@ -90,13 +90,46 @@
 	<data name="AppleRasterNotOneBit" xml:space="preserve">
 		<value>Apple raster has no 1-bit form: its pages are 8-bit grey or 24-bit colour.</value>
 	</data>
+	<data name="IppCertificateNotTrusted" xml:space="preserve">
+		<value>The printer at '{0}' presented a certificate that isn't trusted, with SHA-256 fingerprint {1}. If that is the fingerprint the printer's own web page shows, add it to IppNetworkOptions.TrustedCertificateFingerprints to trust it.</value>
+		<comment>{0} is the printer URI, {1} the certificate's SHA-256 fingerprint as colon-separated hexadecimal pairs.</comment>
+	</data>
+	<data name="IppCertificateNotVouchedForCredentials" xml:space="preserve">
+		<value>The printer at '{0}' presented a certificate the system trusts, with SHA-256 fingerprint {1}, but the password in IppNetworkOptions.Credentials goes only to printers configured in PrinterUris or PrinterCredentials, or whose certificate is pinned or accepted by ServerCertificateValidationCallback. If that is the fingerprint the printer's own web page shows, add it to IppNetworkOptions.TrustedCertificateFingerprints, or configure the printer by its URI.</value>
+		<comment>{0} is the printer URI, {1} the certificate's SHA-256 fingerprint as colon-separated hexadecimal pairs.</comment>
+	</data>
+	<data name="IppRequestWithoutPrinterUri" xml:space="preserve">
+		<value>The IPP request has no printer-uri to send it to.</value>
+	</data>
+	<data name="IppCertificateFingerprintInvalid" xml:space="preserve">
+		<value>'{0}' isn't a SHA-256 fingerprint: it needs 32 bytes in hexadecimal, such as 3A:7F:… with 32 pairs.</value>
+		<comment>{0} is the value given in IppNetworkOptions.TrustedCertificateFingerprints.</comment>
+	</data>
+	<data name="IppCredentialsWithoutUserName" xml:space="preserve">
+		<value>Credentials in IppNetworkOptions have no user name. Set its UserName, or leave them unset to send none.</value>
+	</data>
+	<data name="IppCredentialsUserNameHasColon" xml:space="preserve">
+		<value>A user name in IppNetworkOptions' credentials can't contain ':', which HTTP Basic authentication uses to separate it from the password.</value>
+	</data>
+	<data name="IppPrinterCredentialsUriInvalid" xml:space="preserve">
+		<value>'{0}' in IppNetworkOptions.PrinterCredentials isn't an absolute ipp or ipps URI.</value>
+		<comment>{0} is the URI given.</comment>
+	</data>
+	<data name="IppCredentialsNeedIpps" xml:space="preserve">
+		<value>The printer at '{0}' asks for a user name and password, which Latiprimere sends only over an encrypted connection. Print to its ipps:// address instead.</value>
+		<comment>{0} is the printer URI, an ipp:// one.</comment>
+	</data>
 	<data name="PdfNeedsRasterizerForPrinter" xml:space="preserve">
 		<value>The printer doesn't accept PDF documents; it accepts: {0}. PDFs can be printed to it as raster images with a PDF rasteriser: add Latiprimere.Rendering.Pdfium and call AddLatiprimerePdfium(), or pass a PdfiumRasterizer to IppNetworkPrintSystemFactory.Create.</value>
 		<comment>{0} is the comma-separated MIME types the printer reports.</comment>
 	</data>
 	<data name="RasterNoResolution" xml:space="preserve">
-		<value>The printer accepts '{0}' but lists no resolution for it with the same dots per inch across and down, which Latiprimere needs.</value>
+		<value>The printer accepts '{0}' but lists no resolution for it with the same dots per inch across and down, up to 2400 dpi, which Latiprimere needs.</value>
 		<comment>{0} is the raster MIME type.</comment>
+	</data>
+	<data name="RasterPageTooLarge" xml:space="preserve">
+		<value>A page of {0} × {1} mm at {2} dpi would be more than {3} pixels across or down, more than Latiprimere renders. Choose a smaller paper size, or a lower IppNetworkOptions.MaxRenderDpi.</value>
+		<comment>{0} and {1} are the paper's width and height in millimetres, {2} the resolution, {3} the most pixels allowed.</comment>
 	</data>
 	<data name="RasterNoColorSpace" xml:space="preserve">
 		<value>The printer accepts '{0}' but lists no colour space for it that Latiprimere can send: 8-bit grey, 24-bit sRGB or 1-bit black.</value>

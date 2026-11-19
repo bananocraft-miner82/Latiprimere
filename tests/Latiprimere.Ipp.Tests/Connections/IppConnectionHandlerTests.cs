@@ -89,6 +89,39 @@ public sealed class IppConnectionHandlerTests
 		Assert.Null(stub.LastAuthorization);
 	}
 
+	[Theory]
+	[InlineData("https://192.168.1.20:631/ipp/print", "printer")]
+	[InlineData("https://192.168.1.30:631/ipp/print", "everyone")]
+	[InlineData("http://192.168.1.20:631/ipp/print", null)]
+	[InlineData("http://192.168.1.30:631/ipp/print", null)]
+	public async Task GivenCredentialsKeptToTlsWhenRequestSentThenThePrintersOwnOrTheSharedOnesGoOnlyOverHttps(string uri, string? expectedUser)
+	{
+		// Arrange — direct IPP: one printer's own credentials, one set for the rest (provided by InlineData above)
+		StubHttpMessageHandler stub = IppConnectionHandlerTests.CreateStub();
+
+		IppConnectionSecurity security = new IppConnectionSecurity
+		{
+			Credentials                 = new NetworkCredential("everyone", "shared"),
+			PrinterCredentials          = new Dictionary<string, NetworkCredential>
+			{
+				[IppConnectionSecurity.ToHostPort(new Uri("ipps://192.168.1.20/ipp/print"))] = new NetworkCredential("printer", "own")
+			},
+			SendsCredentialsOnlyOverTls = true
+		};
+
+		using HttpClient client = IppConnectionHandlerTests.CreateClient(security, stub);
+
+		// Act
+		await IppConnectionHandlerTests.PostAsync(client, uri);
+
+		// Assert
+		string? user = stub.LastAuthorization is null
+			? null
+			: Encoding.UTF8.GetString(Convert.FromBase64String(stub.LastAuthorization.Parameter!)).Split(':')[0];
+
+		Assert.Equal(expectedUser, user);
+	}
+
 	/// <summary>
 	/// Creates a handler that answers every request with an empty 200 response.
 	/// </summary>

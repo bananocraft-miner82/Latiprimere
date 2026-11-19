@@ -133,4 +133,21 @@ public sealed class LatiprimereWindowsServiceCollectionExtensionsTests
 		// Assert
 		Assert.Throws<ArgumentNullException>(addWindows);
 	}
+
+	[Fact]
+	public void GivenAnIppPrinterUriThatIppCantUseWhenAddLatiprimereWindowsThenThrowsOnWindowsWithoutWaitingForTheCatalog()
+	{
+		// Arrange — checked only where it would be used, as when the print system is created
+		ServiceCollection services = new ServiceCollection();
+
+		// Act
+		Exception? exception = Record.Exception(() => services.AddLatiprimereWindows(options =>
+		{
+			options.PrintPdfOverIpp = true;
+			options.IppPrinterUris["Office"] = new Uri("ftp://192.168.1.20/");
+		}));
+
+		// Assert
+		Assert.Equal(OperatingSystem.IsWindows(), exception is ArgumentException);
+	}
 }

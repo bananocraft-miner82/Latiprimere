@@ -88,6 +88,20 @@ public sealed class FakePrinter : IAsyncDisposable
 	}
 
 	/// <summary>
+	/// Gets the SHA-256 fingerprint of the printer's certificate, as colon-separated pairs of upper-case hexadecimal
+	/// digits, or <see langword="null"/> without TLS.
+	/// </summary>
+	public string? CertificateFingerprint
+	{
+		get
+		{
+			return this.certificate is null
+				? null
+				: string.Join(':', this.certificate.GetCertHash(System.Security.Cryptography.HashAlgorithmName.SHA256).Select(value => value.ToString("X2", System.Globalization.CultureInfo.InvariantCulture)));
+		}
+	}
+
+	/// <summary>
 	/// Gets the printer's URI, such as <c>ipp://127.0.0.1:54321/ipp/print</c>.
 	/// </summary>
 	public Uri PrinterUri

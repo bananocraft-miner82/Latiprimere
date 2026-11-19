@@ -34,6 +34,7 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 	private readonly string? driverName;          // The printer's driver, if the spooler reported it
 	private readonly string? portName;            // The queue's port, which names the printer's URL for some queues
 	private IppPrinter? ippPrinter;               // The queue's IPP printer, once known to accept PDF or raster
+	private string? ippPrinterUuid;               // The UUID it was found by, for a WSD queue; otherwise null
 	private bool ippPrinterRefusesPdf;            // Whether the queue's IPP printer said it takes neither
 	private bool lacksPrintTickets;               // Whether the driver turned out to have no Print Ticket support
 
@@ -212,8 +213,17 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 		{
 			return await printer.SubmitAsync(content, options, cancellationToken).ConfigureAwait(false);
 		}
-		catch (PrintException exception) when (documentStart is not null && IppConnectionErrors.IsConnectFailure(exception))
+		catch (PrintException exception) when (IppConnectionErrors.IsConnectFailure(exception))
 		{
+			// Moved or switched off since it was found: the next job asks afresh, searching again by UUID, rather than
+			// waiting for the same address to time out each time
+			this.ForgetIppPrinter();
+
+			if (documentStart is null)
+			{
+				throw;
+			}
+
 			// Nothing reached the printer, so the spooler can hold the job until it is back without printing it twice
 			document.Position = documentStart.Value;
 
@@ -330,8 +340,25 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 		}
 
 		this.ippPrinter = new IppPrinter(route.Context, printerUri, this.Info, formats, operations);
+		this.ippPrinterUuid = target.Uuid;
 
 		return this.ippPrinter;
+	}
+
+	/// <summary>
+	/// Forgets the queue's IPP printer, and the route's match for its UUID, so the next PDF job finds it again.
+	/// </summary>
+	private void ForgetIppPrinter()
+	{
+		string? uuid = this.ippPrinterUuid;
+
+		this.ippPrinter = null;
+		this.ippPrinterUuid = null;
+
+		if (uuid is not null)
+		{
+			this.context.IppRoute?.ForgetMatch(uuid);
+		}
 	}
 
 	/// <summary>

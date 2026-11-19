@@ -122,6 +122,30 @@ public static class CupsPrintSystemFactory
 	}
 
 	/// <summary>
+	/// Checks the options as creating the print system does, without creating anything or looking for the scheduler;
+	/// so dependency injection can report a mistake when it is registered rather than when the catalog is first
+	/// resolved.
+	/// </summary>
+	/// <param name="options">The options.</param>
+	/// <exception cref="ArgumentException"><see cref="CupsOptions.Server"/> isn't a socket path or host[:port], or
+	/// the credentials have no user name, or one containing a colon.</exception>
+	internal static void ValidateOptions(CupsOptions options)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+
+		// Only the configured server is parsed: the environment's is reported per request, and no socket is looked for
+		if (!string.IsNullOrWhiteSpace(options.Server))
+		{
+			_ = CupsEndpoint.Resolve(options.Server, environmentServer: null, socketExists: _ => false, CupsPlatform.Other);
+		}
+
+		if (options.Credentials is not null)
+		{
+			CupsPrintSystemFactory.ValidateCredentials(options.Credentials);
+		}
+	}
+
+	/// <summary>
 	/// Works out the user name to send as <c>requesting-user-name</c>.
 	/// </summary>
 	/// <param name="options">The options.</param>
@@ -134,21 +158,19 @@ public static class CupsPrintSystemFactory
 	}
 
 	/// <summary>
-	/// Checks the credentials can be sent with HTTP Basic authentication.
+	/// Checks the credentials can be sent with HTTP Basic authentication, with messages naming
+	/// <see cref="CupsOptions"/>.
 	/// </summary>
 	/// <param name="credentials">The credentials.</param>
 	/// <exception cref="ArgumentException">The user name is missing or contains a colon.</exception>
 	private static void ValidateCredentials(NetworkCredential credentials)
 	{
-		if (string.IsNullOrWhiteSpace(credentials.UserName))
-		{
-			throw new ArgumentException(ExceptionMessages.CredentialsWithoutUserName, nameof(credentials));
-		}
-
-		if (credentials.UserName.Contains(':', StringComparison.Ordinal))
-		{
-			throw new ArgumentException(ExceptionMessages.CredentialsUserNameHasColon, nameof(credentials));
-		}
+		BasicAuthentication.ValidateCredentials
+		(
+			credentials,
+			ExceptionMessages.CredentialsWithoutUserName,
+			ExceptionMessages.CredentialsUserNameHasColon
+		);
 	}
 
 	/// <summary>

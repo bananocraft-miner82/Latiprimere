@@ -2,7 +2,7 @@ namespace Latiprimere.Windows;
 
 /// <summary>
 /// A printer managed by the Windows spooler, with what only Windows offers: its driver's Print Capabilities and
-/// Print Tickets (ADR 0032).
+/// Print Tickets.
 /// </summary>
 /// <remarks>
 /// <para>

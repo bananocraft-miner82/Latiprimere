@@ -36,6 +36,19 @@ internal static class Program
 				await Installation.ListWithoutDependencyInjectionAsync();
 				return 0;
 
+			case "logging":
+				// Disposed before returning, so the console logger writes everything it was given
+				using (ServiceProvider loggingProvider = Logging.BuildServiceProvider())
+				{
+					await FindingPrinters.ListAsync(loggingProvider.GetRequiredService<IPrinterCatalog>());
+				}
+
+				return 0;
+
+			case "logging-without-di":
+				await Logging.ListWithoutDependencyInjectionAsync();
+				return 0;
+
 			case "web":
 				await WebService.RunAsync(arguments);
 				return 0;
@@ -52,10 +65,13 @@ internal static class Program
 				return 0;
 
 			case "capabilities" when arguments.Length == 1:
+				await ReadingCapabilities.ShowAsync(await catalog.GetPrinterAsync(arguments[0]));
+				return 0;
+
+			case "vendor-options" when arguments.Length == 1:
 				IPrinter printer = await catalog.GetPrinterAsync(arguments[0]);
-				await ReadingCapabilities.ShowAsync(printer);
-				await ReadingCapabilities.ShowVendorOptionsAsync(printer);
-				PrintOptions best = await ReadingCapabilities.ChooseBestQualityAsync(printer);
+				await VendorOptions.ShowVendorOptionsAsync(printer);
+				PrintOptions best = await VendorOptions.ChooseBestQualityAsync(printer);
 				Console.WriteLine($"Best quality: {string.Join(", ", best.VendorOptions.Select(option => $"{option.Key}={option.Value}"))}");
 				return 0;
 
@@ -105,9 +121,12 @@ internal static class Program
 		Console.WriteLine("  list                               Finding printers");
 		Console.WriteLine("  options <printer-id> <pdf>         Print options and following jobs");
 		Console.WriteLine("  capabilities <printer-id>          Reading printer capabilities");
+		Console.WriteLine("  vendor-options <printer-id>        Vendor options and Windows Print Capabilities");
 		Console.WriteLine("  label <printer-id> <order>         Labels and receipts: a ZPL label");
 		Console.WriteLine("  receipt <printer-id>               Labels and receipts: an ESC/POS receipt");
 		Console.WriteLine("  errors <printer-id> <pdf>          Errors and troubleshooting");
+		Console.WriteLine("  logging                            Logging: listing printers, logging at Debug");
+		Console.WriteLine("  logging-without-di                 Logging, without dependency injection");
 		Console.WriteLine("  print-to-pdf <pdf> <output-file>   CUPS servers and the Windows spooler");
 		Console.WriteLine("  web                                Printing from a web app or background service");
 	}
