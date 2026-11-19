@@ -66,6 +66,10 @@
 		<value>The printer '{0}' could no longer be found.</value>
 		<comment>{0} is the printer name.</comment>
 	</data>
+	<data name="IppJobPrinterNotFound" xml:space="preserve">
+		<value>The job '{0}' went straight to the IPP printer of the Windows queue '{1}', which wasn't found on the network to ask about it. It may be switched off or asleep; try again once it is on.</value>
+		<comment>{0} is the job ID, which starts ipp:; {1} the queue name.</comment>
+	</data>
 	<data name="IppPrinterUriInvalid" xml:space="preserve">
 		<value>The IPP URI '{1}' for the Windows queue '{0}' must be an absolute ipp, ipps, http or https URI, such as ipp://192.168.1.20/ipp/print.</value>
 		<comment>{0} is the queue name from WindowsOptions.IppPrinterUris, {1} the URI given.</comment>

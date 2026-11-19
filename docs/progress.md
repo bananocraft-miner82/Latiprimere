@@ -26,6 +26,12 @@ Newest entries first. Each entry records what was done, what was learned, and wh
   - [plan.md](plan.md): Spikes 0 and 2, the end-to-end harness, the direct IPP adapter and the documentation are ticked. What stays open waits on the Mac (Spikes 1 and 4, P3-8), the HP (raster, IPPS) or 1.0 itself.
   - The risks tables in plan.md and phase-3-plan.md are brought up to date. New: only one real printer tried, and the API frozen at 1.0. The `Latiprimere.` ID prefix isn't reserved yet: the packages aren't shown as verified on nuget.org.
 
+- **Sweep for bugs, security and performance issues:**
+  - Fixed: the Windows `GetJobAsync` said a job sent over IPP was gone when its printer couldn't be reached; it now throws `PrintException`. `WindowsPrinter`'s cached IPP printer and its UUID are one object, replaced and forgotten atomically. An accepted certificate clears an earlier refusal, so errors don't quote a stale fingerprint. HTTP redirects aren't followed.
+  - Updated PDFium to 160, SharpIppNext to 5.0.3, xunit.v3 to 4.0.3 and StyleCop.Analyzers to 1.3.180; added `.github/dependabot.yml`.
+  - Checked and sound: TLS and credential handling, XML parsing (no DTDs), the address store, bounded raster and GDI memory, vendor options, catalog isolation and disposal.
+  - Left open: a Print-Job upload has no time limit if a printer stalls, unless the caller passes a token; and nothing in the docs says a device on the network can pose as a discovered printer.
+
 ## 2026-11-18: P3-6, remembered addresses that survive a restart
 
 **Done** (owner: "Yes, start P3-6")

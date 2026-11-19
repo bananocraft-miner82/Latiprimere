@@ -23,7 +23,13 @@ The public API as it will be for 1.0 ([ADR 0040](docs/decisions/0040-api-review-
   - `VendorOption.MinimumValue` and `MaximumValue` are now `MinValue` and `MaxValue`, as in `PrinterCapabilities.MaxCopies`.
 
   Messages and documentation stay in British English.
-- **Jobs that Windows sends straight to a queue's IPP printer have IDs starting `ipp:`,** such as `ipp:42`, so `GetJobAsync` can tell them from the spooler's job IDs.
+- **Jobs that Windows sends straight to a queue's IPP printer have IDs starting `ipp:`,** such as `ipp:42`, so `GetJobAsync` can tell them from the spooler's job IDs. Looking one up when that printer can't be reached, or a WSD queue's printer can't be found, throws `PrintException`, as the job may still be there.
+- **PDFium 160,** from 158, in Latiprimere.Rendering.Pdfium. PDFium reads the PDFs you print, so its updates often include security fixes.
+- **IPP requests aren't redirected.** A printer or CUPS server that answers with an HTTP redirect is refused with that status, rather than the request going on to an address you didn't configure. Credentials were never sent on after a redirect.
+
+### Fixed
+
+- **A secure connection's error names the right certificate.** Once a printer's certificate had been refused, a later TLS failure at the same address for another reason, after the certificate was trusted, still quoted the old certificate's fingerprint.
 
 ## 11.0.6-preview - 2026-11-19
 

@@ -304,6 +304,36 @@ public sealed class WindowsPrinterIppRoutingTests : IDisposable
 		Assert.Null(this.client.LastGetJobAttributesRequest);
 	}
 
+	[Fact]
+	public async Task GivenPrinterUnreachableWhenGetJobSentOverIppThenThrowsRatherThanSayingItIsGone()
+	{
+		// Arrange — the job may still be on the printer, which is switched off
+		this.AddPrinter("application/pdf");
+		this.client.JobFailureToThrow = new PrintException("Could not communicate.", new HttpRequestException(HttpRequestError.ConnectionError, "Gone."));
+		WindowsPrinter printer = this.CreatePrinter();
+
+		// Act
+		Func<Task> getJob = () => printer.GetJobAsync("ipp:77", TestContext.Current.CancellationToken);
+
+		// Assert
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(getJob);
+		Assert.Same(this.client.JobFailureToThrow, exception);
+	}
+
+	[Fact]
+	public async Task GivenQueueWithoutAnIppPrinterWhenGetJobSentOverIppThenReturnsNull()
+	{
+		// Arrange — a local port, with the route on: no job of this queue can have gone over IPP
+		WindowsPrinter printer = this.CreatePrinter(printerName: "Label Printer", portName: "USB001");
+
+		// Act
+		IPrintJob? found = await printer.GetJobAsync("ipp:77", TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Null(found);
+		Assert.Null(this.client.LastGetJobAttributesRequest);
+	}
+
 	/// <summary>
 	/// Disposes the route and its fake client.
 	/// </summary>

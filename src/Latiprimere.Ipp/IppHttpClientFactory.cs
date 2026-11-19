@@ -54,10 +54,13 @@ internal static class IppHttpClientFactory
 		// The handler cancels the callback's token when the connect timeout runs out
 		HappyEyeballsConnector connector = HappyEyeballsConnector.CreateDefault();
 
+		// IPP doesn't redirect: a printer that does is refused with its HTTP status, rather than the request going
+		// on to an address nobody configured, as a GET once a POST is redirected
 		SocketsHttpHandler handler = new SocketsHttpHandler
 		{
-			ConnectTimeout  = connectTimeout,
-			ConnectCallback = (context, cancellationToken) =>
+			AllowAutoRedirect = false,
+			ConnectTimeout    = connectTimeout,
+			ConnectCallback   = (context, cancellationToken) =>
 			{
 				return connector.ConnectAsync(context.DnsEndPoint, cancellationToken);
 			}
@@ -112,7 +115,8 @@ internal static class IppHttpClientFactory
 		// Replace the TCP connection with one to the socket; HTTP runs over it unchanged
 		SocketsHttpHandler handler = new SocketsHttpHandler
 		{
-			ConnectCallback = (context, cancellationToken) =>
+			AllowAutoRedirect = false,
+			ConnectCallback   = (context, cancellationToken) =>
 			{
 				return IppHttpClientFactory.ConnectToUnixSocketAsync(socketPath, cancellationToken);
 			}
