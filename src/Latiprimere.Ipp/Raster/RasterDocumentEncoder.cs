@@ -53,8 +53,8 @@ internal static class RasterDocumentEncoder
 		RasterWriter writer = RasterWriter.Create(settings.Format, output);
 		writer.WriteStart(document.PageCount);
 
-		int mediaWidth = RasterDocumentEncoder.ToPixels(settings.Media.WidthMillimetres, settings.Dpi);
-		int mediaHeight = RasterDocumentEncoder.ToPixels(settings.Media.HeightMillimetres, settings.Dpi);
+		int mediaWidth = RasterDocumentEncoder.ToPixels(settings.Media.WidthMillimeters, settings.Dpi);
+		int mediaHeight = RasterDocumentEncoder.ToPixels(settings.Media.HeightMillimeters, settings.Dpi);
 		PageBuffers buffers = new PageBuffers(mediaWidth, settings.ColorSpace);
 
 		for (int pageIndex = 0; pageIndex < document.PageCount; pageIndex++)
@@ -120,7 +120,7 @@ internal static class RasterDocumentEncoder
 
 		return
 		(
-			turns ? RasterRotation.Anticlockwise90 : RasterRotation.None,
+			turns ? RasterRotation.Counterclockwise90 : RasterRotation.None,
 			(mediaWidth - fittedWidth) / 2,
 			(mediaHeight - fittedHeight) / 2,
 			fittedWidth,

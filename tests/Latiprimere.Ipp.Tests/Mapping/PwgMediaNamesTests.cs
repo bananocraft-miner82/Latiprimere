@@ -32,8 +32,8 @@ public sealed class PwgMediaNamesTests
 		Assert.NotNull(size);
 		Assert.Equal(name, size.Name);
 		Assert.Equal(expectedDisplayName, size.DisplayName);
-		Assert.Equal(expectedWidth, size.WidthMillimetres, 2);
-		Assert.Equal(expectedHeight, size.HeightMillimetres, 2);
+		Assert.Equal(expectedWidth, size.WidthMillimeters, 2);
+		Assert.Equal(expectedHeight, size.HeightMillimeters, 2);
 	}
 
 	[Theory]

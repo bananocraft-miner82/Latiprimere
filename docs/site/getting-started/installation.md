@@ -74,8 +74,8 @@ foreach (PrinterInfo printer in printers)
 ```
 
 - **Dispose the print systems** when you've finished with them, as the `using` statements do. They hold connections. The catalog never disposes them.
-- **Pass a PDF rasteriser to the Windows factory** to print PDFs. Without one, the Windows spooler can print raw data only. `IppNetworkPrintSystemFactory.Create(new PdfiumRasterizer(), options)` takes one too, for network printers that can't take PDF.
-- **Each factory takes the same settings** as its `Add…` method, for example `CupsPrintSystemFactory.Create(new CupsOptions { Server = "printserver:631" })`. Only print systems created through dependency injection log: see [Logging](/docs/guides/logging/#without-dependency-injection).
+- **Pass a PDF rasteriser to the Windows factory** to print PDFs. Without one, the Windows spooler can print raw data only. `IppNetworkPrintSystemFactory.Create(new PdfiumRasterizer(), options, loggerFactory)` takes one too, for network printers that can't take PDF.
+- **Each factory takes the same settings** as its `Add…` method, for example `CupsPrintSystemFactory.Create(new CupsOptions { Server = "printserver:631" })`. To log, pass an `ILoggerFactory` to the overload that takes one: see [Logging](/docs/guides/logging/#without-dependency-injection).
 
 The code on this page is in [Installation.cs](https://github.com/bananocraft-miner82/Latiprimere/blob/main/samples/Latiprimere.Examples/Installation.cs).
 

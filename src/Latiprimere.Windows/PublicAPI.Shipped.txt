@@ -1,4 +1,8 @@
 #nullable enable
+Latiprimere.Windows.IWindowsPrinter
+Latiprimere.Windows.IWindowsPrinter.GetDefaultPrintTicketAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+Latiprimere.Windows.IWindowsPrinter.GetPrintCapabilitiesAsync(string? printTicket = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+Latiprimere.Windows.IWindowsPrinter.QueueName.get -> string!
 Latiprimere.Windows.WindowsOptions
 Latiprimere.Windows.WindowsOptions.AllowAnyPrinterName.get -> bool
 Latiprimere.Windows.WindowsOptions.AllowAnyPrinterName.set -> void

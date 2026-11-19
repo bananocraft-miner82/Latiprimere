@@ -203,7 +203,7 @@ public sealed class IppCertificateTrustTests
 	/// Creates a self-signed certificate, as printers have.
 	/// </summary>
 	/// <returns>The certificate.</returns>
-	private static X509Certificate2 CreateCertificate()
+	internal static X509Certificate2 CreateCertificate()
 	{
 		using ECDsa key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
 		CertificateRequest request = new CertificateRequest("CN=HP ENVY 5640", key, HashAlgorithmName.SHA256);

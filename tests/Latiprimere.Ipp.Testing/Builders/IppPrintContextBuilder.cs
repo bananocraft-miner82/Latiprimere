@@ -15,6 +15,7 @@ internal sealed class IppPrintContextBuilder
 	private bool validateJobs = false;                                       // Whether to send Validate-Job first
 	private Latiprimere.Rendering.IPdfRasterizer? pdfRasterizer;             // Renders PDFs for raster jobs
 	private int? maxRenderDpi;                                               // The raster resolution limit
+	private TimeProvider timeProvider = TimeProvider.System;                 // The clock retries are timed by
 
 	/// <summary>Sets how long to resend jobs turned away as busy, with millisecond waits between attempts.</summary>
 	/// <param name="busyRetryDuration">How long to keep resending.</param>
@@ -22,6 +23,16 @@ internal sealed class IppPrintContextBuilder
 	public IppPrintContextBuilder WithBusyRetryDuration(TimeSpan busyRetryDuration)
 	{
 		this.busyRetryDuration = busyRetryDuration;
+
+		return this;
+	}
+
+	/// <summary>Sets the clock, which times the resends of busy jobs.</summary>
+	/// <param name="timeProvider">The clock.</param>
+	/// <returns>This builder, for chaining.</returns>
+	public IppPrintContextBuilder WithTimeProvider(TimeProvider timeProvider)
+	{
+		this.timeProvider = timeProvider;
 
 		return this;
 	}
@@ -119,7 +130,8 @@ internal sealed class IppPrintContextBuilder
 			ValidateJobs         = this.validateJobs,
 			PdfRasterizer        = this.pdfRasterizer,
 			MaxRenderDpi         = this.maxRenderDpi,
-			Logger               = this.logger
+			Logger               = this.logger,
+			TimeProvider         = this.timeProvider
 		};
 	}
 }

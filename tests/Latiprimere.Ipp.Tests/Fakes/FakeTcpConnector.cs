@@ -13,7 +13,7 @@ internal sealed class FakeTcpConnector : ITcpConnector
 	private readonly Lock gate = new Lock();                         // Guards the lists; attempts run concurrently
 	private readonly Dictionary<IPAddress, TimeSpan> answerDelays = new Dictionary<IPAddress, TimeSpan>(); // Answering addresses
 	private readonly Dictionary<IPAddress, TimeSpan> refuseDelays = new Dictionary<IPAddress, TimeSpan>(); // Refusing addresses
-	private readonly HashSet<IPAddress> stubbornAddresses = new HashSet<IPAddress>(); // Answer even after cancellation
+	private readonly Dictionary<IPAddress, TaskCompletionSource> releases = new Dictionary<IPAddress, TaskCompletionSource>(); // Answer when the test says
 	private readonly List<IPAddress> attempts = new List<IPAddress>();               // Addresses tried, in order
 	private readonly List<IPAddress> cancelledAttempts = new List<IPAddress>();      // Attempts abandoned
 	private readonly List<FakeConnectionStream> connections = new List<FakeConnectionStream>(); // Connections opened
@@ -57,19 +57,32 @@ internal sealed class FakeTcpConnector : ITcpConnector
 	/// <summary>Makes an address accept connections after a delay.</summary>
 	/// <param name="address">The address.</param>
 	/// <param name="delay">How long the connection takes to open.</param>
-	/// <param name="ignoresCancellation">Whether the connection opens even if the attempt is cancelled first, as a
-	/// socket can when cancellation comes too late.</param>
 	/// <returns>This connector, for chaining.</returns>
-	public FakeTcpConnector AnswerAfter(IPAddress address, TimeSpan delay, bool ignoresCancellation = false)
+	public FakeTcpConnector AnswerAfter(IPAddress address, TimeSpan delay)
 	{
 		this.answerDelays[address] = delay;
 
-		if (ignoresCancellation)
-		{
-			this.stubbornAddresses.Add(address);
-		}
+		return this;
+	}
+
+	/// <summary>
+	/// Makes an address accept a connection only when <see cref="Release"/> is called, even if the attempt has been
+	/// cancelled by then, as a socket can when cancellation comes too late. Unlike a delay, the test decides when.
+	/// </summary>
+	/// <param name="address">The address.</param>
+	/// <returns>This connector, for chaining.</returns>
+	public FakeTcpConnector AnswerWhenReleased(IPAddress address)
+	{
+		this.releases[address] = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		return this;
+	}
+
+	/// <summary>Lets an address set up with <see cref="AnswerWhenReleased"/> open its connection.</summary>
+	/// <param name="address">The address.</param>
+	public void Release(IPAddress address)
+	{
+		this.releases[address].SetResult();
 	}
 
 	/// <summary>Makes an address refuse connections after a delay.</summary>
@@ -93,14 +106,20 @@ internal sealed class FakeTcpConnector : ITcpConnector
 			this.attempts.Add(address);
 		}
 
+		if (this.releases.TryGetValue(address, out TaskCompletionSource? release))
+		{
+			await release.Task.ConfigureAwait(false);
+
+			return this.Open(address);
+		}
+
 		bool isRefused = this.refuseDelays.TryGetValue(address, out TimeSpan refuseDelay);
 		bool isAnswered = this.answerDelays.TryGetValue(address, out TimeSpan answerDelay);
 		TimeSpan delay = isRefused ? refuseDelay : isAnswered ? answerDelay : Timeout.InfiniteTimeSpan;
-		CancellationToken waitToken = this.stubbornAddresses.Contains(address) ? CancellationToken.None : cancellationToken;
 
 		try
 		{
-			await Task.Delay(delay, waitToken).ConfigureAwait(false);
+			await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
 		}
 		catch (OperationCanceledException)
 		{
@@ -117,6 +136,16 @@ internal sealed class FakeTcpConnector : ITcpConnector
 			throw new SocketException((int)SocketError.ConnectionRefused);
 		}
 
+		return this.Open(address);
+	}
+
+	/// <summary>
+	/// Opens a connection to an address, and records it.
+	/// </summary>
+	/// <param name="address">The address.</param>
+	/// <returns>The connection.</returns>
+	private FakeConnectionStream Open(IPAddress address)
+	{
 		FakeConnectionStream connection = new FakeConnectionStream(address);
 
 		lock (this.gate)

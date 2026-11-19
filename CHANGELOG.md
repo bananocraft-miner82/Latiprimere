@@ -6,6 +6,27 @@ Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` 
 
 ## Unreleased
 
+The public API as it will be for 1.0 ([ADR 0040](docs/decisions/0040-api-review-1-0.md)).
+
+### Added
+
+- **Find a job again after a restart** with `IPrinter.GetJobAsync(jobId)`: store the job's `PrinterId` and `Id`, look the printer up, and ask it for the job, to follow or cancel it as before. It returns `null` for a job the print system no longer knows, as printers and CUPS forget finished jobs after a while, and Windows as soon as they have printed. Classes of your own that implement `IPrinter`, such as test fakes, need to add it.
+- **`PrintCertificateException`,** a `PrintException` thrown when a network printer's certificate isn't trusted, with the fingerprint to pin in `CertificateFingerprint` and the printer's address in `PrinterUri`, so an application can ask whether to trust the printer without reading the message. Existing `catch (PrintException)` blocks still catch it.
+- **Logging without dependency injection:** `CupsPrintSystemFactory.Create(options, loggerFactory)`, `WindowsPrintSystemFactory.Create(pdfRasterizer, options, loggerFactory)` and `IppNetworkPrintSystemFactory.Create(pdfRasterizer, options, loggerFactory)` create print systems that log through the logger factory given.
+
+### Changed
+
+- **Breaking: public names use .NET's spelling and abbreviations,** as the rest of the API and .NET itself do. Each keeps its value; rename it where your code uses it, and recompile code built against an earlier version:
+  - `MediaSize.WidthMillimetres` and `HeightMillimetres` are now `WidthMillimeters` and `HeightMillimeters`;
+  - `PrintJobState.Cancelled` is now `PrintJobState.Canceled`;
+  - `RasterRotation.Anticlockwise90` is now `RasterRotation.Counterclockwise90`;
+  - `VendorOption.MinimumValue` and `MaximumValue` are now `MinValue` and `MaxValue`, as in `PrinterCapabilities.MaxCopies`.
+
+  Messages and documentation stay in British English.
+- **Jobs that Windows sends straight to a queue's IPP printer have IDs starting `ipp:`,** such as `ipp:42`, so `GetJobAsync` can tell them from the spooler's job IDs.
+
+## 11.0.6-preview - 2026-11-19
+
 ### Added
 
 - **Printers found on the network are remembered across restarts** with the new `IppNetworkOptions.AddressStorePath`. A printer that stops answering mDNS while asleep is still found by name at its last address, as long as it still reports the UUID it announced. The file is JSON; a missing or damaged one is logged, never an error.

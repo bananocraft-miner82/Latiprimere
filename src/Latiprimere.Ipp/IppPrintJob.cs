@@ -14,6 +14,7 @@ internal sealed class IppPrintJob : IPrintJob
 	private readonly IppPrintContext context; // Client and settings shared with the print system
 	private readonly Uri printerUri;          // URI of the printer the job was sent to
 	private readonly int jobNumber;           // The IPP job-id
+	private readonly string idPrefix;         // Put before the job-id in Id, to tell it from other jobs' IDs
 	private volatile bool isCancelRequested;  // Whether CancelAsync cancelled the job
 
 	/// <summary>
@@ -23,12 +24,14 @@ internal sealed class IppPrintJob : IPrintJob
 	/// <param name="printerUri">The URI of the printer the job was sent to.</param>
 	/// <param name="printerId">The Latiprimere identifier of that printer.</param>
 	/// <param name="jobNumber">The IPP <c>job-id</c>.</param>
-	public IppPrintJob(IppPrintContext context, Uri printerUri, string printerId, int jobNumber)
+	/// <param name="idPrefix">Put before the <c>job-id</c> in <see cref="Id"/>, or empty.</param>
+	public IppPrintJob(IppPrintContext context, Uri printerUri, string printerId, int jobNumber, string idPrefix = "")
 	{
 		this.context = context;
 		this.printerUri = printerUri;
 		this.PrinterId = printerId;
 		this.jobNumber = jobNumber;
+		this.idPrefix = idPrefix;
 	}
 
 	/// <inheritdoc/>
@@ -36,7 +39,7 @@ internal sealed class IppPrintJob : IPrintJob
 	{
 		get
 		{
-			return this.jobNumber.ToString(CultureInfo.InvariantCulture);
+			return this.idPrefix + this.jobNumber.ToString(CultureInfo.InvariantCulture);
 		}
 	}
 

@@ -58,7 +58,7 @@ public sealed class WindowsPrinterWsdRoutingTests : IDisposable
 		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
 
 		// Assert
-		Assert.Equal(("88", "windows:" + WindowsPrinterWsdRoutingTests.PrinterName), (job.Id, job.PrinterId));
+		Assert.Equal(("ipp:88", "windows:" + WindowsPrinterWsdRoutingTests.PrinterName), (job.Id, job.PrinterId));
 		Assert.Equal(WindowsPrinterWsdRoutingTests.PrinterUri, this.client.LastPrintJobRequest?.OperationAttributes?.PrinterUri?.Value);
 		Assert.Equal("application/pdf", this.client.LastPrintJobRequest?.OperationAttributes?.DocumentFormat?.Value.Value);
 		Assert.Null(this.gdi.LastRequest);
@@ -77,7 +77,7 @@ public sealed class WindowsPrinterWsdRoutingTests : IDisposable
 		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
 
 		// Assert — the job is the printer's, and the driver isn't used
-		Assert.Equal("88", job.Id);
+		Assert.Equal("ipp:88", job.Id);
 		Assert.Equal("image/urf", this.client.LastPrintJobRequest?.OperationAttributes?.DocumentFormat?.Value.Value);
 		Assert.Null(this.gdi.LastRequest);
 
@@ -158,7 +158,7 @@ public sealed class WindowsPrinterWsdRoutingTests : IDisposable
 		IPrintJob thirdJob = await printer.SubmitAsync(PrintContent.FromPdf(third), PrintOptions.Default, TestContext.Current.CancellationToken);
 
 		// Assert — the driver printed the second, and the third was searched for afresh and sent over IPP
-		Assert.Equal(("88", "5", "88"), (firstJob.Id, secondJob.Id, thirdJob.Id));
+		Assert.Equal(("ipp:88", "5", "ipp:88"), (firstJob.Id, secondJob.Id, thirdJob.Id));
 		Assert.NotNull(this.gdi.LastRequest);
 		Assert.Equal(2, this.discovery.SearchedUuids.Count);
 	}

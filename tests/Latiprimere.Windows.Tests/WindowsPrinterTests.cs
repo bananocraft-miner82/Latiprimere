@@ -1,6 +1,7 @@
 using System.Text;
 using Latiprimere.Testing.Fakes;
 using Latiprimere.Windows.Gdi;
+using Latiprimere.Windows.Interop;
 using Latiprimere.Windows.Spooler;
 using Latiprimere.Windows.Tests.Builders;
 using Latiprimere.Windows.Tests.Fakes;
@@ -303,8 +304,8 @@ public sealed class WindowsPrinterTests
 			{
 				Name              = "iso_a4_210x297mm",
 				DisplayName       = "A4 (another driver)",
-				WidthMillimetres  = 210,
-				HeightMillimetres = 297
+				WidthMillimeters  = 210,
+				HeightMillimeters = 297
 			},
 			InputTray = new InputTray { Id = "257", Name = "Tray 1" }
 		};
@@ -340,8 +341,8 @@ public sealed class WindowsPrinterTests
 			{
 				Name              = "iso_a3_297x420mm",
 				DisplayName       = "A3",
-				WidthMillimetres  = 297,
-				HeightMillimetres = 420
+				WidthMillimeters  = 297,
+				HeightMillimeters = 420
 			}
 		};
 
@@ -852,6 +853,44 @@ public sealed class WindowsPrinterTests
 				new WindowsBinRecord { Id = 257, Name = "Tray 1" },
 			}
 		};
+	}
+
+	[Fact]
+	public async Task GivenJobTheSpoolerListsWhenGetJobThenReturnsIt()
+	{
+		// Arrange
+		FakeWinSpool spool = new FakeWinSpool();
+		spool.SetJob(12, new WindowsJobRecord { JobId = 12, Status = JobStatusFlags.Paused });
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool));
+
+		// Act
+		IPrintJob? job = await printer.GetJobAsync("12", TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.NotNull(job);
+		Assert.Equal("12", job.Id);
+		Assert.Equal("windows:Office", job.PrinterId);
+		PrintJobStatus status = await job.GetStatusAsync(TestContext.Current.CancellationToken);
+		Assert.Equal(PrintJobState.Held, status.State);
+	}
+
+	[Theory]
+	[InlineData("12")]
+	[InlineData("abc")]
+	[InlineData("0")]
+	[InlineData("-12")]
+	[InlineData("ipp:12")]
+	public async Task GivenJobTheSpoolerDoesNotListWhenGetJobThenReturnsNull(string jobId)
+	{
+		// Arrange — jobId has left the queue, or is no spooler job ID (provided by InlineData above); no IPP route
+		FakeWinSpool spool = new FakeWinSpool();
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool));
+
+		// Act
+		IPrintJob? job = await printer.GetJobAsync(jobId, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Null(job);
 	}
 
 	/// <summary>

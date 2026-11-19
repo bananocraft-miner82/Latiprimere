@@ -6,7 +6,7 @@ public sealed class PrintJobStatusTests
 {
 	[Theory]
 	[InlineData(PrintJobState.Completed)]
-	[InlineData(PrintJobState.Cancelled)]
+	[InlineData(PrintJobState.Canceled)]
 	[InlineData(PrintJobState.Aborted)]
 	public void GivenFinalStateWhenIsTerminalThenReturnsTrue(PrintJobState state)
 	{

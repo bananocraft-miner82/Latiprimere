@@ -9,7 +9,7 @@ namespace Latiprimere.Ipp.Tests.Raster;
 public sealed class RasterDocumentEncoderTests
 {
 	/// <summary>A4, portrait.</summary>
-	private static readonly MediaSize A4 = new MediaSize { Name = "iso_a4_210x297mm", DisplayName = "A4", WidthMillimetres = 210, HeightMillimetres = 297 };
+	private static readonly MediaSize A4 = new MediaSize { Name = "iso_a4_210x297mm", DisplayName = "A4", WidthMillimeters = 210, HeightMillimeters = 297 };
 
 	/// <summary>An A4 page in points.</summary>
 	private static readonly PageSize PortraitA4 = new PageSize(595.28, 841.89);
@@ -73,7 +73,7 @@ public sealed class RasterDocumentEncoderTests
 		RasterPage page = Assert.Single(RasterDocumentEncoderTests.EncodeAndRead(document, settings).Pages);
 
 		// Assert — the page's top-left (black) is now bottom left, its top-right (red) top left
-		Assert.All(document.Bands, band => Assert.Equal(RasterRotation.Anticlockwise90, band.Rotation));
+		Assert.All(document.Bands, band => Assert.Equal(RasterRotation.Counterclockwise90, band.Rotation));
 		Assert.Equal((595, 841), (page.Width, page.Height));
 		Assert.Equal(QuadrantDocument.Red, page.GetGrey(20, 20));
 		Assert.Equal(QuadrantDocument.Black, page.GetGrey(20, 820));
@@ -83,7 +83,7 @@ public sealed class RasterDocumentEncoderTests
 
 	[Theory]
 	[InlineData(PageOrientation.Portrait, RasterRotation.None)]
-	[InlineData(PageOrientation.Landscape, RasterRotation.Anticlockwise90)]
+	[InlineData(PageOrientation.Landscape, RasterRotation.Counterclockwise90)]
 	[InlineData(PageOrientation.PrinterDefault, RasterRotation.None)]
 	public void GivenOrientationAskedForWhenPortraitPageEncodedThenItDecidesTheTurn(PageOrientation orientation, RasterRotation expected)
 	{
@@ -97,7 +97,7 @@ public sealed class RasterDocumentEncoderTests
 		// Assert
 		Assert.All(document.Bands, band => Assert.Equal(expected, band.Rotation));
 
-		if (expected == RasterRotation.Anticlockwise90)
+		if (expected == RasterRotation.Counterclockwise90)
 		{
 			// 842 × 595 turned is 595 wide and 421 high: centred, white above and below
 			Assert.Equal((0, 210, 595, 631), page.ImageBox);

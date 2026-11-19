@@ -6,13 +6,25 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 | Item | Value |
 |---|---|
-| Phase | 3: Direct IPP and v1.0, begun ([phase-3-plan.md](phase-3-plan.md), accepted 2026-11-18); P3-1, P3-2 and P3-6 done; P3-3, P3-4 and P3-5 built (their checks on the HP wait). Phase 1's open item: the end-to-end harness's mDNS trial in CI. Phase 0's: the Mac checks (Spikes 1 and 4) |
-| Released | `11.0.5-preview` on nuget.org, 2026-11-17. The next release is `11.0.6-preview` ([ADR 0030](decisions/0030-release-numbering.md)) |
+| Phase | 3: Direct IPP and v1.0, begun ([phase-3-plan.md](phase-3-plan.md), accepted 2026-11-18); P3-1, P3-2, P3-6 and P3-7 done; P3-3, P3-4 and P3-5 built (their checks on the HP wait); P3-9 begun. Phase 1 is done. Phase 0's open items: the Mac checks (Spikes 1 and 4), which are P3-8 |
+| Released | `11.0.6-preview` on nuget.org, 2026-11-19; its post-release pull request isn't merged into `main` yet. The next release is `11.0.7-preview`, or 1.0 once `RELEASE_PREVIEW` is `false` ([ADR 0030](decisions/0030-release-numbering.md)) |
 | State | Every Phase 2 item is done. Windows PDF jobs take a Print Ticket in `windows:print-ticket` ([ADR 0031](decisions/0031-windows-print-tickets.md)). `PrinterCapabilities.VendorOptions` lists every IPP job attribute and Windows driver feature a printer offers, ready to set, and `IWindowsPrinter` reads a driver's Print Capabilities ([ADR 0032](decisions/0032-vendor-options-in-capabilities.md)). CI was green on all three runners on 2026-11-17 (owner). Releases are numbered after the latest one, and a merge with nothing new releases nothing. Every ADR is accepted (owner, 2026-11-18). |
-| Next step | P3-7: docs, samples and API reference, then P3-9 for 1.0. When the HP is on: the manual checks of P3-1, P3-3, P3-4 and P3-5 (about six sheets, each only when you say). Owner: delete the leftover branch `post-release/v11.0.4-preview`. |
+| Next step | P3-9 for 1.0: the API review is applied ([ADR 0040](decisions/0040-api-review-1-0.md)), the docs are reviewed against it, and the housekeeping is done; next, the real-printer sign-off, then the stable switch (D8). When the HP is on: the manual checks of P3-1, P3-3, P3-4 and P3-5 (about six sheets, each only when you say). Owner: delete the leftover branch `post-release/v11.0.4-preview`. |
 | Blockers | None |
 
 ---
+
+## 2026-11-19: P3-9 begun: the 1.0 API, the docs against it, and housekeeping
+
+- **Timing flakes:** a macOS CI failure in the busy-retry test was a race with the real clock; the test now uses a clock that moves on by a fixed step. A sweep found one more, in the Happy Eyeballs tests, now released by the test itself. The others have wide margins.
+- **API review for 1.0** ([api-review-1.0.md](api-review-1.0.md), [ADR 0040](decisions/0040-api-review-1-0.md)): all seven decisions as recommended (owner). .NET spellings in public names; factory overloads taking an `ILoggerFactory`; `PrintCertificateException`; `IPrinter.GetJobAsync`, with Windows jobs routed over IPP given `ipp:` IDs; `VendorOption.MinValue` and `MaxValue`; the rules for changing the API after 1.0 in CONTRIBUTING.md.
+- **11.0.6-preview** was released the same day, before the decisions were applied, and shipped names the review counted as unshipped. The renames went ahead with compatibility suppressions; the two-argument `IppNetworkPrintSystemFactory.Create` stays. The working tree has the release commit's changes, and `main` compares with 11.0.6-preview, as the 1.0 release will.
+- **Releases and the compatibility baseline:** the release workflow left `main` comparing its packages with the release before the one just made, so a change to something that release first shipped passed on `main` and failed at the next release. Now the post-release pull request has a second commit, made by `tools/releasing/post-release.sh`, that sets the baseline to the version just released and removes the compatibility suppressions, which package validation would fail on once unneeded. `anything-to-release.sh` doesn't count that commit's changes. Both scripts were tried in a scratch repository, with LF and CRLF files; the workflow itself runs at the next release.
+- **Docs review against the 1.0 API:** 295 links between pages resolve, 140 to anchors; every Latiprimere name in the pages exists; six pages updated for the new API. The website builds, type-checks, lints and passes its unit and smoke tests against them.
+- **Housekeeping:**
+  - The mDNS trial passed in all 17 CI runs since the fixes of 2026-11-17, so it's now a normal CI job that can fail the build ([ADR 0029](decisions/0029-end-to-end-test-harness.md)).
+  - [plan.md](plan.md): Spikes 0 and 2, the end-to-end harness, the direct IPP adapter and the documentation are ticked. What stays open waits on the Mac (Spikes 1 and 4, P3-8), the HP (raster, IPPS) or 1.0 itself.
+  - The risks tables in plan.md and phase-3-plan.md are brought up to date. New: only one real printer tried, and the API frozen at 1.0. The `Latiprimere.` ID prefix isn't reserved yet: the packages aren't shown as verified on nuget.org.
 
 ## 2026-11-18: P3-6, remembered addresses that survive a restart
 

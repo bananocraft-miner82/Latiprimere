@@ -110,8 +110,8 @@ internal static class IppJobTemplateMapper
 			(
 				new IppMediaSize
 				{
-					XDimension = IppJobTemplateMapper.ToDimension(size.WidthMillimetres),
-					YDimension = IppJobTemplateMapper.ToDimension(size.HeightMillimetres)
+					XDimension = IppJobTemplateMapper.ToDimension(size.WidthMillimeters),
+					YDimension = IppJobTemplateMapper.ToDimension(size.HeightMillimeters)
 				}
 			);
 		}

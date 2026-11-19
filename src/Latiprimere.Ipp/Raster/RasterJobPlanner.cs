@@ -345,13 +345,13 @@ internal static class RasterJobPlanner
 		const double millimetresPerInch = 25.4;
 
 		// As double, since a printer's paper size, or the application's, could overflow integer pixels
-		double longest = Math.Max(media.WidthMillimetres, media.HeightMillimetres) / millimetresPerInch * dpi;
+		double longest = Math.Max(media.WidthMillimeters, media.HeightMillimeters) / millimetresPerInch * dpi;
 
 		if (!(longest <= RasterJobPlanner.MaxPagePixels))
 		{
 			string message = ExceptionMessages.FormatRasterPageTooLarge
 			(
-				media.WidthMillimetres, media.HeightMillimetres, dpi, RasterJobPlanner.MaxPagePixels
+				media.WidthMillimeters, media.HeightMillimeters, dpi, RasterJobPlanner.MaxPagePixels
 			);
 
 			throw new NotSupportedException(message);

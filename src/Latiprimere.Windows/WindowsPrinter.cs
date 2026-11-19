@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Xml;
 using Latiprimere.Ipp;
 using Latiprimere.Ipp.Discovery;
@@ -29,6 +30,12 @@ namespace Latiprimere.Windows;
 /// </remarks>
 internal sealed class WindowsPrinter : IWindowsPrinter
 {
+	/// <summary>
+	/// Goes before the IPP <c>job-id</c> in the ID of a job sent straight to the queue's IPP printer, to tell it from
+	/// the spooler's job IDs, which are numbers too.
+	/// </summary>
+	internal const string IppJobIdPrefix = "ipp:";
+
 	private readonly WindowsPrintContext context; // Spooler, GDI and rasteriser
 	private readonly string printerName;          // The spooler's name for the printer
 	private readonly string? driverName;          // The printer's driver, if the spooler reported it
@@ -132,6 +139,39 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 			jobNumber,
 			this.context.TimeProvider
 		);
+	}
+
+	/// <inheritdoc/>
+	/// <remarks>
+	/// The spooler removes a job once it has printed, unless the printer's "Keep printed documents" setting is on. A
+	/// job sent straight to the queue's IPP printer, whose ID starts <c>ipp:</c>, is asked of that printer, which needs
+	/// <see cref="WindowsOptions.PrintPdfOverIpp"/> on and the printer found again.
+	/// </remarks>
+	public async Task<IPrintJob?> GetJobAsync(string jobId, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(jobId);
+
+		if (jobId.StartsWith(WindowsPrinter.IppJobIdPrefix, StringComparison.Ordinal))
+		{
+			IppPrinter? printer = await this.FindIppPrinterAsync(PrintOptions.Default, cancellationToken).ConfigureAwait(false);
+
+			return printer is null
+				? null
+				: await printer.GetJobAsync(jobId, cancellationToken).ConfigureAwait(false);
+		}
+
+		if (!int.TryParse(jobId, NumberStyles.None, CultureInfo.InvariantCulture, out int jobNumber) || jobNumber <= 0)
+		{
+			return null;
+		}
+
+		// Spooler calls block, so run them off the caller's thread
+		WindowsJobRecord? job = await Task.Run(() => this.context.Spool.GetJob(this.printerName, jobNumber), cancellationToken)
+										  .ConfigureAwait(false);
+
+		return job is null
+			? null
+			: new WindowsPrintJob(this.context.Spool, this.printerName, this.Info.Id, jobNumber, this.context.TimeProvider);
 	}
 
 	/// <inheritdoc/>
@@ -339,7 +379,11 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 			WindowsLog.IppPrinterMatched(this.context.Logger, this.printerName, printerUri);
 		}
 
-		this.ippPrinter = new IppPrinter(route.Context, printerUri, this.Info, formats, operations);
+		this.ippPrinter = new IppPrinter(route.Context, printerUri, this.Info, formats, operations)
+		{
+			JobIdPrefix = WindowsPrinter.IppJobIdPrefix
+		};
+
 		this.ippPrinterUuid = target.Uuid;
 
 		return this.ippPrinter;

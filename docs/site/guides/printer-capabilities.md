@@ -48,7 +48,7 @@ Most copies:   1
 | `MaxCopies`                          | The most copies one job can ask for                  |
 | `VendorOptions`                      | Everything else the printer offers, as `VendorOption`: see below |
 
-A `MediaSize` has a `DisplayName` to show people, a `Name` that is the print system's own name for it, and its size in `WidthMillimetres` and `HeightMillimetres`.
+A `MediaSize` has a `DisplayName` to show people, a `Name` that is the print system's own name for it, and its size in `WidthMillimeters` and `HeightMillimeters`.
 
 :::note[Empty means "not reported"]
 An empty list or a `null` value means the print system didn't say, not that the printer can't. The lists never contain the `PrinterDefault` values.

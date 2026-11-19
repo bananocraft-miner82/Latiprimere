@@ -76,18 +76,18 @@ public VendorOptionKind Kind { get; init; }
 
 Gets what kind of value the option takes: one of the [VendorOption.Choices](/docs/reference/latiprimere-abstractions/vendoroption/#choices), a whole number, or text.
 
-### MaximumValue
+### MaxValue
 
 ```csharp
-public long? MaximumValue { get; init; }
+public long? MaxValue { get; init; }
 ```
 
 Gets the largest value an [VendorOptionKind.Number](/docs/reference/latiprimere-abstractions/vendoroptionkind/#values) option takes, or `null` if not reported.
 
-### MinimumValue
+### MinValue
 
 ```csharp
-public long? MinimumValue { get; init; }
+public long? MinValue { get; init; }
 ```
 
 Gets the smallest value an [VendorOptionKind.Number](/docs/reference/latiprimere-abstractions/vendoroptionkind/#values) option takes, or `null` if not reported.

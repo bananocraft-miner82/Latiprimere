@@ -3,8 +3,9 @@ name: Update website
 # Rebuilds latiprimere.com after each release, once its packages are published. The website reads the docs from the
 # newest release tag, and shows only released versions from CHANGELOG.md, both when it is built, so a release is the
 # only change here that alters the live site. Merges to main don't: their docs and Unreleased notes aren't shown.
-# The one exception is the release's post-release pull request, which brings its dated notes into main, so the site
-# is rebuilt again when that is merged.
+# The new release's notes come from its tag until main has them dated, so the first rebuild shows them. The
+# release's post-release pull request brings them into main, so the site is rebuilt again when that is merged, to
+# pick up any correction made to the notes in the meantime.
 # Run it by hand from the Actions tab after correcting the notes of a version already released.
 # It calls a Workers Builds deploy hook for the website's production branch; see docs/releasing.md for the setup.
 on:

@@ -126,9 +126,13 @@ public sealed class IppNetworkOptions
 	}
 
 	/// <summary>
-	/// Gets or sets the user name sent with requests. When <see langword="null"/>, the current operating-system user
-	/// name is used.
+	/// Gets or sets the user name sent with requests as <c>requesting-user-name</c>, which printers list jobs under.
+	/// When <see langword="null"/>, the current operating-system user name is used.
 	/// </summary>
+	/// <remarks>
+	/// It isn't a login, and printers don't check it. For a printer that asks for a user name and password, set
+	/// <see cref="Credentials"/> or <see cref="PrinterCredentials"/>.
+	/// </remarks>
 	public string? UserName { get; set; }
 
 	/// <summary>

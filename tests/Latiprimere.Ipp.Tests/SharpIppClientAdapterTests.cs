@@ -1,8 +1,12 @@
 using System.Net;
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using Latiprimere.Ipp.Connections;
 using Latiprimere.Ipp.Testing.Builders;
+using Latiprimere.Ipp.Tests.Connections;
 using Latiprimere.Ipp.Tests.Fakes;
 using SharpIpp.Exceptions;
 using SharpIpp.Models.Requests;
@@ -190,8 +194,8 @@ public sealed class SharpIppClientAdapterTests
 			{
 				Name              = "iso_a4_210x297mm",
 				DisplayName       = "A4",
-				WidthMillimetres  = 210,
-				HeightMillimetres = 297
+				WidthMillimeters  = 210,
+				HeightMillimeters = 297
 			},
 			InputTray = new InputTray { Id = "tray-1", Name = "Tray 1" }
 		};
@@ -320,8 +324,8 @@ public sealed class SharpIppClientAdapterTests
 			{
 				Name              = "na_letter_8.5x11in",
 				DisplayName       = "Letter",
-				WidthMillimetres  = 215.9,
-				HeightMillimetres = 279.4
+				WidthMillimeters  = 215.9,
+				HeightMillimeters = 279.4
 			}
 		};
 
@@ -445,6 +449,37 @@ public sealed class SharpIppClientAdapterTests
 		PrintException exception = await Assert.ThrowsAsync<PrintException>(request);
 		Assert.Contains("encrypted connection", exception.Message, StringComparison.Ordinal);
 		Assert.Contains("certificate", exception.Message, StringComparison.Ordinal);
+		Assert.Same(handshakeFailure, exception.InnerException);
+	}
+
+	[Fact]
+	public async Task GivenPrinterCertificateRefusedWhenRequestSentThenThrowsPrintCertificateExceptionWithItsFingerprint()
+	{
+		// Arrange — the trust refused the printer's self-signed certificate, so the handshake failed
+		using X509Certificate2 certificate = IppCertificateTrustTests.CreateCertificate();
+		IppCertificateTrust trust = new IppCertificateTrust([], callback: null);
+		_ = trust.Validate(new object(), SharpIppClientAdapterTests.PrinterUri.Host, certificate, null, SslPolicyErrors.RemoteCertificateChainErrors);
+
+		HttpRequestException handshakeFailure = new HttpRequestException
+		(
+			HttpRequestError.SecureConnectionError,
+			"The SSL connection could not be established, see inner exception.",
+			new AuthenticationException("The remote certificate was rejected by the provided RemoteCertificateValidationCallback.")
+		);
+
+		using SharpIppClientAdapter client = new SharpIppClientAdapter(new HttpClient(new FailingHttpMessageHandler(handshakeFailure), disposeHandler: true))
+		{
+			CertificateTrust = trust
+		};
+
+		// Act
+		Func<Task> request = () => SharpIppClientAdapterTests.GetAttributesAsync(client);
+
+		// Assert
+		PrintCertificateException exception = await Assert.ThrowsAsync<PrintCertificateException>(request);
+		Assert.Equal(IppCertificateTrust.GetFingerprint(certificate), exception.CertificateFingerprint);
+		Assert.Equal(SharpIppClientAdapterTests.PrinterUri, exception.PrinterUri);
+		Assert.Contains(exception.CertificateFingerprint!, exception.Message, StringComparison.Ordinal);
 		Assert.Same(handshakeFailure, exception.InnerException);
 	}
 

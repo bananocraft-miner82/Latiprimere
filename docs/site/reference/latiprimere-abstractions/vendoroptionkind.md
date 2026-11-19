@@ -17,5 +17,5 @@ What kind of value a [VendorOption](/docs/reference/latiprimere-abstractions/ven
 ## Values
 
 - **`Choice`** (`0`): One of the option's [VendorOption.Choices](/docs/reference/latiprimere-abstractions/vendoroption/#choices), or several when it allows that.
-- **`Number`** (`1`): A whole number, between [VendorOption.MinimumValue](/docs/reference/latiprimere-abstractions/vendoroption/#minimumvalue) and [VendorOption.MaximumValue](/docs/reference/latiprimere-abstractions/vendoroption/#maximumvalue) where they are given.
+- **`Number`** (`1`): A whole number, between [VendorOption.MinValue](/docs/reference/latiprimere-abstractions/vendoroption/#minvalue) and [VendorOption.MaxValue](/docs/reference/latiprimere-abstractions/vendoroption/#maxvalue) where they are given.
 - **`Text`** (`2`): Text, which the printer's driver interprets.

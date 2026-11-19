@@ -110,8 +110,8 @@ public sealed class IppVendorOptionMapperTests
 		// Assert — job-priority-supported is the number of levels, not the highest value
 		VendorOption priority = Assert.Single(options, option => option.Key == "ipp:job-priority");
 		Assert.Equal(VendorOptionKind.Number, priority.Kind);
-		Assert.Equal(1, priority.MinimumValue);
-		Assert.Equal(100, priority.MaximumValue);
+		Assert.Equal(1, priority.MinValue);
+		Assert.Equal(100, priority.MaxValue);
 		Assert.Equal("50", priority.DefaultValue);
 		Assert.Empty(priority.Choices);
 
@@ -150,8 +150,8 @@ public sealed class IppVendorOptionMapperTests
 		Assert.Equal(["ipp:finishings", "ipp:x-vendor-darkness"], options.Select(option => option.Key));
 		Assert.Equal(["None", "Staple", "Punch"], options[0].Choices.Select(choice => choice.DisplayName));
 		Assert.Equal(VendorOptionKind.Number, options[1].Kind);
-		Assert.Equal(-5, options[1].MinimumValue);
-		Assert.Equal(5, options[1].MaximumValue);
+		Assert.Equal(-5, options[1].MinValue);
+		Assert.Equal(5, options[1].MaxValue);
 		Assert.Equal("0", options[1].DefaultValue);
 	}
 

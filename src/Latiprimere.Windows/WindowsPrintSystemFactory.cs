@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Latiprimere.Ipp;
 using Latiprimere.Ipp.Discovery;
 using Latiprimere.Ipp.Mapping;
@@ -32,21 +33,37 @@ public static class WindowsPrintSystemFactory
 	/// </returns>
 	/// <exception cref="ArgumentException">A URI in <see cref="WindowsOptions.IppPrinterUris"/> isn't an absolute
 	/// <c>ipp</c>, <c>ipps</c>, <c>http</c> or <c>https</c> URI.</exception>
+	[SuppressMessage
+	(
+		"ApiDesign",
+		"RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads",
+		Justification = "Shipped before the overload with a logger factory, whose parameters are all required so that Create() and Create(pdfRasterizer) stay unambiguous."
+	)]
 	public static IPrintSystem Create(IPdfRasterizer? pdfRasterizer = null, WindowsOptions? options = null)
 	{
 		return WindowsPrintSystemFactory.Create(pdfRasterizer, options, loggerFactory: null);
 	}
 
 	/// <summary>
-	/// Creates the Windows print system, logging through a logger factory when there is one.
+	/// Creates the Windows print system, which logs what it carries on without, such as vendor options it couldn't
+	/// read.
 	/// </summary>
-	/// <param name="pdfRasterizer">The PDF rasteriser, or <see langword="null"/> for raw data only.</param>
+	/// <param name="pdfRasterizer">
+	/// The rasteriser used to print PDF documents, such as <c>PdfiumRasterizer</c> from Latiprimere.Rendering.Pdfium,
+	/// or <see langword="null"/> to support raw printer data only.
+	/// </param>
 	/// <param name="options">How to print, or <see langword="null"/> for the defaults.</param>
-	/// <param name="loggerFactory">The application's logger factory, or <see langword="null"/> to log nothing.</param>
-	/// <returns>The print system.</returns>
-	/// <exception cref="ArgumentException">A URI in <see cref="WindowsOptions.IppPrinterUris"/> isn't one IPP can
-	/// use.</exception>
-	internal static IPrintSystem Create(IPdfRasterizer? pdfRasterizer, WindowsOptions? options, ILoggerFactory? loggerFactory)
+	/// <param name="loggerFactory">
+	/// The application's logger factory, or <see langword="null"/> to log nothing. The print system logs under the
+	/// category <c>Latiprimere.Windows</c>, and PDF jobs sent straight to IPP printers under <c>Latiprimere.Ipp</c>.
+	/// </param>
+	/// <returns>
+	/// The print system. On platforms other than Windows it reports itself as unsupported, so it can be registered
+	/// unconditionally in cross-platform applications.
+	/// </returns>
+	/// <exception cref="ArgumentException">A URI in <see cref="WindowsOptions.IppPrinterUris"/> isn't an absolute
+	/// <c>ipp</c>, <c>ipps</c>, <c>http</c> or <c>https</c> URI.</exception>
+	public static IPrintSystem Create(IPdfRasterizer? pdfRasterizer, WindowsOptions? options, ILoggerFactory? loggerFactory)
 	{
 		options ??= new WindowsOptions();
 		ILogger logger = loggerFactory?.CreateLogger(WindowsPrintSystemFactory.LoggerCategory) ?? NullLogger.Instance;

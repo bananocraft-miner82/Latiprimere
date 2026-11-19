@@ -53,7 +53,7 @@ public sealed class WindowsPrintJobTests
 		// Assert
 		Assert.True(isCancelled);
 		Assert.Equal(new[] { 5 }, spool.DeletedJobIds);
-		Assert.Equal(PrintJobState.Cancelled, status.State);
+		Assert.Equal(PrintJobState.Canceled, status.State);
 	}
 
 	[Fact]

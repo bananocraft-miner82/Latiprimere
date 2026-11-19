@@ -41,8 +41,8 @@ public static class LatiprimereIppServiceCollectionExtensions
 		(
 			serviceProvider => (IppNetworkPrintSystem)IppNetworkPrintSystemFactory.Create
 			(
-				options,
 				serviceProvider.GetService<IPdfRasterizer>(),
+				options,
 				serviceProvider.GetService<ILoggerFactory>()
 			))
 		);

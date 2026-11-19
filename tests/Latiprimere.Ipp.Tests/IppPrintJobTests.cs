@@ -123,7 +123,7 @@ public sealed class IppPrintJobTests
 		PrintJobStatus status = await job.GetStatusAsync(TestContext.Current.CancellationToken);
 
 		// Assert
-		Assert.Equal(PrintJobState.Cancelled, status.State);
+		Assert.Equal(PrintJobState.Canceled, status.State);
 	}
 
 	[Fact]

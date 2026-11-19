@@ -14,6 +14,7 @@ namespace LatiprimereExamples.Tests.Fakes;
 internal sealed class FakePrinter : IPrinter
 {
 	private readonly List<SubmittedJob> submittedJobs = new List<SubmittedJob>(); // Everything sent, in order
+	private readonly List<FakePrintJob> jobs = new List<FakePrintJob>();            // The jobs handed back, to find again
 
 	/// <summary>
 	/// Initialises a new instance of the <see cref="FakePrinter"/> class.
@@ -85,8 +86,24 @@ internal sealed class FakePrinter : IPrinter
 		this.submittedJobs.Add(new SubmittedJob { Format = content.Format, Options = options, Document = document.ToArray() });
 
 		string jobId = this.submittedJobs.Count.ToString(CultureInfo.InvariantCulture);
+		FakePrintJob job = new FakePrintJob(jobId, this.Info.Id, this.JobStates);
+		this.jobs.Add(job);
 
-		return new FakePrintJob(jobId, this.Info.Id, this.JobStates);
+		return job;
+	}
+
+	/// <summary>
+	/// Finds a job this printer handed back, by its ID.
+	/// </summary>
+	/// <param name="jobId">The job's ID.</param>
+	/// <param name="cancellationToken">Not used.</param>
+	/// <returns>The job, or <see langword="null"/> if this printer wasn't sent it.</returns>
+	/// <exception cref="ArgumentNullException"><paramref name="jobId"/> is <see langword="null"/>.</exception>
+	public Task<IPrintJob?> GetJobAsync(string jobId, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(jobId);
+
+		return Task.FromResult<IPrintJob?>(this.jobs.Find(job => job.Id == jobId));
 	}
 
 	/// <summary>

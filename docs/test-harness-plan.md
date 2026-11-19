@@ -1,6 +1,6 @@
 # End-to-End Test Harness Plan
 
-> Status: **Accepted** (2026-11-16); decisions recorded in [ADR 0029](decisions/0029-end-to-end-test-harness.md). H0 to H4 done (2026-11-17); H5 built the same day, with only its mDNS trial still to run in CI. Part of [plan.md](plan.md).
+> Status: **Accepted** (2026-11-16); decisions recorded in [ADR 0029](decisions/0029-end-to-end-test-harness.md). H0 to H5 done: H0 to H4 on 2026-11-17, and H5 built the same day, with its mDNS trial passing in CI in every run from then to 2026-11-19, when it became a normal CI job (ADR 0029). Part of [plan.md](plan.md).
 
 ## Purpose
 
@@ -159,7 +159,7 @@ For the checks only a person can make, and for the "manual testing with real pri
 
 **Not for now** (ADR 0029, decision 4): the harness is a manual and local tool. CI builds its projects, so they keep compiling, but every scenario skips unless `LATIPRIMERE_TEST_E2E` is set, and CI doesn't set it. The run scripts set it.
 
-The one planned exception is **mDNS discovery on the Ubuntu runner** (decision 6): the container on the host network so its Avahi announcements reach the tests, tried in H5 and dropped if flaky. Built as the `mdns` job in `build.yml`, which runs `ipp.discovery.mdns` and can't fail the build while on trial (`continue-on-error`).
+The one planned exception is **mDNS discovery on the Ubuntu runner** (decision 6): the container on the host network so its Avahi announcements reach the tests, tried in H5 and dropped if flaky. Built as the `mdns` job in `build.yml`, which runs `ipp.discovery.mdns`. It couldn't fail the build while on trial (`continue-on-error`); it passed in every run, and since 2026-11-19 it can.
 
 Later options, not planned: a scheduled run of the slow scenarios (the 100-page PDF at 600 DPI with its time and memory budget from ADR 0009, many concurrent jobs, long busy retries), packaged and AOT modes, and packaged mode in `release.yml` before publishing.
 

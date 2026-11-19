@@ -57,15 +57,17 @@ Filter by category, as above, rather than by event ID: the IDs aren't part of th
 
 ## Without dependency injection
 
-Only the catalog logs: pass it a logger. The print systems from `CupsPrintSystemFactory`, `WindowsPrintSystemFactory` and `IppNetworkPrintSystemFactory` log only when created through dependency injection.
+Pass a logger factory to each print system's factory, and a logger to the catalog. Each factory has an overload that takes an `ILoggerFactory`; the others log nothing.
 
 ```csharp
 using ILoggerFactory loggerFactory = LoggerFactory.Create(logging => logging.AddConsole().SetMinimumLevel(LogLevel.Debug));
 
-using IPrintSystem cups = CupsPrintSystemFactory.Create();
-using IPrintSystem windows = WindowsPrintSystemFactory.Create();
-using IPrintSystem network = IppNetworkPrintSystemFactory.Create();
+// Each print system logs through the logger factory it is given
+using IPrintSystem cups = CupsPrintSystemFactory.Create(options: null, loggerFactory);
+using IPrintSystem windows = WindowsPrintSystemFactory.Create(new PdfiumRasterizer(), options: null, loggerFactory);
+using IPrintSystem network = IppNetworkPrintSystemFactory.Create(new PdfiumRasterizer(), options: null, loggerFactory);
 
+// And the catalog through its logger
 PrinterCatalog catalog = new PrinterCatalog([cups, windows, network], loggerFactory.CreateLogger<PrinterCatalog>());
 ```
 

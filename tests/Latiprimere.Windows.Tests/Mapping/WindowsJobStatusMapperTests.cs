@@ -21,9 +21,9 @@ public sealed class WindowsJobStatusMapperTests
 	[InlineData(0x1000u, PrintJobState.Completed)]         // complete (sent to printer)
 	[InlineData(0x2080u, PrintJobState.Completed)]         // printed and retained
 	[InlineData(0x2000u, PrintJobState.Completed)]         // retained alone
-	[InlineData(0x0004u, PrintJobState.Cancelled)]         // deleting
-	[InlineData(0x0100u, PrintJobState.Cancelled)]         // deleted
-	[InlineData(0x0014u, PrintJobState.Cancelled)]         // deleting while printing
+	[InlineData(0x0004u, PrintJobState.Canceled)]         // deleting
+	[InlineData(0x0100u, PrintJobState.Canceled)]         // deleted
+	[InlineData(0x0014u, PrintJobState.Canceled)]         // deleting while printing
 	[InlineData(0x0011u, PrintJobState.Held)]              // paused while printing
 	public void GivenSpoolerStatusFlagsWhenToPrintJobStateThenReturnsMostDecisiveState
 	(
@@ -90,7 +90,7 @@ public sealed class WindowsJobStatusMapperTests
 		PrintJobStatus status = WindowsJobStatusMapper.ToPrintJobStatus(job, "12", true, DateTimeOffset.UnixEpoch);
 
 		// Assert
-		Assert.Equal(PrintJobState.Cancelled, status.State);
+		Assert.Equal(PrintJobState.Canceled, status.State);
 		Assert.Null(status.StateMessage);
 	}
 

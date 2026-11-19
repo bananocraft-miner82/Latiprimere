@@ -6,7 +6,7 @@ namespace Latiprimere.Ipp.Tests.Raster;
 
 public sealed class RasterJobPlannerTests
 {
-	private static readonly MediaSize A5 = new MediaSize { Name = "iso_a5_148x210mm", DisplayName = "A5", WidthMillimetres = 148, HeightMillimetres = 210 };
+	private static readonly MediaSize A5 = new MediaSize { Name = "iso_a5_148x210mm", DisplayName = "A5", WidthMillimeters = 148, HeightMillimeters = 210 };
 
 	[Theory]
 	[InlineData(new[] { "application/octet-stream", "image/urf", "image/pwg-raster" }, (int)RasterFormat.PwgRaster)]
@@ -297,7 +297,7 @@ public sealed class RasterJobPlannerTests
 			? PrintOptions.Default
 			: new PrintOptions
 			{
-				MediaSize = new MediaSize { Name = "huge", DisplayName = "Huge", WidthMillimetres = chosenMillimetres.Value, HeightMillimetres = chosenMillimetres.Value }
+				MediaSize = new MediaSize { Name = "huge", DisplayName = "Huge", WidthMillimeters = chosenMillimetres.Value, HeightMillimeters = chosenMillimetres.Value }
 			};
 
 		// Act
