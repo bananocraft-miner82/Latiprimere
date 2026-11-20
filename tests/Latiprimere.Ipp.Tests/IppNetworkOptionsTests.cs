@@ -70,6 +70,74 @@ public sealed class IppNetworkOptionsTests
 	}
 
 	[Fact]
+	public void GivenNewOptionsWhenReadThenUploadStallTimeoutIsFiveMinutes()
+	{
+		// Arrange
+		IppNetworkOptions options = new IppNetworkOptions();
+
+		// Act
+		TimeSpan uploadStallTimeout = options.UploadStallTimeout;
+
+		// Assert
+		Assert.Equal(TimeSpan.FromMinutes(5), uploadStallTimeout);
+		Assert.Equal(IppNetworkOptions.DefaultUploadStallTimeout, uploadStallTimeout);
+	}
+
+	[Fact]
+	public void GivenInfiniteWhenUploadStallTimeoutSetThenKeepsIt()
+	{
+		// Arrange
+		IppNetworkOptions options = new IppNetworkOptions();
+
+		// Act
+		options.UploadStallTimeout = Timeout.InfiniteTimeSpan;
+
+		// Assert
+		Assert.Equal(Timeout.InfiniteTimeSpan, options.UploadStallTimeout);
+	}
+
+	[Fact]
+	public void GivenPositiveTimeoutWhenUploadStallTimeoutSetThenKeepsIt()
+	{
+		// Arrange
+		IppNetworkOptions options = new IppNetworkOptions();
+
+		// Act
+		options.UploadStallTimeout = TimeSpan.FromSeconds(30);
+
+		// Assert
+		Assert.Equal(TimeSpan.FromSeconds(30), options.UploadStallTimeout);
+	}
+
+	[Theory]
+	[InlineData(0)]
+	[InlineData(-2)]
+	public void GivenTimeoutNotPositiveWhenUploadStallTimeoutSetThenThrowsArgumentOutOfRangeException(int milliseconds)
+	{
+		// Arrange — zero, or negative other than infinite (provided by InlineData above)
+		IppNetworkOptions options = new IppNetworkOptions();
+
+		// Act
+		Action set = () => options.UploadStallTimeout = TimeSpan.FromMilliseconds(milliseconds);
+
+		// Assert
+		Assert.Throws<ArgumentOutOfRangeException>(set);
+	}
+
+	[Fact]
+	public void GivenTimeoutLongerThanTimersAllowWhenUploadStallTimeoutSetThenThrowsArgumentOutOfRangeException()
+	{
+		// Arrange
+		IppNetworkOptions options = new IppNetworkOptions();
+
+		// Act
+		Action set = () => options.UploadStallTimeout = TimeSpan.FromDays(30);
+
+		// Assert
+		Assert.Throws<ArgumentOutOfRangeException>(set);
+	}
+
+	[Fact]
 	public void GivenNegativeDurationWhenBusyRetryDurationSetThenThrowsArgumentOutOfRangeException()
 	{
 		// Arrange
@@ -109,5 +177,18 @@ public sealed class IppNetworkOptionsTests
 
 		// Assert
 		Assert.Equal(TimeSpan.Zero, options.DiscoveryDuration);
+	}
+
+	[Fact]
+	public void GivenNewOptionsWhenReadThenRasterFormatsArePwgThenAppleThenPclm()
+	{
+		// Arrange
+		IppNetworkOptions options = new IppNetworkOptions();
+
+		// Act
+		IList<IppRasterFormat> formats = options.RasterFormats;
+
+		// Assert
+		Assert.Equal([IppRasterFormat.PwgRaster, IppRasterFormat.AppleRaster, IppRasterFormat.Pclm], formats);
 	}
 }

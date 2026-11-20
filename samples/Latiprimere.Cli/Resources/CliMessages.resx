@@ -21,7 +21,7 @@
                  [--output FILE] [--stats] [--paper NAME] [--color color|mono] [--tray ID] [--option KEY=VALUE]...
                  [--ticket FILE]
 
-Files are sent as PDF unless --raw is given. --cancel cancels the job straight after submitting it.
+Files ending .png, .jpg or .jpeg are sent as images, .txt as UTF-8 text, others as PDF, unless --raw is given. --cancel cancels the job straight after submitting it.
 --output prints to FILE instead of the device (Windows printers only). --stats reports time and memory used.
 --paper and --tray take a paper size's name (such as iso_a4_210x297mm) and a tray's ID, as caps lists them.
 --option sets a vendor option, such as ipp:print-quality=5; repeat it for more. caps lists the printer's vendor
@@ -31,7 +31,8 @@ FILE merged on, or with --default-ticket its default Print Ticket.
 Set CUPS_SERVER (for example localhost:631) to use a CUPS server from Windows.
 IPP printers on the network are found automatically and listed by name; quote IDs with spaces, for example
 "ipp:dnssd:Office Laser". List other printers in LATIPRIMERE_IPP_PRINTERS (comma-separated URIs, for example
-ipp://192.168.1.20/ipp/print).</value>
+ipp://192.168.1.20/ipp/print). Trust the certificates of printers reached over ipps:// by listing their SHA-256
+fingerprints, checked against each printer's own web page, in LATIPRIMERE_IPP_FINGERPRINTS (comma-separated).</value>
 	</data>
 	<data name="PrintersHeading" xml:space="preserve">
 		<value>Printers:</value>
@@ -77,12 +78,20 @@ ipp://192.168.1.20/ipp/print).</value>
 		<comment>{0} is the job ID.</comment>
 	</data>
 	<data name="JobStatusLine" xml:space="preserve">
-		<value>  {0:HH:mm:ss}  {1}{2}{3}</value>
-		<comment>{0} is the time, {1} the job state, {2} the state message part (or empty), {3} the pages part (or empty).</comment>
+		<value>  {0:HH:mm:ss}  {1}{2}{3}{4}</value>
+		<comment>{0} is the time, {1} the job state, {2} the state message part (or empty), {3} the state reasons part (or empty), {4} the pages part (or empty).</comment>
 	</data>
 	<data name="JobStatusMessagePart" xml:space="preserve">
 		<value> - {0}</value>
 		<comment>{0} is the job state message.</comment>
+	</data>
+	<data name="JobStatusReasonsPart" xml:space="preserve">
+		<value> [{0}]</value>
+		<comment>{0} is the job's state reasons, comma-separated job-state-reasons keywords.</comment>
+	</data>
+	<data name="TrustCertificateHint" xml:space="preserve">
+		<value>To trust this printer, check that the fingerprint matches the one on its own web page, then list it in {0}: {0}={1}</value>
+		<comment>{0} is the environment variable, {1} the certificate's SHA-256 fingerprint.</comment>
 	</data>
 	<data name="JobStatusPagesPart" xml:space="preserve">
 		<value> ({0} pages)</value>
@@ -163,6 +172,9 @@ ipp://192.168.1.20/ipp/print).</value>
 	</data>
 	<data name="CapabilityTrays" xml:space="preserve">
 		<value>Trays:</value>
+	</data>
+	<data name="CapabilityFormats" xml:space="preserve">
+		<value>Formats:</value>
 	</data>
 	<data name="PaperSizeValue" xml:space="preserve">
 		<value>{0} ({1})</value>

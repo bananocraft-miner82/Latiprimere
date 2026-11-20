@@ -89,6 +89,15 @@ public sealed record PrintOptions
 	public ColorMode ColorMode { get; init; } = ColorMode.PrinterDefault;
 
 	/// <summary>
+	/// Gets how an image is sized on the paper: by default, shrunk to fit if it is larger, otherwise at its own size.
+	/// </summary>
+	/// <remarks>
+	/// It applies to images, from <see cref="PrintContent.FromJpeg"/> and <see cref="PrintContent.FromPng"/>, and is
+	/// ignored for other documents.
+	/// </remarks>
+	public ScalingMode Scaling { get; init; } = ScalingMode.PrinterDefault;
+
+	/// <summary>
 	/// Gets the paper source to print from, or <see langword="null"/> to use the printer's default.
 	/// </summary>
 	/// <remarks>

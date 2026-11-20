@@ -3,6 +3,10 @@ namespace Latiprimere;
 /// <summary>
 /// Enumerates the orientations in which pages can be printed.
 /// </summary>
+/// <remarks>
+/// Later versions may add orientations, as IPP also has reverse portrait and reverse landscape. Treat one you don't
+/// know as <see cref="PrinterDefault"/>, as print systems do.
+/// </remarks>
 public enum PageOrientation
 {
 	/// <summary>

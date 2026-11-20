@@ -14,6 +14,8 @@ public enum VendorOptionKind
 
 What kind of value a [VendorOption](/docs/reference/latiprimere-abstractions/vendoroption/) takes.
 
+Later versions may add kinds. Treat one you don't know as [VendorOptionKind.Text](/docs/reference/latiprimere-abstractions/vendoroptionkind/#values): the value you set in [PrintOptions.VendorOptions](/docs/reference/latiprimere-abstractions/printoptions/#vendoroptions) goes to the print system as you give it.
+
 ## Values
 
 - **`Choice`** (`0`): One of the option's [VendorOption.Choices](/docs/reference/latiprimere-abstractions/vendoroption/#choices), or several when it allows that.

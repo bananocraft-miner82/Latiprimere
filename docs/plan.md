@@ -171,18 +171,32 @@ Broken into work packages P3-1 to P3-9, with what exists and the decisions taken
 - [x] Direct IPP adapter with mDNS discovery (started in Spike 4; hardened through Phases 1 to 3 with Happy Eyeballs, busy retries, remembered addresses, raster printing and IPPS; mDNS discovery checked in CI. Discovery on a real Mac is P3-8)
 - [x] Validate-Job before submitting to network printers. Done 2026-11-18 (P3-1, [ADR 0033](decisions/0033-validate-job.md)): on by default for printers that list it, `IppNetworkOptions.ValidateJobs` to turn it off; Windows queues routed to IPP check too. Still to do: a check on the real HP, which was off
 - [ ] Print PDFs to printers that don't accept PDF, by rendering with PDFium to Apple raster (`image/urf`), PCLm or PWG raster. The HP ENVY 5640 is one: over IPP it takes PCL, JPEG, PCLm, Apple raster and octet-stream, but not PDF. Encoders done 2026-11-18 (P3-2, [ADR 0034](decisions/0034-raster-encoders.md)): PWG raster and Apple raster, grey, colour and 1-bit black, with back-side transforms. Printing with them over direct IPP built 2026-11-18 (P3-3, [ADR 0035](decisions/0035-printing-pdfs-as-raster.md)); Windows WSD queues route to such printers too, matched by UUID over mDNS (P3-4, [ADR 0036](decisions/0036-wsd-queues-over-ipp.md)); the checks on the HP's paper remain
-- [ ] IPPS (TLS) and authentication. Built 2026-11-18 (P3-5, [ADR 0037](decisions/0037-ipps-and-authentication.md)): pinned certificates by SHA-256 fingerprint or a callback, credentials sent only over IPPS, and IPPS preferred for discovered printers once trust is configured. Checked over real TLS on the scripted printer; the HP over `ipps://` waits for the manual check
+- [ ] IPPS (TLS) and authentication. Built 2026-11-18 (P3-5, [ADR 0037](decisions/0037-ipps-and-authentication.md)): pinned certificates by SHA-256 fingerprint or a callback, credentials sent only over IPPS, and IPPS preferred for discovered printers once trust is configured. Checked over real TLS on the scripted printer; the HP over `ipps://` waits for the manual check. Windows queues sent over IPP take the same settings since 2026-11-20 ([ADR 0042](decisions/0042-ipps-for-windows-queues-and-uri-authentication.md))
 - [x] Optionally persist the remembered addresses of name IDs, so a printer that stops answering mDNS while asleep is still found after a restart (the HP ENVY did this on 2026-11-12). Done 2026-11-18 (P3-6, [ADR 0038](decisions/0038-remembered-addresses.md)): `IppNetworkOptions.AddressStorePath`
 - [x] Documentation site and samples (console, ASP.NET Core, worker service). Done 2026-11-19 (P3-7), with the API reference ([ADR 0039](decisions/0039-api-reference.md)), and reviewed again against the 1.0 API (P3-9)
 - [ ] macOS verification on real hardware
-- [ ] `1.0.0` release
+- [ ] `1.0.0` release, after Phase 4 (Phase 4's decision D1): the first stable release, `11.0.<n>` (Phase 3's decision D8). The sign-off and the switch are listed in [releasing.md](releasing.md#the-first-stable-release-10); the switch is ready to run (2026-11-20)
+
+### Phase 4: PCLm, images and text, and events (before 1.0)
+
+Three of the later items come forward, so 1.0 starts with them (owner, 2026-11-20). Work packages P4-1 to P4-7, what exists, and the decisions are in [phase-4-plan.md](phase-4-plan.md), accepted 2026-11-20 with every decision as recommended.
+
+- [x] A small PDF writer, internal (P4-1). Done 2026-11-20 ([ADR 0045](decisions/0045-pdf-writer.md)): objects and streams written as they come, Flate, run-length and pass-through compression, images and Courier text, checked through PDFium
+- [x] PCLm, and a choice of raster format (P4-2). Done 2026-11-20 ([ADR 0046](decisions/0046-pclm-and-raster-format-order.md)): PCLm strips written as they fill, Flate or run-length as the printer prefers, and `IppNetworkOptions.RasterFormats` and `WindowsOptions.IppRasterFormats` to order or leave out raster formats. The HP on paper is in the sign-off
+- [x] Images: JPEG and PNG (P4-3). Done 2026-11-20 ([ADR 0047](decisions/0047-printing-images.md)): `PrintContent.FromJpeg` and `FromPng`, `PrintOptions.Scaling` and `PrinterCapabilities.DocumentFormats`; JPEGs passed through, a PNG decoder written here, and images placed on a page as a PDF where they can't go as they are. A photo on the HP's paper is in the sign-off
+- [x] Plain text (P4-4). Done 2026-11-20 ([ADR 0048](decisions/0048-printing-plain-text.md)): `PrintContent.FromText`; CUPS lays text out, and elsewhere Latiprimere does, as a PDF in Courier, with Windows-1252 characters only. Text on the HP's paper is in the sign-off
+- [x] Printer and job events (P4-5). Done 2026-11-20 ([ADR 0049](decisions/0049-following-printers-and-jobs.md)): `PrinterStatus`, `IPrinter.GetStatusAsync` and `WatchStatusAsync`, and `IPrintJob.WatchStatusAsync` as a member. Windows follows the spooler's change notifications; CUPS and network printers are polled, as CUPS doesn't wait on IPP notifications
+- [ ] Docs, samples and an API review of the additions (P4-6)
+- [ ] The sign-off extended to them (P4-7)
 
 ### Later (unscheduled)
 
-- UI add-ons: print dialogs and preview for Avalonia, MAUI, WPF/WinForms
-- Image and plain-text content helpers
-- Printer event subscriptions (IPP notifications, Windows change notifications)
-- Android/iOS
+Each can be added after 1.0 without breaking the API; [ADR 0044](decisions/0044-room-to-grow-after-1-0.md) sets out how.
+
+- UI add-ons: print dialogs and preview for Avalonia, MAUI, WPF/WinForms (new packages, over the public API)
+- Image and plain-text content helpers: proposed for Phase 4. Beyond it: text in any script, which needs an embedded font
+- Printer event subscriptions: proposed for Phase 4, for jobs and printers' states. Beyond it: printers appearing and going (a default-implemented catalog member)
+- Android/iOS (new adapter packages and target frameworks)
 
 ## Risks
 

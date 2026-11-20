@@ -36,7 +36,38 @@ public DocumentFormat Format { get; }
 
 Gets the format of the document data.
 
+### TextEncoding
+
+```csharp
+public Encoding? TextEncoding { get; }
+```
+
+Gets the encoding of a text document's characters, or `null` for other formats.
+
 ## Methods
+
+### FromJpeg
+
+```csharp
+public static PrintContent FromJpeg(Stream content)
+```
+
+Creates print content from a stream containing a JPEG image, printed on one page.
+
+The image is sized on the paper as [PrintOptions.Scaling](/docs/reference/latiprimere-abstractions/printoptions/#scaling) says, turned as its EXIF orientation says, and printed landscape when it is wider than tall, unless [PrintOptions.Orientation](/docs/reference/latiprimere-abstractions/printoptions/#orientation) says otherwise. Baseline and progressive JPEGs in grey, colour or CMYK can be printed.
+
+**Parameters**
+
+- `content`: A readable stream containing the JPEG image.
+
+**Returns**
+
+The print content.
+
+**Exceptions**
+
+- [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `content` is `null`.
+- [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): `content` cannot be read.
 
 ### FromPdf
 
@@ -49,6 +80,29 @@ Creates print content from a stream containing a PDF document.
 **Parameters**
 
 - `content`: A readable stream containing the PDF document.
+
+**Returns**
+
+The print content.
+
+**Exceptions**
+
+- [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `content` is `null`.
+- [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): `content` cannot be read.
+
+### FromPng
+
+```csharp
+public static PrintContent FromPng(Stream content)
+```
+
+Creates print content from a stream containing a PNG image, printed on one page.
+
+The image is sized on the paper as [PrintOptions.Scaling](/docs/reference/latiprimere-abstractions/printoptions/#scaling) says, turned as its EXIF orientation says, and printed landscape when it is wider than tall, unless [PrintOptions.Orientation](/docs/reference/latiprimere-abstractions/printoptions/#orientation) says otherwise. Every PNG can be printed, with any transparency over white. An animated PNG prints its first frame.
+
+**Parameters**
+
+- `content`: A readable stream containing the PNG image.
 
 **Returns**
 
@@ -78,4 +132,50 @@ The print content.
 **Exceptions**
 
 - [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `content` is `null`.
+- [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): `content` cannot be read.
+
+### FromText
+
+```csharp
+public static PrintContent FromText(string text)
+```
+
+Creates print content from plain text.
+
+Text is laid out in Courier at 10 points, within half-inch margins: long lines wrap at a space where they can, tabs stop every 8 columns, and a form feed starts a new page. [PrintOptions.Orientation](/docs/reference/latiprimere-abstractions/printoptions/#orientation) chooses portrait or landscape pages. CUPS lays text out itself.
+
+Courier shows the Windows-1252 characters, which cover Western European languages. Elsewhere than CUPS, text with any other character, or a control character other than tab, line breaks and form feed, is refused by [IPrinter.SubmitAsync](/docs/reference/latiprimere-abstractions/iprinter/#submitasync) with [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) naming it.
+
+**Parameters**
+
+- `text`: The text.
+
+**Returns**
+
+The print content, holding the text as UTF-8.
+
+**Exceptions**
+
+- [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `text` is `null`.
+
+```csharp
+public static PrintContent FromText(Stream content, Encoding encoding)
+```
+
+Creates print content from a stream containing plain text.
+
+The text is laid out as [PrintContent.FromText](/docs/reference/latiprimere-abstractions/printcontent/#fromtext) describes.
+
+**Parameters**
+
+- `content`: A readable stream containing the text.
+- `encoding`: The text's encoding, such as [Encoding.UTF8](https://learn.microsoft.com/dotnet/api/system.text.encoding.utf8). A byte order mark at the start of the stream overrides it.
+
+**Returns**
+
+The print content.
+
+**Exceptions**
+
+- [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `content` or `encoding` is `null`.
 - [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): `content` cannot be read.

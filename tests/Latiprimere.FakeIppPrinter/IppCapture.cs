@@ -47,9 +47,35 @@ public static class IppCapture
 	/// <returns>The files and the values to replace before sharing them.</returns>
 	/// <exception cref="ArgumentException">The URI isn't <c>ipp</c> or <c>ipps</c>.</exception>
 	/// <exception cref="HttpRequestException">The printer couldn't be reached or answered with an HTTP error.</exception>
-	public static async Task<IppCaptureResult> CaptureAsync(Uri printerUri, string directory, string fileName, CancellationToken cancellationToken)
+	public static Task<IppCaptureResult> CaptureAsync(Uri printerUri, string directory, string fileName, CancellationToken cancellationToken)
+	{
+		return IppCapture.CaptureAsync(printerUri, directory, fileName, Array.Empty<string>(), cancellationToken);
+	}
+
+	/// <summary>
+	/// Asks a printer for all its attributes and saves the answer, trusting the given certificates as well as those
+	/// the system trusts, as for a printer reached over IPPS with its own certificate pinned.
+	/// </summary>
+	/// <param name="printerUri">The printer, as an <c>ipp</c> or <c>ipps</c> URI.</param>
+	/// <param name="directory">The folder to save into, created if needed.</param>
+	/// <param name="fileName">The name for both files, without extension, such as <c>hp-envy-5640-printer-attributes</c>.</param>
+	/// <param name="trustedFingerprints">SHA-256 fingerprints of certificates to trust, in hexadecimal, with or without
+	/// colons.</param>
+	/// <param name="cancellationToken">Cancels the request.</param>
+	/// <returns>The files and the values to replace before sharing them.</returns>
+	/// <exception cref="ArgumentException">The URI isn't <c>ipp</c> or <c>ipps</c>.</exception>
+	/// <exception cref="HttpRequestException">The printer couldn't be reached or answered with an HTTP error.</exception>
+	public static async Task<IppCaptureResult> CaptureAsync
+	(
+		Uri                         printerUri,
+		string                      directory,
+		string                      fileName,
+		IReadOnlyCollection<string> trustedFingerprints,
+		CancellationToken           cancellationToken
+	)
 	{
 		ArgumentNullException.ThrowIfNull(printerUri);
+		ArgumentNullException.ThrowIfNull(trustedFingerprints);
 		ArgumentException.ThrowIfNullOrWhiteSpace(directory);
 		ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
 
@@ -76,7 +102,16 @@ public static class IppCapture
 		using MemoryStream requestBody = new MemoryStream();
 		await protocol.WriteIppRequestAsync(request, requestBody, cancellationToken);
 
-		using HttpClient client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+		HashSet<string> pinned = trustedFingerprints.Select(IppCapture.NormalizeFingerprint).ToHashSet(StringComparer.Ordinal);
+
+		using HttpClientHandler handler = new HttpClientHandler
+		{
+			ServerCertificateCustomValidationCallback = (message, certificate, chain, errors) =>
+				errors == System.Net.Security.SslPolicyErrors.None
+				|| (certificate is not null && pinned.Contains(Convert.ToHexString(certificate.GetCertHash(System.Security.Cryptography.HashAlgorithmName.SHA256))))
+		};
+
+		using HttpClient client = new HttpClient(handler, disposeHandler: false) { Timeout = TimeSpan.FromSeconds(30) };
 		using ByteArrayContent content = new ByteArrayContent(requestBody.ToArray());
 		content.Headers.ContentType = new MediaTypeHeaderValue("application/ipp");
 		using HttpResponseMessage response = await client.PostAsync(httpUri, content, cancellationToken);
@@ -123,5 +158,15 @@ public static class IppCapture
 		UriBuilder builder = new UriBuilder(printerUri) { Scheme = scheme, Port = printerUri.IsDefaultPort ? 631 : printerUri.Port };
 
 		return builder.Uri;
+	}
+
+	/// <summary>
+	/// Puts a fingerprint into one form for comparison: hexadecimal digits in upper case, without separators.
+	/// </summary>
+	/// <param name="fingerprint">The fingerprint.</param>
+	/// <returns>The fingerprint.</returns>
+	private static string NormalizeFingerprint(string fingerprint)
+	{
+		return string.Concat(fingerprint.Where(character => character is not (':' or ' ' or '-'))).ToUpperInvariant();
 	}
 }

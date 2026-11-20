@@ -29,7 +29,7 @@ public static class PdfPrinters
 	/// </summary>
 	/// <param name="context">The scenario.</param>
 	/// <param name="printer">The CUPS-PDF queue.</param>
-	/// <param name="documentName">The test document.</param>
+	/// <param name="documentName">The test document: a PDF, a PNG or JPEG image, or UTF-8 text.</param>
 	/// <param name="options">How to print it.</param>
 	/// <param name="label">Names the evidence file, such as <c>monochrome</c>.</param>
 	/// <returns>What CUPS-PDF wrote.</returns>
@@ -43,7 +43,7 @@ public static class PdfPrinters
 		using FileStream document = TestDocuments.Open(documentName);
 		DateTime submittedAt = DateTime.UtcNow;
 
-		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options with { JobName = options.JobName ?? "Latiprimere end-to-end" }, context.CancellationToken);
+		IPrintJob job = await printer.SubmitAsync(PdfPrinters.ToContent(document, documentName), options with { JobName = options.JobName ?? "Latiprimere end-to-end" }, context.CancellationToken);
 		context.Note($"Submitted job {job.Id} ({label}).");
 		PrintJobStatus status = await JobFollower.WaitUntilFinishedAsync(context, job);
 		context.RequireEqual($"the {label} job completes", PrintJobState.Completed, status.State);
@@ -64,7 +64,7 @@ public static class PdfPrinters
 	/// </summary>
 	/// <param name="context">The scenario.</param>
 	/// <param name="printer">Microsoft Print to PDF.</param>
-	/// <param name="documentName">The test document.</param>
+	/// <param name="documentName">The test document: a PDF, a PNG or JPEG image, or UTF-8 text.</param>
 	/// <param name="options">How to print it; the output file is set here.</param>
 	/// <param name="label">Names the output file, such as <c>landscape</c>.</param>
 	/// <returns>What the driver wrote.</returns>
@@ -87,7 +87,7 @@ public static class PdfPrinters
 		// Only one job at a time, across every test process, or the driver can stall and leave an empty file
 		using (SharedPrinterLock printerLock = new SharedPrinterLock(TestPrinters.MicrosoftPrintToPdfName))
 		{
-			IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), withFile, context.CancellationToken);
+			IPrintJob job = await printer.SubmitAsync(PdfPrinters.ToContent(document, documentName), withFile, context.CancellationToken);
 			context.Note($"Submitted job {job.Id} ({label}).");
 			PrintJobStatus status = await JobFollower.WaitUntilFinishedAsync(context, job);
 			context.RequireEqual($"the {label} job completes", PrintJobState.Completed, status.State);
@@ -99,6 +99,23 @@ public static class PdfPrinters
 		context.AddEvidence(outputFile, $"What Microsoft Print to PDF wrote ({label})");
 
 		return PdfPrinters.Describe(context, PdfInspector.Inspect(written!), label);
+	}
+
+	/// <summary>
+	/// Wraps a test document as print content of the format its extension names.
+	/// </summary>
+	/// <param name="document">The document's stream.</param>
+	/// <param name="documentName">Its file name.</param>
+	/// <returns>The content: a PNG, a JPEG, UTF-8 text, or a PDF.</returns>
+	private static PrintContent ToContent(Stream document, string documentName)
+	{
+		return Path.GetExtension(documentName).ToUpperInvariant() switch
+		{
+			".PNG" => PrintContent.FromPng(document),
+			".JPG" => PrintContent.FromJpeg(document),
+			".TXT" => PrintContent.FromText(document, System.Text.Encoding.UTF8),
+			_      => PrintContent.FromPdf(document),
+		};
 	}
 
 	/// <summary>

@@ -17,8 +17,20 @@
 #     scripted IPP printer, so on every runner (ADR 0032);
 #   - ipp.raster.apple-raster-two-sided: a PDF rendered by PDFium, turned, encoded as Apple raster, gzipped and
 #     streamed through a pipe to the scripted printer with the HP's profile, so on every runner (ADR 0035);
+#   - ipp.raster.pclm-pages: the same PDF as PCLm, its strips written by Latiprimere's own PDF writer, run-length
+#     encoded and gzipped, then read back by PDFium (ADR 0046);
+#   - ipp.images.png-as-raster: a PNG decoded by Latiprimere's own decoder, placed on a page as a PDF, then rendered
+#     by PDFium and sent as Apple raster, against the scripted printer, so on every runner (ADR 0047);
+#   - ipp.text.as-pdf: text read, wrapped and laid out in Courier as a PDF by Latiprimere, against the scripted
+#     printer, so on every runner (ADR 0048);
 #   - ipp.discovery.remembered-address: the address store's source-generated JSON read natively, and a printer
-#     found by name at its remembered address, against the scripted printer, so on every runner (ADR 0038).
+#     found by name at its remembered address, against the scripted printer, so on every runner (ADR 0038);
+#   - ipp.faults.stalled-upload: a printer that stops reading a job, which the stall guard's handler, content and
+#     stream must notice, against the scripted printer, so on every runner (ADR 0041);
+#   - ipp.lifecycle.cancel-waiting-job: a job cancelled and followed to its end, its reasons and message read through
+#     the raw Get-Job-Attributes that SharpIppNext maps to its typed response, so on every runner (ADR 0043);
+#   - windows.ipp-route.password-over-ipps: a Windows queue's PDF to an ipps:// printer over TLS, its certificate
+#     pinned and a password sent, on Windows with Microsoft Print to PDF (ADR 0042).
 #
 # A scenario whose test printers this machine doesn't have is skipped; one that runs must pass. The first four are
 # the checks this script made with the CLI sample before the harness existed: CI runs only these (ADR 0029). Run every scenario
@@ -42,7 +54,13 @@ scenarios=(
 	windows.vendor-options.listed-and-sent
 	ipp.vendor-options.listed-and-sent
 	ipp.raster.apple-raster-two-sided
+	ipp.raster.pclm-pages
+	ipp.images.png-as-raster
+	ipp.text.as-pdf
 	ipp.discovery.remembered-address
+	ipp.faults.stalled-upload
+	ipp.lifecycle.cancel-waiting-job
+	windows.ipp-route.password-over-ipps
 )
 
 # The ILCompiler finds the Windows linker through vswhere, which Git Bash may not have on its path

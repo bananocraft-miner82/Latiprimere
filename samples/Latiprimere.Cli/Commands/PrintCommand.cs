@@ -125,9 +125,26 @@ internal static class PrintCommand
 	{
 		using FileStream document = File.OpenRead(printArguments.FilePath);
 
-		PrintContent content = printArguments.IsRaw ? PrintContent.FromRaw(document) : PrintContent.FromPdf(document);
+		PrintContent content = printArguments.IsRaw ? PrintContent.FromRaw(document) : PrintCommand.ToContent(document, printArguments.FilePath);
 
 		return await printer.SubmitAsync(content, printArguments.Options, CancellationToken.None);
+	}
+
+	/// <summary>
+	/// Wraps a file as an image, text or a PDF, by its extension.
+	/// </summary>
+	/// <param name="document">The open file.</param>
+	/// <param name="filePath">Its path.</param>
+	/// <returns>A PNG or JPEG for those extensions, UTF-8 text for <c>.txt</c>, otherwise a PDF.</returns>
+	private static PrintContent ToContent(FileStream document, string filePath)
+	{
+		return Path.GetExtension(filePath).ToUpperInvariant() switch
+		{
+			".PNG"           => PrintContent.FromPng(document),
+			".JPG" or ".JPEG" => PrintContent.FromJpeg(document),
+			".TXT"           => PrintContent.FromText(document, System.Text.Encoding.UTF8),
+			_                => PrintContent.FromPdf(document),
+		};
 	}
 
 	/// <summary>
@@ -143,6 +160,11 @@ internal static class PrintCommand
 				? string.Empty
 				: CliMessages.FormatJobStatusMessagePart(status.StateMessage);
 
+			// Why the job is in its state, as the printer's job-state-reasons keywords (ADR 0043)
+			string reasonsPart = status.StateReasons.Count == 0
+				? string.Empty
+				: CliMessages.FormatJobStatusReasonsPart(string.Join(", ", status.StateReasons));
+
 			string pagesPart = status.PagesCompleted is null
 				? string.Empty
 				: CliMessages.FormatJobStatusPagesPart(status.PagesCompleted);
@@ -153,6 +175,7 @@ internal static class PrintCommand
 				status.Timestamp.ToLocalTime(),
 				status.State,
 				messagePart,
+				reasonsPart,
 				pagesPart
 			);
 		}

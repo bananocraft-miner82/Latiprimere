@@ -6,11 +6,363 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 | Item | Value |
 |---|---|
-| Phase | 3: Direct IPP and v1.0, begun ([phase-3-plan.md](phase-3-plan.md), accepted 2026-11-18); P3-1, P3-2, P3-6 and P3-7 done; P3-3, P3-4 and P3-5 built (their checks on the HP wait); P3-9 begun. Phase 1 is done. Phase 0's open items: the Mac checks (Spikes 1 and 4), which are P3-8 |
-| Released | `11.0.6-preview` on nuget.org, 2026-11-19; its post-release pull request isn't merged into `main` yet. The next release is `11.0.7-preview`, or 1.0 once `RELEASE_PREVIEW` is `false` ([ADR 0030](decisions/0030-release-numbering.md)) |
-| State | Every Phase 2 item is done. Windows PDF jobs take a Print Ticket in `windows:print-ticket` ([ADR 0031](decisions/0031-windows-print-tickets.md)). `PrinterCapabilities.VendorOptions` lists every IPP job attribute and Windows driver feature a printer offers, ready to set, and `IWindowsPrinter` reads a driver's Print Capabilities ([ADR 0032](decisions/0032-vendor-options-in-capabilities.md)). CI was green on all three runners on 2026-11-17 (owner). Releases are numbered after the latest one, and a merge with nothing new releases nothing. Every ADR is accepted (owner, 2026-11-18). |
-| Next step | P3-9 for 1.0: the API review is applied ([ADR 0040](decisions/0040-api-review-1-0.md)), the docs are reviewed against it, and the housekeeping is done; next, the real-printer sign-off, then the stable switch (D8). When the HP is on: the manual checks of P3-1, P3-3, P3-4 and P3-5 (about six sheets, each only when you say). Owner: delete the leftover branch `post-release/v11.0.4-preview`. |
-| Blockers | None |
+| Phase | 4: PCLm, images and text, and events, before 1.0 ([phase-4-plan.md](phase-4-plan.md), accepted 2026-11-20). P4-1 to P4-5 done; P4-6, the docs, samples and 1.0 API review, and P4-7, the sign-off's additions, to come. Phase 3 ([phase-3-plan.md](phase-3-plan.md)) is done but for its checks on the HP, the Mac (P3-8) and the stable switch, which wait for the sign-off |
+| Released | `11.0.7-preview` on nuget.org, 2026-11-20, with the 1.0 API ([ADR 0040](decisions/0040-api-review-1-0.md)). Its post-release pull request is merged into `main`. The next release is `11.0.8-preview`, or the first stable one, 1.0, after the sign-off ([releasing.md](releasing.md#the-first-stable-release-10)) |
+| State | Committed on `feature/release-prep-cleanup`, rebased onto `main` after the 11.0.7-preview post-release merge: Phase 4's P4-1 to P4-5 ([ADR 0045](decisions/0045-pdf-writer.md) to [ADR 0049](decisions/0049-following-printers-and-jobs.md)) and the fixes from their review; before them, the pre-1.0 work found by the review of 2026-11-20: a time limit on a printer that stops taking a job ([ADR 0041](decisions/0041-upload-stall-timeout.md)); IPPS, pinned certificates and passwords for Windows queues, and what printers say each address asks for ([ADR 0042](decisions/0042-ipps-for-windows-queues-and-uri-authentication.md)); why a job is in its state, `PrintJobStatus.StateReasons` ([ADR 0043](decisions/0043-job-state-reasons.md)); the docs on printers anyone can announce; room to grow after 1.0 ([ADR 0044](decisions/0044-room-to-grow-after-1-0.md)); and the stable switch, ready to run. 3,176 tests pass here; not yet through CI. Every ADR is accepted (owner). |
+| Next step | Owner: merge this branch's pull request, and release it as `11.0.8-preview`. Then the sign-off, as [releasing.md](releasing.md#1-the-sign-off) lists it: the HP over IPP, IPPS and its Windows queue (about ten sheets, each only when you say), and the Mac. Then the stable switch. |
+| Blockers | The sign-off waits on the HP being on and on time at a Mac. Owner: delete the leftover branches `post-release/v11.0.4-preview` and `post-release/v11.0.6-preview`, and reserve the `Latiprimere.` ID prefix on nuget.org ([releasing.md](releasing.md#one-time-setup-owner)). |
+
+---
+
+## 2026-11-20: Review of Phase 4's changes, and fixes
+
+**Done** (owner: "Run a sweep for any potential bugs, security/performance issues etc introduced", then "Fix all of them")
+- **A review of P4-1 to P4-5** found 10 issues; all are fixed. The changes are recorded as amendments to [ADR 0047](decisions/0047-printing-images.md), [ADR 0048](decisions/0048-printing-plain-text.md) and [ADR 0049](decisions/0049-following-printers-and-jobs.md).
+- **Correctness:**
+  - **refused text on Windows:** a Windows queue sent over IPP no longer takes text refused for a character for a raster refusal, so it no longer tries the driver and reports the wrong reason;
+  - **a failed change notification:** it is closed and the watch polls, rather than spinning;
+  - **network printers that list no formats:** they get JPEGs as they are and PNGs and text laid out as a PDF, rather than being treated as CUPS;
+  - **printer watches:** they report a failed read as `Unknown` and go on;
+  - **Windows capabilities:** with the IPP route on, they list what the queue's IPP printer takes.
+- **Security:** images are capped at 300 million pixels in all, against decompression bombs.
+- **Performance:**
+  - CUPS text is re-encoded as it uploads (`Utf8TextStream`);
+  - images are read once from seekable streams;
+  - text-only drivers are refused before anything is converted;
+  - a printer's default paper is kept for five minutes.
+- **Tests:** a test for each fix, including a surrogate pair split across the transcoder's buffer, a notification that fails, a printer that goes and comes back, and the paper kept and read again. The Windows watch and routing tests were repeated five times without a failure.
+
+**Learned**
+- **The routing tests had built their IPP context with CUPS's formats,** where the real route uses the standard ones; that only mattered once CUPS's behaviour was keyed to the print system rather than to missing formats.
+
+---
+
+## 2026-11-20: P4-5, following printers and jobs
+
+**Done** (owner: "Proceed with P4-5")
+- **Public API** ([ADR 0049](decisions/0049-following-printers-and-jobs.md), accepted by the owner: "Accept ADR 0049"):
+  - `PrinterStatus`: state, message, IPP reasons, whether it accepts jobs;
+  - `IPrinter.GetStatusAsync` and `IPrinter.WatchStatusAsync`, and `IPrintJob.WatchStatusAsync` as a member, all with default implementations that poll, so classes of your own keep compiling;
+  - `PrinterExtensions.WatchStatusAsync` with a 5-second `DefaultPollInterval`;
+  - `PrintJobExtensions` kept. Its overload with an interval is hidden, so code compiled against earlier versions still runs; package validation passes against 11.0.6-preview.
+- **Windows:**
+  - jobs and printers followed by `FindFirstPrinterChangeNotification`, waited on by the thread pool;
+  - re-read at least every 30 seconds in case a change isn't signalled;
+  - polled when the spooler can't signal;
+  - status flags given as the IPP reasons that match.
+- **IPP and CUPS:** `GetStatusAsync` reads the printer's state attributes; watching polls.
+- **Tests:**
+  - the default members and extensions;
+  - the IPP printer's status;
+  - Windows notifications, with signals that change nothing, the fallback, and jobs to their end, each repeated five times without a failure.
+- **Harness:** `cups.printer-status.paused`, `windows.printer-status.paused`, `ipp.printer-status.polled`, and `windows.jobs.watch-by-notification`, where a job followed with an hour between polls is seen cancelled at once. All pass here; the CUPS container was stopped afterwards.
+
+**Learned**
+- **CUPS 2.4 doesn't wait on Get-Notifications:** with `notify-wait` set, it answered at once with no events and `notify-get-interval` 60. With the HP and `ippeveprinter` offering no subscriptions, IPP notifications would have been slower than polling, so they weren't built (the plan expected otherwise).
+- **Default interface members are reached only through the interface:** tests holding a fake class cast it to `IPrintJob`.
+
+**Not done**
+- **IPP notifications:** for a printer that honours `notify-wait`, when one is at hand.
+
+---
+
+## 2026-11-20: P4-4, plain text
+
+**Done** (owner: "Go for P4-4")
+- **Public API** ([ADR 0048](decisions/0048-printing-plain-text.md), accepted by the owner: "Accept ADR 0048"), all additive:
+  - `DocumentFormat.Text`;
+  - `PrintContent.FromText(string)` and `FromText(stream, encoding)`;
+  - `PrintContent.TextEncoding`.
+- **Where text goes:**
+  - **CUPS:** as UTF-8 `text/plain`, re-encoded from any encoding; CUPS lays it out with any character its fonts have;
+  - **direct IPP:** always a PDF Latiprimere lays out, sent as any PDF (or as raster);
+  - **Windows:** the same PDF through the driver, or the IPP route.
+- **The layout** (`TextDocumentConverter`, `TextPageWriter`):
+  - Courier at 10 points within half-inch margins: 87 × 64 on A4, 90 × 60 on US Letter;
+  - landscape when the job asks;
+  - every kind of line end, wrapping at the last space that fits, tabs every 8 columns;
+  - form feeds without stray blank pages, and one blank page for empty text.
+- **Characters:** Windows-1252 only, with tab, line ends and form feed. Anything else is refused with `NotSupportedException` naming its code point, line and column, before anything is sent.
+- **Shared with images:** `DocumentConverter` now turns both into PDFs, and the refusal for a printer that can take neither names the document's format.
+- **Tests:** 40 new, run on both frameworks (3,092 in all, none failing):
+  - each page's lines read back from the PDF: positions, wrapping, tabs, line ends, form feeds, encodings, refusals;
+  - PDFium drawing a line where it belongs;
+  - the scripted IPP client, the fake spooler and the IPP route.
+- **Harness:** `ipp.text.as-pdf`, `ipp.text.character-refused`, `windows.text.print-to-pdf` and `cups.text.cups-pdf-output`, all passing here, the last in the CUPS container (stopped afterwards). Microsoft Print to PDF's output was looked at: the tabbed table lines up, accents and € show, the long line wraps at a space, and the form feed starts page 2. The Native AOT check now runs `ipp.text.as-pdf`.
+- **Test document:** `text-2-pages.txt` in `tools/test-documents`.
+- **CLI sample:** `.txt` files print as UTF-8 text.
+- **Docs:** how it works, print options, network printers, CUPS and Windows; CHANGELOG.
+
+**Not done**
+- **Other scripts** outside CUPS: they need an embedded font (D6).
+- **Text on the HP's paper:** in the sign-off.
+
+---
+
+## 2026-11-20: P4-3, JPEG and PNG images
+
+**Done** (owner: "Start P4-3")
+- **Public API** ([ADR 0047](decisions/0047-printing-images.md), accepted by the owner: "Accept ADR 0047"), all additive:
+  - `DocumentFormat.Jpeg` and `Png`, `PrintContent.FromJpeg` and `FromPng`;
+  - `ScalingMode` and `PrintOptions.Scaling`;
+  - `PrinterCapabilities.DocumentFormats`, filled by every print system.
+- **Where images go:**
+  - **CUPS:** as they are, with `print-scaling`;
+  - **direct IPP:** a JPEG as it is to a printer that takes JPEG; otherwise a one-page PDF on the job's paper or the printer's default, sent as any PDF (or as raster);
+  - **Windows:** the same PDF, through PDFium and the driver in the page's orientation, or the IPP route for queues sent over IPP.
+- **The page:** turned by EXIF; landscape when the image is wider than tall unless `Orientation` says otherwise. `Fit` and the default keep 5 mm margins, and an image that gives no resolution is 96 dpi.
+- **JPEG:** headers read, never decoded; codings PDF can't carry refused; Adobe CMYK inverted.
+- **PNG:** a decoder written here:
+  - every colour type, depth, filter and Adam7, palettes and `tRNS`, CRCs checked;
+  - transparency laid over white;
+  - rows streamed into the PDF;
+  - opaque 8-bit images passed through with PDF's PNG predictors.
+- **Tests:** 135 new, run on both frameworks (3,004 in all, none failing):
+  - the PNG decoder against a test encoder written apart from it, pixel by pixel;
+  - JPEG and EXIF headers;
+  - all eight EXIF orientations and PNG colours through PDFium;
+  - the layout;
+  - the scripted IPP client, the fake spooler and the IPP route.
+- **Harness:** `ipp.images.jpeg-as-is`, `ipp.images.png-as-pdf`, `ipp.images.png-as-raster`, `windows.images.print-to-pdf` and `cups.images.cups-pdf-output`, all passing here, the last in the CUPS container. Microsoft Print to PDF's output was looked at: the bar on top, the red square bottom right, the transparent disc white. The Native AOT check now runs `ipp.images.png-as-raster`.
+- **Test images:** `photo-300x200.png` and `.jpg` in `tools/test-documents`, made by `make-images.py` and `make-images.ps1`.
+- **CLI sample:** `.png`, `.jpg` and `.jpeg` files print as images; `caps` lists the formats.
+- **Docs:** how it works, print options, network printers, CUPS and Windows; CHANGELOG.
+
+**Learned**
+- **CUPS turns a wide image onto portrait paper itself:** CUPS-PDF wrote portrait A4 pages for the landscape test image, filled to 87%.
+
+**Not done**
+- **PngSuite,** which the plan named: its images need downloading, which I haven't done without asking. The test encoder covers the same colour types, depths, filters and interlacing.
+- **A photo on the HP's paper:** in the sign-off.
+
+---
+
+## 2026-11-20: P4-2, PCLm and the order of raster formats
+
+**Done** (owner: "Start P4-2")
+- **PCLm** ([ADR 0046](decisions/0046-pclm-and-raster-format-order.md), accepted by the owner: "Accept ADR 0046"):
+  - **`PclmWriter`,** beside the PWG and Apple raster writers, on P4-1's PDF writer: `%PCLm 1.0` on the second line, each page the paper's size, lines gathered into strips and written as each fills, so a page is never held whole;
+  - **the planner** reads `pclm-source-resolution-*`, `pclm-strip-height-*` (at most 256 lines, else 16), `pclm-compression-method-preferred` (the first of `flate` and `rle`, else Flate) and `pclm-raster-back-side`. For the HP that's 600 dpi, strips of 32, run-length, rotated backs;
+  - PCLm has no 1-bit form, so the planner never asks for it and the writer refuses it.
+- **The order of raster formats:**
+  - **new public API:** the enum `IppRasterFormat`, `IppNetworkOptions.RasterFormats` and `WindowsOptions.IppRasterFormats`. By default PWG raster, Apple raster, then PCLm, so nothing changes for printers that take either of the first two;
+  - **an empty list** turns raster off. A PDF to a printer printed to directly is then refused, and when the printer takes a format the list leaves out, the message names the formats and the option. A Windows queue prints such PDFs through its driver.
+- **Tests:** 26 new, on both frameworks:
+  - PCLm strips decoded from their streams and compared line by line with PWG raster of the same PDFs: grey and colour, Flate and run-length, odd and over-tall strips, rotated back sides;
+  - PDFium reading the PCLm back with the strips in place;
+  - the planner's PCLm choices and the format order;
+  - the scripted printer: PCLm only, PCLm first, and none allowed.
+- **Harness:** `ipp.raster.pclm-pages` and `ipp.raster.format-order`, both passing. The Native AOT check now runs `ipp.raster.pclm-pages` too.
+- **Docs:** the network printers guide on raster formats and `RasterFormats`; the Windows guide on `IppRasterFormats`; CHANGELOG.
+
+**Learned**
+- **PDFium smooths images it scales,** even by a hair: rendering a PCLm page at its own resolution gives pixels up to 2.6 levels off on average, not exact. Strips 32 lines out of place would be 5 to 19 levels off. So the exact check decodes the strips as a printer does, and PDFium only checks where they land.
+
+**Not done**
+- **The HP on paper,** with `RasterFormats` set to PCLm first: in the sign-off, as the plan has it. A printer may read PCLm more strictly than PDFium does.
+
+---
+
+## 2026-11-20: P4-1, a small PDF writer
+
+**Done** (owner: "Start P4-1")
+- **`Latiprimere.Ipp.Documents`** ([ADR 0045](decisions/0045-pdf-writer.md)), internal:
+  - **`PdfObjectWriter`:** objects by reserved number in any order, streams, the cross-reference table and trailer. Offsets are counted as bytes go out, and a stream of unknown length gets an indirect `/Length`, so the output needn't seek and data is never held whole;
+  - **`PdfDocumentWriter`:** pages, images drawn into rectangles, and Courier text, with each image written as it is drawn and each page as it ends;
+  - **compression:** Flate through .NET, run-length through an encoder written here (the HP prefers it for PCLm), and data passed through, such as a JPEG;
+  - **text:** in Windows-1252, by a table written here; any other character refused with its code point and position.
+- **No new dependency;** the writers are `IDisposable` without closing the output.
+- **Tests:** 66 new, on both frameworks:
+  - byte-level checks of every cross-reference entry and indirect length;
+  - documents rendered by PDFium and their pixels checked: Flate and run-length images, a JPEG passed through, escaped text, three page sizes;
+  - a 4 MB image streamed to a stream that can't seek;
+  - run-length against a separate decoder.
+- **Test data:** `quadrants-64x48.jpg`, made with Windows' `System.Drawing`, for JPEG pass-through.
+- **Tidied:** the test helper `RecordingStream` from earlier today moved out of its test class into `Fakes`, as CONTRIBUTING.md asks for helper types.
+
+**Not done**
+- **Nothing uses the writer yet:** P4-2, PCLm, is next.
+
+---
+
+## 2026-11-20: Phase 4 planned
+
+**Done** (owner: "Let's also plan to add these now. There's no harm starting more feature-rich than the original plan.")
+- **[phase-4-plan.md](phase-4-plan.md),** accepted with every decision as recommended (owner: "Accept all"), brings three later items forward so 1.0 starts with them:
+  - PCLm, with a choice of raster format;
+  - images and plain text;
+  - printer and job events.
+
+  Seven work packages, about four to five weeks, with ten decisions proposed. plan.md has the Phase 4 checklist.
+- **Found while planning:** neither the HP nor `ippeveprinter` lists any IPP subscription operation. So events would come from CUPS (`ippget`) and the Windows spooler's change notifications, and most network printers would still be polled. The plan says so, and keeps polling as the fallback.
+
+**Next**
+- P4-1, the PDF writer, then P4-2, PCLm. P4-5, events, can run alongside them in another session.
+
+---
+
+## 2026-11-20: The CLI sample and IPPS printers
+
+**Done** (owner: "Start the CLI")
+- **`LATIPRIMERE_IPP_FINGERPRINTS`** lists, comma-separated, the SHA-256 fingerprints of printer certificates the CLI trusts over IPPS, as `IppNetworkOptions.TrustedCertificateFingerprints` does. Before, it couldn't print to a printer with the self-signed certificate printers nearly always have.
+- **A refused certificate** is followed by the line to set, `LATIPRIMERE_IPP_FINGERPRINTS=<fingerprint>`, after checking it against the printer's web page. The library's message names `IppNetworkOptions`, which a CLI user doesn't set.
+- **A fingerprint that isn't one** exits with 64, as a malformed address does.
+- **Each job status line shows the job's reasons,** such as `[job-completed-successfully]` ([ADR 0043](decisions/0043-job-state-reasons.md)).
+- **The harness scenario `samples.cli.ipps-printer`** runs the CLI program against the scripted printer over TLS, checking all of that: it passes, as does `samples.cli.ipp-printer`.
+
+---
+
+## 2026-11-20: CI coverage for today's work and the release scripts
+
+**Done** (owner: "Yes, start those")
+- **The Native AOT check runs three more scenarios** (`tools/aot-check/check-aot.sh`):
+  - `ipp.faults.stalled-upload`, the stall guard's handler, content and stream ([ADR 0041](decisions/0041-upload-stall-timeout.md));
+  - `ipp.lifecycle.cancel-waiting-job`, job reasons through the raw Get-Job-Attributes that SharpIppNext maps to its typed response ([ADR 0043](decisions/0043-job-state-reasons.md));
+  - `windows.ipp-route.password-over-ipps`, TLS with a pinned certificate and a password on the Windows route, on the Windows runner ([ADR 0042](decisions/0042-ipps-for-windows-queues-and-uri-authentication.md)).
+
+  Here, natively, on .NET 11 and .NET 10: no trimming or AOT warnings, and every scenario this PC can run passes, the three new ones among them.
+- **The release scripts are checked in CI** on the Ubuntu runner, as they run only at a release, and the stable switch only once:
+  - **ShellCheck** over `tools/releasing/*.sh`: clean, once two false alarms were marked as intended, as `prepare-release.sh` already marked a third;
+  - **`tools/releasing/test-release-scripts.sh`** runs the stable switch and the README status check on scratch copies of the files, with LF and with CRLF line endings: 58 checks. A copy of `switch-to-stable.sh` with a step removed fails it. Once the README says stable, after 1.0, it tests only the status check, so the step keeps passing.
+- **The README status check is a script of its own,** `tools/releasing/check-readme-status.sh`, which `prepare-release.sh` calls, so it can be tested without nuget.org. Rechecked through `prepare-release.sh` on the scratch clone: a stable version is still refused while the README says preview.
+
+---
+
+## 2026-11-20: The Windows test printers
+
+**Done** (owner installed them: "Those windows route scenarios installs are sorted")
+- **The five Windows route scenarios that need them all pass,** with `LATIPRIMERE_TEST_WINDOWS_OUTPUT` at `C:\ProgramData\Latiprimere\TestOutput`: `fallback-no-pdf`, `fallback-unreachable`, `fallback-password`, `refusal-not-resent`, and the new `fallback-password-for-jobs` ([ADR 0042](decisions/0042-ipps-for-windows-queues-and-uri-authentication.md)), whose printer answers questions freely and asks for a password only to print, and gets no Validate-Job or Print-Job.
+- **Every harness scenario:** 55 passed, none failed, 19 skipped: CUPS (the container was stopped), mDNS, and the manual checks.
+- **The Windows tests:** 786, none failed. One test was skipped on both frameworks, as it needs `ippeveprinter` from the container.
+- **Then with the CUPS container as well** (owner: "Start the container and run the remaining scenarios"):
+  - **every harness scenario,** on both .NET 11 and .NET 10: 66 passed, none failed, 8 skipped. The skips are mDNS discovery, which needs a Linux host's network, as Docker Desktop doesn't pass multicast through, and the seven manual checks, which need a person and a real printer;
+  - **every test:** 2,534, none failed, 148 skipped. The Windows test that needs `ippeveprinter` passes too. Every skip is the end-to-end xUnit host, which runs only with `LATIPRIMERE_TEST_E2E=1`, and whose scenarios are the ones the console harness ran above.
+
+---
+
+## 2026-11-20: The CUPS integration test, against the container
+
+**Done** (owner: "Start Docker and run the CUPS integration test")
+- **Docker started,** and the CUPS test container with it.
+- **The test failed as first written:** CUPS gives the cancelled two-sided job only `processing-to-stop-point`, which Latiprimere doesn't explain, and no `job-state-message`. Its reason is in `job-printer-state-message`, a CUPS extension: "Printer cannot print with supplied options."
+- **Fixed** ([ADR 0043](decisions/0043-job-state-reasons.md), "Outcome against CUPS"):
+  - Get-Job-Attributes asks for `job-printer-state-message` too, in its raw form, since SharpIppNext doesn't model it, with the typed response still read from the same answer;
+  - a job with no `job-state-message` takes it instead, ahead of Latiprimere's explanation of the reasons;
+  - the test passes on both target frameworks, and three new unit tests cover the fallback.
+- **Every test against the container:** 2,534 tests, none failed, 158 skipped. That's 76 more run than without Docker: the CUPS queues, `ippeveprinter` over IPP and IPPS, and the raster integration tests. The skips are the Windows test printers, the Mac and the end-to-end host.
+
+---
+
+## 2026-11-20: The stable release, ready to switch
+
+**Done** (owner: "Start item 7")
+- **[releasing.md](releasing.md), "The first stable release (1.0)":** the sign-off, with the command for each check; the switch; the release.
+- **`tools/releasing/switch-to-stable.sh`** makes the wording changes when the sign-off is done:
+  - the README's and the package README's status say stable;
+  - `--prerelease` goes from the install commands in four files;
+  - the changelog's notes start with what 1.0 means.
+
+  It's a script rather than changes kept on a branch, because the README's status line names the current version, which each release changes. Nothing user-facing says stable yet.
+- **`prepare-release.sh` checks the README's status matches the release,** before changing anything: no preview while it says stable, no stable release while it says preview. So switching the wording and setting `RELEASE_PREVIEW` must go together.
+- **Manual mode takes `--fingerprint`** for a printer over IPPS. Without it, the sign-off's IPPS check on the HP couldn't have run: its self-signed certificate would have been refused. The pin is trusted for direct IPP, for a Windows queue sent over IPPS, and for saving the printer's attributes, which used their own connection.
+- **Tried on a scratch clone** of the 11.0.7-preview post-release commit:
+  - the switch, once, then refusing a second run;
+  - `prepare-release.sh` with each pairing of status and version: the two mismatches stop before any file changes; the two matches prepare the release, the stable one with the README saying "stable. Version 11.0.99".
+- **Tried against the scripted printer over TLS:** manual mode fails with the fingerprint, then passes `manual.printer-details` and `manual.test-page` with it pinned.
+
+**Not done**
+- **The sign-off itself:** the HP and the Mac.
+- **latiprimere.com's own pages,** in the website's repository, may still say preview: the checklist says to change them there.
+
+---
+
+## 2026-11-20: Printers anyone can announce, and room to grow after 1.0
+
+**Done** (owner: "Start items 5 and 6")
+- **Item 5, a new section in the network printers guide: "Anyone on the network can announce a printer."**
+  - What it covers: multicast DNS can't check who's speaking; what Latiprimere guards (UUID checks, IPPS from the same host, shared passwords only to pinned printers); and what it can't.
+  - Found while writing it: a printer looked up by name falls back to plain IPP when its certificate isn't trusted. So pinning protects only a printer printed to by its `ipps://` address, and the guide says so.
+  - Pointers added from the secure printers page and the Windows WSD matching.
+- **Item 6, [ADR 0044](decisions/0044-room-to-grow-after-1-0.md), accepted (owner, "Accept ADR 0044"): each "Later" item can be added after 1.0 without breaking anything.**
+  - UI add-ons: new packages.
+  - Image and text content: new `DocumentFormat` values and `PrintContent` factories.
+  - Events: an optional interface beside `IPrintSystem`, and default-implemented members.
+  - Android and iOS: new adapter packages and target frameworks.
+- **Before 1.0, as a result:**
+  - `DocumentFormat`, `ColorMode`, `PageOrientation` and `VendorOptionKind` say they may gain values, and how to treat one you don't know;
+  - CONTRIBUTING.md says which enums may grow and where new features go;
+  - IPP printing throws `NotSupportedException` for an unknown document format, as `SubmitAsync` documents, not `ArgumentOutOfRangeException`;
+  - plan.md's Later list gives each item's route.
+- **Checks:** all 329 links between the site's pages resolve, anchors included; every Latiprimere name the new text uses exists; the API reference is regenerated; 2,528 tests, none failed, 234 skipped.
+
+---
+
+## 2026-11-20: Why a job is in its state
+
+**Done** (owner: "Start item 4")
+- **`job-state-reasons` is read** with every IPP job status ([ADR 0043](decisions/0043-job-state-reasons.md), accepted: owner, "Accept ADR 0043"), for CUPS queues, printers printed to directly and Windows queues' jobs sent over IPP.
+  - **`PrintJobStatus.StateReasons`,** new: the keywords, in lower case, in order, without `none`; empty for the Windows spooler.
+  - **`StateMessage`,** when the printer gives none, explains the most telling of about 30 known reasons: the cause first, then who cancelled, then why a job waits. This closes Spike 1's open item: a job CUPS cancels no longer ends with no explanation.
+  - **`WatchStatusAsync`** reports a change of reasons, comparing the lists by content.
+- **Tests:**
+  - new unit tests: reading and explaining reasons (37 cases), the mapping (4), `WatchStatusAsync` and the default;
+  - the harness's four IPP lifecycle scenarios check reasons and messages: all pass;
+  - a CUPS integration test for a two-sided job to the one-sided Virtual-IPP queue, which skipped here.
+- **Docs:** the job states section of the print options and jobs guide, the API reference, the changelog.
+- **Results:** 2,528 tests, none failed, 234 skipped (Docker, the Windows test printers and other platforms); the harness's 35 IPP and Windows-route scenarios: 29 passed, 6 skipped as before.
+
+**Not done**
+- **The CUPS integration test hasn't run:** Docker wasn't running here, and CI will run it. Which reasons CUPS gives for the cancelled job is still to see.
+- **CUPS's `job-printer-state-message`** and **the Windows spooler's status flags** aren't read (ADR 0043).
+
+---
+
+## 2026-11-20: IPPS for Windows queues, and what printers say they ask for
+
+**Done** (owner: "Start items 2 and 3")
+- **Windows queues over IPPS** ([ADR 0042](decisions/0042-ipps-for-windows-queues-and-uri-authentication.md), accepted: owner, "Accept ADR 0042"). Four new settings: `WindowsOptions.IppTrustedCertificateFingerprints`, `IppServerCertificateValidationCallback`, `IppCredentials` and `IppPrinterCredentials`.
+  - **The same rules as direct IPP,** from code now shared between the two: passwords only over TLS, and with a shared password a WSD queue's printer must be pinned.
+  - **IPPS first** for a WSD queue's printer that announces it, once trust is configured, with plain IPP if the encrypted connection fails.
+  - **Checked at creation,** with messages naming `WindowsOptions`.
+  - **No more silent fallbacks:** a refused certificate is logged as a warning with its fingerprint; other failures at Information. A TLS failure at Print-Job now sends the job through the driver.
+- **`uri-authentication-supported` is read,** with `printer-uri-supported`, matched by scheme, port and path, since printers name themselves rather than the address used.
+  - **The Windows route:** a printer asking for a password it won't be sent, or for `digest`, `certificate` or `negotiate`, has its jobs printed by the driver, without Validate-Job or Print-Job. Before, a printer that answered questions freely but wanted a password to print failed the job with `PrintAuthenticationException`.
+  - **Direct IPP doesn't refuse early,** so a printer that misreports still prints. Its authentication refusals now name its `ipps://` address, or say the authentication it wants can't be given.
+- **Scripted printer:** `FakePrinterOptions.RequiresCredentialsForJobsOnly`, as most real printers ask.
+- **Tests:**
+  - new unit tests for the reader (13 cases), the refusal hints, the route's security (12), and the factory's checks (6);
+  - harness: `windows.ipp-route.password-over-ipps` passes here; `windows.ipp-route.fallback-password-for-jobs` needs the Windows test printers, so it was skipped;
+  - the existing security, route and fault scenarios still pass.
+- **Docs:** the Windows section of the CUPS and Windows page, with a new example in `CupsAndWindows.cs`; the secure printers page; ADR 0037's "Not done"; the API reference; the changelog.
+- **Results:** 2,440 tests, none failed, 232 skipped (Docker, the Windows test printers and other platforms); the harness's 35 IPP and Windows-route scenarios: 29 passed, 6 skipped for want of the Windows test printers and a virtual IPP printer.
+
+**Not done**
+- **`windows.ipp-route.fallback-password-for-jobs`** hasn't run: it needs the Windows test printers (`tools/windows-test-printers`, elevated).
+- **Not tried on a real printer:** the HP asks for no password, and its WSD queue isn't on this PC.
+
+---
+
+## 2026-11-20: A time limit on a printer that stops taking a job
+
+**Done** (owner: "Yes, start item 1", from the review of what's left before 1.0)
+- **`IppNetworkOptions.UploadStallTimeout`** ([ADR 0041](decisions/0041-upload-stall-timeout.md), accepted), 5 minutes by default (owner: "Keep 5 minutes"). It closes what the sweep of 2026-11-19 left open: a Print-Job had no time limit if the printer stalled.
+  - A job fails when one write of its document, or the wait for the answer once it's all sent, takes longer.
+  - The time between writes isn't counted, so rendering raster pages isn't a stall, and a printer that keeps reading, however slowly, is never cut short.
+  - The `PrintException` says whether the printer stopped taking the document or was sent it all and didn't answer.
+  - It isn't a connect failure, so a routed Windows queue doesn't print the job through the spooler as well. It isn't resent.
+  - Windows queues routed over IPP get the default. CUPS is unchanged.
+- **Found on the way: Windows reports a single large socket write as finished once it's queued.** SharpIppNext writes a seekable document in one write, and 64 MB was "sent" in 24 ms to a printer reading nothing. So writes go on in 64 KiB pieces, each timed. Without them, a stall would have been reported as a missing answer, and a slow printer reading a large PDF cut off after 5 minutes.
+- **Scripted printer:** `FakePrinterBehaviour.StallPrintJobUpload` stops reading a Print-Job after its IPP header. Stopping the printer releases such a request, as Kestrel no longer sees the client hang up.
+- **Tests:**
+  - 30 new unit tests: the watch, the stream's pieces, the handler, the option and factory checks, and the stall not counting as a connect failure;
+  - three over real TCP: a printer that never reads, with a seekable and a forward-only 64 MB document, and one that never answers;
+  - the harness scenario `ipp.faults.stalled-upload`, through the public API: it fails after the 2 s limit set there, and the job is sent once.
+- **Docs:** the network printers settings table, the troubleshooting guide, the API reference and the changelog.
+- **Results:** 2,366 tests, none failed, 228 skipped (Docker, the Windows test printers and other platforms); the harness's 33 IPP and Windows-route scenarios: 28 passed, 5 skipped for want of the Windows test printers and a virtual IPP printer.
+
+**Not done**
+- **Not tried on a real printer:** making the HP stall on purpose isn't practical.
+- **The changelog** has a second `## Unreleased` heading above the one the 11.0.7-preview post-release pull request turns into that release's, so the entry isn't counted as 11.0.7's. Merge that pull request first.
 
 ---
 

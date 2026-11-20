@@ -74,4 +74,24 @@ internal sealed class WindowsPrintJob : IPrintJob
 
 		return isDeleted;
 	}
+
+	/// <inheritdoc/>
+	/// <remarks>
+	/// The spooler signals each change to the queue's jobs, so the status is read when one comes, and at least every
+	/// 30 seconds, rather than every <paramref name="pollInterval"/> (ADR 0049). If the spooler can't signal, as for
+	/// some print servers' queues, the status is read every <paramref name="pollInterval"/>.
+	/// </remarks>
+	public IAsyncEnumerable<PrintJobStatus> WatchStatusAsync(TimeSpan pollInterval, CancellationToken cancellationToken = default)
+	{
+		return WindowsStatusWatch.WatchAsync
+		(
+			() => this.spool.OpenChangeNotification(this.printerName, WindowsChanges.Jobs),
+			this.GetStatusAsync,
+			WindowsStatusWatch.HasChanged,
+			status => status.IsTerminal,
+			pollInterval,
+			onFailure: null,
+			cancellationToken
+		);
+	}
 }

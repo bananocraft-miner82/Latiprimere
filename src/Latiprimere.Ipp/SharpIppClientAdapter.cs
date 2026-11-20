@@ -283,15 +283,59 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 	}
 
 	/// <inheritdoc/>
+	/// <remarks>
+	/// Sent in its raw form, so a job without a <c>job-state-message</c> can take CUPS's
+	/// <c>job-printer-state-message</c> instead, which SharpIppNext doesn't model: CUPS says there why it cancelled a
+	/// job, such as "Printer cannot print with supplied options." (ADR 0043).
+	/// </remarks>
 	public Task<GetJobAttributesResponse> GetJobAttributesAsync(GetJobAttributesRequest request, CancellationToken cancellationToken)
 	{
 		return this.SendAsync
 		(
 			request.OperationAttributes?.PrinterUri,
-			token => this.client.GetJobAttributesAsync(request, token),
+			token => this.SendRawGetJobAttributesAsync(request, token),
 			isUpload: false,
 			cancellationToken
 		);
+	}
+
+	/// <summary>
+	/// Sends a Get-Job-Attributes request in its raw form, reads the typed response from the answer, and gives a job
+	/// without a <c>job-state-message</c> its <c>job-printer-state-message</c>, when it has one.
+	/// </summary>
+	/// <param name="request">The typed request.</param>
+	/// <param name="cancellationToken">A token to cancel the request.</param>
+	/// <returns>The response.</returns>
+	private async Task<GetJobAttributesResponse> SendRawGetJobAttributesAsync(GetJobAttributesRequest request, CancellationToken cancellationToken)
+	{
+		IIppRequestMessage raw = this.client.CreateRawRequest(request);
+
+		Uri printerUri = request.OperationAttributes?.PrinterUri?.Value
+						 ?? throw new ArgumentException(ExceptionMessages.IppRequestWithoutPrinterUri, nameof(request));
+
+		IIppResponseMessage response = await this.client.SendAsync(printerUri, raw, cancellationToken).ConfigureAwait(false);
+		GetJobAttributesResponse typed = this.client.CreateResponse<GetJobAttributesResponse>(response);
+
+		if (typed.JobAttributes is { } job && string.IsNullOrWhiteSpace(job.JobStateMessage?.Value))
+		{
+			string? printerMessage = response.JobAttributes
+				.SelectMany(group => group)
+				.Where(attribute => attribute.Name == IppRequestedAttributes.JobPrinterStateMessage)
+				.Select(attribute => attribute.Value switch
+				{
+					string text => text,
+					StringWithLanguage text => text.Value,
+					_ => null,
+				})
+				.FirstOrDefault(text => !string.IsNullOrWhiteSpace(text));
+
+			if (printerMessage is not null)
+			{
+				job.JobStateMessage = new StringWithLanguage(printerMessage);
+			}
+		}
+
+		return typed;
 	}
 
 	/// <inheritdoc/>
@@ -346,6 +390,18 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 		try
 		{
 			return await send(responseTimeout?.Token ?? cancellationToken).ConfigureAwait(false);
+		}
+		catch (Exception exception) when (SharpIppClientAdapter.FindStall(exception) is { } stall)
+		{
+			// The printer stopped reading the document, or didn't answer once it had it (IppStallGuardHandler). The
+			// stall is kept as the inner exception, which isn't a connect failure, so a Windows queue's job isn't
+			// sent through the spooler as well
+			string seconds = Connections.IppTransferStalledException.FormatSeconds(stall.StallTimeout);
+			string message = stall.IsAwaitingResponse
+				? ExceptionMessages.FormatIppResponseStalled(target, seconds)
+				: ExceptionMessages.FormatIppUploadStalled(target, seconds);
+
+			throw new PrintException(message, stall);
 		}
 		catch (IppResponseException exception)
 			when (exception.InnerException is HttpRequestException { StatusCode: HttpStatusCode httpStatus }
@@ -432,6 +488,24 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 
 			throw new PrintException(message, exception);
 		}
+	}
+
+	/// <summary>
+	/// Finds the stall that ended a request, however SharpIppNext or the HTTP client wrapped it.
+	/// </summary>
+	/// <param name="exception">The failure.</param>
+	/// <returns>The stall, or <see langword="null"/> if the request failed for another reason.</returns>
+	private static Connections.IppTransferStalledException? FindStall(Exception exception)
+	{
+		for (Exception? current = exception; current is not null; current = current.InnerException)
+		{
+			if (current is Connections.IppTransferStalledException stall)
+			{
+				return stall;
+			}
+		}
+
+		return null;
 	}
 
 	/// <summary>

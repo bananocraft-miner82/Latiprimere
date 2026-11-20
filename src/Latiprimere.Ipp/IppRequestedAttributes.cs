@@ -11,6 +11,15 @@ internal static class IppRequestedAttributes
 	/// <summary>The URIs the printer accepts requests on.</summary>
 	internal const string PrinterUriSupported = "printer-uri-supported";
 
+	/// <summary>The security each of <see cref="PrinterUriSupported"/> uses, in the same order: <c>none</c> or <c>tls</c>.</summary>
+	internal const string UriSecuritySupported = "uri-security-supported";
+
+	/// <summary>
+	/// The authentication each of <see cref="PrinterUriSupported"/> asks for, in the same order: <c>none</c>,
+	/// <c>requesting-user-name</c>, <c>basic</c>, <c>digest</c>, <c>certificate</c> or <c>negotiate</c>.
+	/// </summary>
+	internal const string UriAuthenticationSupported = "uri-authentication-supported";
+
 	/// <summary>The printer's human-readable description.</summary>
 	internal const string PrinterInfo = "printer-info";
 
@@ -71,8 +80,17 @@ internal static class IppRequestedAttributes
 	/// <summary>The job's state.</summary>
 	internal const string JobState = "job-state";
 
+	/// <summary>Why the job is in its state, as keywords such as <c>job-canceled-at-device</c>.</summary>
+	internal const string JobStateReasons = "job-state-reasons";
+
 	/// <summary>Detail about the job's state.</summary>
 	internal const string JobStateMessage = "job-state-message";
+
+	/// <summary>
+	/// The printer's state message when the job last changed: a CUPS extension, where CUPS says why it cancelled a job,
+	/// as it gives no <see cref="JobStateMessage"/>.
+	/// </summary>
+	internal const string JobPrinterStateMessage = "job-printer-state-message";
 
 	/// <summary>The URI of the printer or queue a job was submitted to.</summary>
 	internal const string JobPrinterUri = "job-printer-uri";
@@ -110,7 +128,9 @@ internal static class IppRequestedAttributes
 		IppRequestedAttributes.PrinterStateMessage,
 		IppRequestedAttributes.DocumentFormatSupported,
 		IppRequestedAttributes.PrinterUuid,
-		IppRequestedAttributes.OperationsSupported
+		IppRequestedAttributes.OperationsSupported,
+		IppRequestedAttributes.UriSecuritySupported,
+		IppRequestedAttributes.UriAuthenticationSupported
 	};
 
 	/// <summary>
@@ -147,7 +167,9 @@ internal static class IppRequestedAttributes
 	{
 		IppRequestedAttributes.JobId,
 		IppRequestedAttributes.JobState,
+		IppRequestedAttributes.JobStateReasons,
 		IppRequestedAttributes.JobStateMessage,
+		IppRequestedAttributes.JobPrinterStateMessage,
 		IppRequestedAttributes.JobImpressionsCompleted
 	};
 

@@ -38,7 +38,7 @@ public sealed class PrintJobExtensionsTests
 		// Act
 		List<PrintJobStatus> statuses = await PrintJobExtensionsTests.CollectAsync
 		(
-			job.WatchStatusAsync(TimeSpan.FromMilliseconds(1), TestContext.Current.CancellationToken)
+			((IPrintJob)job).WatchStatusAsync(TimeSpan.FromMilliseconds(1), TestContext.Current.CancellationToken)
 		);
 
 		// Assert
@@ -75,12 +75,35 @@ public sealed class PrintJobExtensionsTests
 		// Act
 		List<PrintJobStatus> statuses = await PrintJobExtensionsTests.CollectAsync
 		(
-			job.WatchStatusAsync(TimeSpan.FromMilliseconds(1), TestContext.Current.CancellationToken)
+			((IPrintJob)job).WatchStatusAsync(TimeSpan.FromMilliseconds(1), TestContext.Current.CancellationToken)
 		);
 
 		// Assert
 		Assert.Equal(3, statuses.Count);
 		Assert.Equal("Door open", statuses[1].StateMessage);
+	}
+
+	[Fact]
+	public async Task GivenStateReasonsChangeWhenWatchStatusThenYieldsTheChangeButNotARepeat()
+	{
+		// Arrange — the same reasons twice, in new lists, as each poll reads them afresh
+		FakePrintJob job = new FakePrintJob
+		(
+			new PrintJobStatusBuilder().WithState(PrintJobState.Pending).Build(),
+			new PrintJobStatusBuilder().WithState(PrintJobState.Pending).WithStateReasons("printer-stopped").Build(),
+			new PrintJobStatusBuilder().WithState(PrintJobState.Pending).WithStateReasons("printer-stopped").Build(),
+			new PrintJobStatusBuilder().WithState(PrintJobState.Canceled).Build()
+		);
+
+		// Act
+		List<PrintJobStatus> statuses = await PrintJobExtensionsTests.CollectAsync
+		(
+			((IPrintJob)job).WatchStatusAsync(TimeSpan.FromMilliseconds(1), TestContext.Current.CancellationToken)
+		);
+
+		// Assert
+		Assert.Equal(3, statuses.Count);
+		Assert.Equal(["printer-stopped"], statuses[1].StateReasons);
 	}
 
 	[Fact]
@@ -112,7 +135,7 @@ public sealed class PrintJobExtensionsTests
 		// Act
 		Func<Task> watchStatus = () => PrintJobExtensionsTests.CollectAsync
 		(
-			job.WatchStatusAsync(pollInterval, TestContext.Current.CancellationToken)
+			((IPrintJob)job).WatchStatusAsync(pollInterval, TestContext.Current.CancellationToken)
 		);
 
 		// Assert
@@ -128,8 +151,8 @@ public sealed class PrintJobExtensionsTests
 		// Act
 		Func<Task> watchStatus = () => PrintJobExtensionsTests.CollectAsync
 		(
-			job!.WatchStatusAsync(TimeSpan.FromMilliseconds(1), TestContext.Current.CancellationToken)
-		); // Deliberately null
+			job!.WatchStatusAsync(TestContext.Current.CancellationToken)
+		); // Deliberately null, through the extension, which checks it
 
 		// Assert
 		await Assert.ThrowsAsync<ArgumentNullException>(watchStatus);
@@ -151,7 +174,7 @@ public sealed class PrintJobExtensionsTests
 		// Act
 		Func<Task> watchStatus = async () =>
 		{
-			await foreach (PrintJobStatus status in job.WatchStatusAsync(pollInterval, cancellationSource.Token))
+			await foreach (PrintJobStatus status in ((IPrintJob)job).WatchStatusAsync(pollInterval, cancellationSource.Token))
 			{
 				// Stop watching as soon as the first status arrives
 				await cancellationSource.CancelAsync();
@@ -183,7 +206,7 @@ public sealed class PrintJobExtensionsTests
 		// Act
 		Func<Task> watchStatus = async () =>
 		{
-			await foreach (PrintJobStatus status in job.WatchStatusAsync(TimeSpan.FromMilliseconds(1), TestContext.Current.CancellationToken))
+			await foreach (PrintJobStatus status in ((IPrintJob)job).WatchStatusAsync(TimeSpan.FromMilliseconds(1), TestContext.Current.CancellationToken))
 			{
 				states.Add(status.State);
 			}

@@ -1,3 +1,5 @@
+using Latiprimere.Ipp.Documents;
+
 namespace Latiprimere.Ipp.Raster;
 
 /// <summary>
@@ -38,4 +40,12 @@ internal sealed record RasterSettings
 	/// <summary>Gets the most memory one rendered band may take; a page is rendered in as many bands as that
 	/// needs.</summary>
 	public long MaxBandBytes { get; init; } = RasterSettings.DefaultMaxBandBytes;
+
+	/// <summary>Gets the lines in each strip of a PCLm page, from the printer's <c>pclm-strip-height-preferred</c>.
+	/// Defaults to 16, Mopria's own default.</summary>
+	public int PclmStripHeight { get; init; } = 16;
+
+	/// <summary>Gets how each strip of a PCLm page is compressed: Flate or run-length, as the printer prefers.
+	/// Defaults to Flate.</summary>
+	public PdfStreamEncoding PclmCompression { get; init; } = PdfStreamEncoding.Flate;
 }

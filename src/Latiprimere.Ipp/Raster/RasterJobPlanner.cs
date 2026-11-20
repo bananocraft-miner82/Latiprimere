@@ -1,4 +1,5 @@
 using System.Globalization;
+using Latiprimere.Ipp.Documents;
 using Latiprimere.Ipp.Mapping;
 using Latiprimere.Ipp.Resources;
 using SharpIpp.Protocol.Models;
@@ -6,7 +7,7 @@ using SharpIpp.Protocol.Models;
 namespace Latiprimere.Ipp.Raster;
 
 /// <summary>
-/// Chooses how to send a PDF as raster, from the printer's attributes and the job's options (ADR 0035).
+/// Chooses how to send a PDF as raster, from the printer's attributes and the job's options (ADR 0035, ADR 0046).
 /// </summary>
 internal static class RasterJobPlanner
 {
@@ -15,6 +16,15 @@ internal static class RasterJobPlanner
 
 	/// <summary>Apple raster's MIME type.</summary>
 	internal const string AppleRasterMimeType = "image/urf";
+
+	/// <summary>PCLm's MIME type, as Mopria registers it.</summary>
+	internal const string PclmMimeType = "application/PCLm";
+
+	/// <summary>A PCLm strip's height when the printer prefers none: Mopria's default.</summary>
+	internal const int DefaultPclmStripHeight = 16;
+
+	/// <summary>The tallest PCLm strip used, so a printer's answer can't make one strip a whole page.</summary>
+	internal const int MaxPclmStripHeight = 256;
 
 	/// <summary>Without a default from the printer, the highest resolution used: finer costs time for little gain.</summary>
 	internal const int PreferredMaxDpi = 600;
@@ -40,31 +50,74 @@ internal static class RasterJobPlanner
 		"sides-default",
 		"print-color-mode-default",
 		"compression-supported",
+		"pclm-source-resolution-supported",
+		"pclm-source-resolution-default",
+		"pclm-strip-height-preferred",
+		"pclm-strip-height-supported",
+		"pclm-compression-method-preferred",
+		"pclm-raster-back-side",
 	];
 
 	/// <summary>
-	/// Chooses the raster format to send a PDF in: PWG raster, then Apple raster (decision D2).
+	/// The order raster formats are tried in when none is set: PWG raster, Apple raster, then PCLm (Phase 3 plan, D2;
+	/// Phase 4 plan, D3).
+	/// </summary>
+	internal static readonly IReadOnlyList<RasterFormat> DefaultFormatOrder = [RasterFormat.PwgRaster, RasterFormat.AppleRaster, RasterFormat.Pclm];
+
+	/// <summary>
+	/// Chooses the raster format to send a PDF in, in the default order: PWG raster, Apple raster, then PCLm.
 	/// </summary>
 	/// <param name="supportedFormats">The MIME types the printer accepts.</param>
-	/// <returns>The format, or <see langword="null"/> if it takes neither.</returns>
+	/// <returns>The format, or <see langword="null"/> if it takes none of them.</returns>
 	internal static RasterFormat? ChooseFormat(IEnumerable<string> supportedFormats)
 	{
+		return RasterJobPlanner.ChooseFormat(supportedFormats, RasterJobPlanner.DefaultFormatOrder);
+	}
+
+	/// <summary>
+	/// Chooses the raster format to send a PDF in: the first in an order that the printer takes
+	/// (<see cref="IppNetworkOptions.RasterFormats"/>).
+	/// </summary>
+	/// <param name="supportedFormats">The MIME types the printer accepts.</param>
+	/// <param name="order">The formats to try, in order; one left out is never sent.</param>
+	/// <returns>The format, or <see langword="null"/> if it takes none of them.</returns>
+	internal static RasterFormat? ChooseFormat(IEnumerable<string> supportedFormats, IReadOnlyList<RasterFormat> order)
+	{
 		ArgumentNullException.ThrowIfNull(supportedFormats);
+		ArgumentNullException.ThrowIfNull(order);
 
 		HashSet<string> formats = new HashSet<string>(supportedFormats, StringComparer.OrdinalIgnoreCase);
 
-		if (formats.Contains(RasterJobPlanner.PwgRasterMimeType))
+		foreach (RasterFormat format in order)
 		{
-			return RasterFormat.PwgRaster;
+			if (formats.Contains(RasterJobPlanner.GetMimeType(format)))
+			{
+				return format;
+			}
 		}
 
-		return formats.Contains(RasterJobPlanner.AppleRasterMimeType) ? RasterFormat.AppleRaster : null;
+		return null;
+	}
+
+	/// <summary>
+	/// Gets a raster format's MIME type, sent as <c>document-format</c>.
+	/// </summary>
+	/// <param name="format">The format.</param>
+	/// <returns>The MIME type.</returns>
+	internal static string GetMimeType(RasterFormat format)
+	{
+		return format switch
+		{
+			RasterFormat.AppleRaster => RasterJobPlanner.AppleRasterMimeType,
+			RasterFormat.Pclm        => RasterJobPlanner.PclmMimeType,
+			_                        => RasterJobPlanner.PwgRasterMimeType,
+		};
 	}
 
 	/// <summary>
 	/// Plans a raster job.
 	/// </summary>
-	/// <param name="format">The raster format, from <see cref="ChooseFormat"/>.</param>
+	/// <param name="format">The raster format, from <see cref="ChooseFormat(IEnumerable{string}, IReadOnlyList{RasterFormat})"/>.</param>
 	/// <param name="attributes">The printer's <see cref="Attributes"/>, as encoded.</param>
 	/// <param name="options">The job's options.</param>
 	/// <param name="maxRenderDpi">The highest resolution to choose, or <see langword="null"/> for no limit.</param>
@@ -77,7 +130,7 @@ internal static class RasterJobPlanner
 		ArgumentNullException.ThrowIfNull(options);
 
 		Dictionary<string, List<IppAttribute>> byName = IppVendorOptionMapper.GroupTopLevel(attributes);
-		string mimeType = format == RasterFormat.PwgRaster ? RasterJobPlanner.PwgRasterMimeType : RasterJobPlanner.AppleRasterMimeType;
+		string mimeType = RasterJobPlanner.GetMimeType(format);
 
 		// Apple raster lists what it takes as keywords in one attribute, such as RS300-600, W8, SRGB24 and DM3
 		List<string> urf = format == RasterFormat.AppleRaster
@@ -86,16 +139,25 @@ internal static class RasterJobPlanner
 				.ToList()
 			: [];
 
-		List<int> resolutions = format == RasterFormat.PwgRaster
-			? RasterJobPlanner.PwgResolutions(byName)
-			: RasterJobPlanner.UrfResolutions(urf);
+		List<int> resolutions = format switch
+		{
+			RasterFormat.PwgRaster => RasterJobPlanner.PwgResolutions(byName),
+			RasterFormat.Pclm      => RasterJobPlanner.ReadResolutions(byName, "pclm-source-resolution-supported").Distinct().ToList(),
+			_                      => RasterJobPlanner.UrfResolutions(urf),
+		};
 
 		if (resolutions.Count == 0)
 		{
 			throw new NotSupportedException(ExceptionMessages.FormatRasterNoResolution(mimeType));
 		}
 
-		int? defaultDpi = RasterJobPlanner.ReadResolutions(byName, "printer-resolution-default").Cast<int?>().FirstOrDefault();
+		// PCLm has a default of its own; the others go by the printer's
+		IEnumerable<int> pclmDefault = format == RasterFormat.Pclm ? RasterJobPlanner.ReadResolutions(byName, "pclm-source-resolution-default") : [];
+
+		int? defaultDpi = pclmDefault
+			.Concat(RasterJobPlanner.ReadResolutions(byName, "printer-resolution-default"))
+			.Cast<int?>()
+			.FirstOrDefault();
 
 		DuplexMode duplex = options.Duplex != DuplexMode.PrinterDefault
 			? options.Duplex
@@ -113,8 +175,15 @@ internal static class RasterJobPlanner
 			Dpi         = RasterJobPlanner.ChooseDpi(resolutions, defaultDpi, maxRenderDpi),
 			Media       = RasterJobPlanner.ChooseMedia(byName, options.MediaSize),
 			Duplex      = duplex,
-			BackSide    = format == RasterFormat.PwgRaster ? RasterJobPlanner.PwgBackSide(byName) : RasterJobPlanner.UrfBackSide(urf),
-			Orientation = options.Orientation
+			BackSide    = format switch
+			{
+				RasterFormat.PwgRaster => RasterJobPlanner.SheetBack(byName, "pwg-raster-document-sheet-back"),
+				RasterFormat.Pclm      => RasterJobPlanner.SheetBack(byName, "pclm-raster-back-side"),
+				_                      => RasterJobPlanner.UrfBackSide(urf),
+			},
+			Orientation     = options.Orientation,
+			PclmStripHeight = RasterJobPlanner.ChooseStripHeight(byName),
+			PclmCompression = RasterJobPlanner.ChooseStripCompression(byName)
 		};
 
 		RasterJobPlanner.EnsurePageFits(settings.Media, settings.Dpi);
@@ -185,6 +254,13 @@ internal static class RasterJobPlanner
 			gray = types.Contains("sgray_8", StringComparer.Ordinal);
 			black = types.Contains("black_1", StringComparer.Ordinal);
 		}
+		else if (format == RasterFormat.Pclm)
+		{
+			// PCLm's pages are 8-bit grey or 24-bit sRGB, and it lists no colour spaces of its own
+			srgb = true;
+			gray = true;
+			black = false;
+		}
 		else
 		{
 			// W8 or SRGB24, possibly with other depths after a dash, as W8-16
@@ -249,13 +325,60 @@ internal static class RasterJobPlanner
 	}
 
 	/// <summary>
-	/// Reads how a PWG raster printer wants back sides of two-sided jobs.
+	/// Chooses a PCLm strip's height: the printer's preferred, else the lowest it lists, else Mopria's default of
+	/// 16, and never more than <see cref="MaxPclmStripHeight"/>.
 	/// </summary>
 	/// <param name="byName">The printer's attributes, by name.</param>
-	/// <returns>The back side; normal if it doesn't say.</returns>
-	private static RasterBackSide PwgBackSide(Dictionary<string, List<IppAttribute>> byName)
+	/// <returns>The lines in each strip.</returns>
+	private static int ChooseStripHeight(Dictionary<string, List<IppAttribute>> byName)
 	{
-		return RasterJobPlanner.Keywords(byName, "pwg-raster-document-sheet-back").FirstOrDefault() switch
+		int? preferred = RasterJobPlanner.Integers(byName, "pclm-strip-height-preferred")
+			.Where(height => height is >= 1 and <= RasterJobPlanner.MaxPclmStripHeight)
+			.Cast<int?>()
+			.FirstOrDefault();
+
+		int? lowest = RasterJobPlanner.Integers(byName, "pclm-strip-height-supported")
+			.Where(height => height is >= 1 and <= RasterJobPlanner.MaxPclmStripHeight)
+			.Cast<int?>()
+			.Min();
+
+		return preferred ?? lowest ?? RasterJobPlanner.DefaultPclmStripHeight;
+	}
+
+	/// <summary>
+	/// Chooses how PCLm strips are compressed: the first the printer prefers of Flate and run-length, as JPEG would
+	/// blur text and .NET has no encoder for it (Phase 4 plan, D2); Flate if it prefers neither.
+	/// </summary>
+	/// <param name="byName">The printer's attributes, by name.</param>
+	/// <returns>The compression.</returns>
+	private static PdfStreamEncoding ChooseStripCompression(Dictionary<string, List<IppAttribute>> byName)
+	{
+		foreach (string method in RasterJobPlanner.Keywords(byName, "pclm-compression-method-preferred"))
+		{
+			if (method == "flate")
+			{
+				return PdfStreamEncoding.Flate;
+			}
+
+			if (method == "rle")
+			{
+				return PdfStreamEncoding.RunLength;
+			}
+		}
+
+		return PdfStreamEncoding.Flate;
+	}
+
+	/// <summary>
+	/// Reads how a PWG raster or PCLm printer wants back sides of two-sided jobs, from
+	/// <c>pwg-raster-document-sheet-back</c> or <c>pclm-raster-back-side</c>, which share their keywords.
+	/// </summary>
+	/// <param name="byName">The printer's attributes, by name.</param>
+	/// <param name="name">The attribute.</param>
+	/// <returns>The back side; normal if it doesn't say.</returns>
+	private static RasterBackSide SheetBack(Dictionary<string, List<IppAttribute>> byName, string name)
+	{
+		return RasterJobPlanner.Keywords(byName, name).FirstOrDefault() switch
 		{
 			"flipped"       => RasterBackSide.Flipped,
 			"rotated"       => RasterBackSide.Rotated,
@@ -356,6 +479,20 @@ internal static class RasterJobPlanner
 
 			throw new NotSupportedException(message);
 		}
+	}
+
+	/// <summary>
+	/// Reads an attribute's integer values.
+	/// </summary>
+	/// <param name="byName">The printer's attributes, by name.</param>
+	/// <param name="name">The attribute.</param>
+	/// <returns>Its values; empty if absent.</returns>
+	private static List<int> Integers(Dictionary<string, List<IppAttribute>> byName, string name)
+	{
+		return byName.GetValueOrDefault(name, [])
+			.Select(attribute => attribute.Value)
+			.OfType<int>()
+			.ToList();
 	}
 
 	/// <summary>

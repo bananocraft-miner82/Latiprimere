@@ -26,7 +26,7 @@ PrinterInfo Info { get; }
 
 Gets information about the printer, as read when the printer was looked up.
 
-It isn't updated afterwards: to see the printer's current state, look it up again with [IPrinterCatalog.GetPrinterAsync](/docs/reference/latiprimere-abstractions/iprintercatalog/#getprinterasync).
+It isn't updated afterwards: to see the printer's current state, use [IPrinter.GetStatusAsync](/docs/reference/latiprimere-abstractions/iprinter/#getstatusasync).
 
 ## Methods
 
@@ -72,6 +72,28 @@ The job, or `null` if the print system no longer knows it, or it was never submi
 - [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `jobId` is `null`.
 - [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system or printer couldn't be asked.
 
+### GetStatusAsync
+
+```csharp
+Task<PrinterStatus> GetStatusAsync(CancellationToken cancellationToken = default)
+```
+
+Reads the printer's current state from the print system.
+
+The default implementation gives the state in [IPrinter.Info](/docs/reference/latiprimere-abstractions/iprinter/#info), as read when the printer was looked up.
+
+**Parameters**
+
+- `cancellationToken`: A token to cancel the operation.
+
+**Returns**
+
+The printer's current status.
+
+**Exceptions**
+
+- [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system failed to report the printer's state, or no longer has the printer.
+
 ### SubmitAsync
 
 ```csharp
@@ -95,3 +117,26 @@ The submitted job, which can be used to follow its progress.
 - [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `content` or `options` is `null`.
 - [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception): The printer cannot accept documents in the content's format.
 - [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system rejected or failed to accept the job.
+
+### WatchStatusAsync
+
+```csharp
+IAsyncEnumerable<PrinterStatus> WatchStatusAsync(TimeSpan pollInterval, CancellationToken cancellationToken = default)
+```
+
+Follows the printer's state, reporting each change as it happens, until cancelled.
+
+The Windows spooler signals each change to a printer, so its state is read when one comes, and at least every 30 seconds. CUPS and network printers are read every `pollInterval`. A state that can't be read, as when the printer is off or the network drops, is reported as [PrinterState.Unknown](/docs/reference/latiprimere-abstractions/printerstate/#values) with why as its message, and the watch goes on, reporting the printer's state again once it can be read. The default implementation reads [IPrinter.GetStatusAsync](/docs/reference/latiprimere-abstractions/iprinter/#getstatusasync) every `pollInterval`.
+
+**Parameters**
+
+- `pollInterval`: How long to wait between reads of the state when the print system can't say when it changes, so it is polled.
+- `cancellationToken`: A token to stop following the printer.
+
+**Returns**
+
+The printer's status, then each change of its state, message, reasons or whether it accepts jobs, never twice the same. A printer has no final state, so this goes on until `cancellationToken` is cancelled, which ends it with [OperationCanceledException](https://learn.microsoft.com/dotnet/api/system.operationcanceledexception).
+
+**Exceptions**
+
+- [ArgumentOutOfRangeException](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception): `pollInterval` is zero or negative.

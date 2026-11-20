@@ -275,7 +275,10 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 
 		IReadOnlyCollection<IppOperation>? operations = IppValueReader.ReadReference(attributes.OperationsSupported);
 
-		return new IppPrinter(context, locatedUri, info, formats, operations);
+		return new IppPrinter(context, locatedUri, info, formats, operations)
+		{
+			UriRequirements = PrinterUriRequirementsReader.Read(attributes, locatedUri)
+		};
 	}
 
 	/// <summary>

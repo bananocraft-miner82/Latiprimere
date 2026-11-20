@@ -1,5 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Net;
 using Latiprimere.Ipp;
+using Latiprimere.Ipp.Connections;
 using Latiprimere.Ipp.Discovery;
 using Latiprimere.Ipp.Mapping;
 using Latiprimere.Rendering;
@@ -31,8 +33,11 @@ public static class WindowsPrintSystemFactory
 	/// The print system. On platforms other than Windows it reports itself as unsupported, so it can be registered
 	/// unconditionally in cross-platform applications.
 	/// </returns>
-	/// <exception cref="ArgumentException">A URI in <see cref="WindowsOptions.IppPrinterUris"/> isn't an absolute
-	/// <c>ipp</c>, <c>ipps</c>, <c>http</c> or <c>https</c> URI.</exception>
+	/// <exception cref="ArgumentException">With <see cref="WindowsOptions.PrintPdfOverIpp"/> on: a URI in
+	/// <see cref="WindowsOptions.IppPrinterUris"/> isn't an absolute <c>ipp</c>, <c>ipps</c>, <c>http</c> or <c>https</c>
+	/// URI; a fingerprint in <see cref="WindowsOptions.IppTrustedCertificateFingerprints"/> isn't 32 bytes in
+	/// hexadecimal; a credential has no user name, or one containing a colon; or a URI in
+	/// <see cref="WindowsOptions.IppPrinterCredentials"/> isn't an absolute <c>ipp</c> or <c>ipps</c> URI.</exception>
 	[SuppressMessage
 	(
 		"ApiDesign",
@@ -61,8 +66,11 @@ public static class WindowsPrintSystemFactory
 	/// The print system. On platforms other than Windows it reports itself as unsupported, so it can be registered
 	/// unconditionally in cross-platform applications.
 	/// </returns>
-	/// <exception cref="ArgumentException">A URI in <see cref="WindowsOptions.IppPrinterUris"/> isn't an absolute
-	/// <c>ipp</c>, <c>ipps</c>, <c>http</c> or <c>https</c> URI.</exception>
+	/// <exception cref="ArgumentException">With <see cref="WindowsOptions.PrintPdfOverIpp"/> on: a URI in
+	/// <see cref="WindowsOptions.IppPrinterUris"/> isn't an absolute <c>ipp</c>, <c>ipps</c>, <c>http</c> or <c>https</c>
+	/// URI; a fingerprint in <see cref="WindowsOptions.IppTrustedCertificateFingerprints"/> isn't 32 bytes in
+	/// hexadecimal; a credential has no user name, or one containing a colon; or a URI in
+	/// <see cref="WindowsOptions.IppPrinterCredentials"/> isn't an absolute <c>ipp</c> or <c>ipps</c> URI.</exception>
 	public static IPrintSystem Create(IPdfRasterizer? pdfRasterizer, WindowsOptions? options, ILoggerFactory? loggerFactory)
 	{
 		options ??= new WindowsOptions();
@@ -101,8 +109,8 @@ public static class WindowsPrintSystemFactory
 	/// registered rather than when the catalog is first resolved.
 	/// </summary>
 	/// <param name="options">The options.</param>
-	/// <exception cref="ArgumentException">A URI in <see cref="WindowsOptions.IppPrinterUris"/> isn't one IPP can
-	/// use, on Windows with <see cref="WindowsOptions.PrintPdfOverIpp"/> on.</exception>
+	/// <exception cref="ArgumentException">On Windows with <see cref="WindowsOptions.PrintPdfOverIpp"/> on, a URI,
+	/// fingerprint or credential for routed jobs is one IPP can't use.</exception>
 	internal static void ValidateOptions(WindowsOptions options)
 	{
 		ArgumentNullException.ThrowIfNull(options);
@@ -110,6 +118,10 @@ public static class WindowsPrintSystemFactory
 		if (OperatingSystem.IsWindows() && options.PrintPdfOverIpp)
 		{
 			WindowsPrintSystemFactory.ValidateIppPrinterUris(options);
+			WindowsPrintSystemFactory.ValidateIppCredentials(options);
+
+			// Each pinned fingerprint is checked as the trust is made
+			_ = new IppCertificateTrust(options.IppTrustedCertificateFingerprints, callback: null);
 		}
 	}
 
@@ -139,15 +151,40 @@ public static class WindowsPrintSystemFactory
 	/// <param name="loggerFactory">The application's logger factory, or <see langword="null"/>.</param>
 	/// <param name="logger">The Windows print system's logger.</param>
 	/// <returns>The route, which owns its HTTP connections.</returns>
-	/// <exception cref="ArgumentException">A configured URI isn't one IPP can use.</exception>
+	/// <exception cref="ArgumentException">A configured URI, fingerprint or credential isn't one IPP can use.</exception>
 	private static WindowsIppRoute CreateIppRoute(WindowsOptions options, IPdfRasterizer? pdfRasterizer, ILoggerFactory? loggerFactory, ILogger logger)
 	{
 		// Checked before the connection pool exists, so a bad URI leaves nothing to dispose
 		WindowsPrintSystemFactory.ValidateIppPrinterUris(options);
+		WindowsPrintSystemFactory.ValidateIppCredentials(options);
+
+		// Certificates and passwords as for printers printed to directly (ADR 0037, ADR 0042)
+		IppCertificateTrust trust = IppCertificateTrust.CreateForPrinters
+		(
+			options.IppTrustedCertificateFingerprints,
+			options.IppServerCertificateValidationCallback,
+			options.IppCredentials,
+			options.IppPrinterUris.Values.Concat(options.IppPrinterCredentials.Keys)
+		);
+
+		IppConnectionSecurity security = IppConnectionSecurity.CreateForPrinters(options.IppCredentials, options.IppPrinterCredentials, trust);
+
+		// A printer that stops reading partway fails the job, as for a printer printed to directly; it isn't sent
+		// through the spooler as well, as some of it may already have printed
+		HttpClient httpClient = IppHttpClientFactory.CreateForTcp
+		(
+			IppNetworkOptions.DefaultConnectTimeout,
+			security,
+			IppNetworkOptions.DefaultUploadStallTimeout
+		);
 
 		IppPrintContext ippContext = new IppPrintContext
 		{
-			Client             = new SharpIppClientAdapter(IppHttpClientFactory.CreateForTcp(IppNetworkOptions.DefaultConnectTimeout)),
+			Client             = new SharpIppClientAdapter(httpClient)
+			{
+				Security         = security,
+				CertificateTrust = trust
+			},
 			RequestingUserName = Environment.UserName,
 			DocumentFormats    = IppDocumentFormats.Standard,
 			BusyRetryDuration  = IppNetworkOptions.DefaultBusyRetryDuration,
@@ -158,10 +195,57 @@ public static class WindowsPrintSystemFactory
 			// A PDF the printer can't take goes as raster, rendered as for the driver (ADR 0036)
 			PdfRasterizer        = pdfRasterizer,
 			MaxRenderDpi         = options.MaxRenderDpi,
+			RasterFormats        = IppNetworkPrintSystemFactory.ToRasterFormats(options.IppRasterFormats),
 			Logger               = IppLog.CreateLogger(loggerFactory)
 		};
 
 		// A WSD queue's printer is found by the UUID its port records, among printers announced over mDNS
-		return new WindowsIppRoute(ippContext, options.IppPrinterUris, new MdnsIppPrinterDiscovery(), logger);
+		return new WindowsIppRoute(ippContext, options.IppPrinterUris, new MdnsIppPrinterDiscovery(), logger)
+		{
+			Security    = security,
+			// As for printers printed to directly: IPPS first once trust beyond the system's is configured (D4)
+			PrefersIpps = trust.TrustsBeyondSystem
+		};
+	}
+
+	/// <summary>
+	/// Checks the credentials for routed jobs can be sent with HTTP Basic authentication, and that each printer's is
+	/// keyed by an IPP URI, with messages naming <see cref="WindowsOptions"/>.
+	/// </summary>
+	/// <param name="options">The options.</param>
+	/// <exception cref="ArgumentException">A credential has no user name, or one containing a colon; or a key of
+	/// <see cref="WindowsOptions.IppPrinterCredentials"/> isn't an absolute ipp or ipps URI.</exception>
+	private static void ValidateIppCredentials(WindowsOptions options)
+	{
+		if (options.IppCredentials is not null)
+		{
+			WindowsPrintSystemFactory.ValidateCredentials(options.IppCredentials);
+		}
+
+		foreach (KeyValuePair<Uri, NetworkCredential> printer in options.IppPrinterCredentials)
+		{
+			if (!IppConnectionSecurity.IsPrinterCredentialsUri(printer.Key))
+			{
+				throw new ArgumentException(Resources.ExceptionMessages.FormatIppPrinterCredentialsUriInvalid(printer.Key), nameof(options));
+			}
+
+			ArgumentNullException.ThrowIfNull(printer.Value, nameof(options));
+			WindowsPrintSystemFactory.ValidateCredentials(printer.Value);
+		}
+	}
+
+	/// <summary>
+	/// Checks one set of credentials can be sent with HTTP Basic authentication.
+	/// </summary>
+	/// <param name="credentials">The credentials.</param>
+	/// <exception cref="ArgumentException">They have no user name, or one containing a colon.</exception>
+	private static void ValidateCredentials(NetworkCredential credentials)
+	{
+		BasicAuthentication.ValidateCredentials
+		(
+			credentials,
+			Resources.ExceptionMessages.IppCredentialsWithoutUserName,
+			Resources.ExceptionMessages.IppCredentialsUserNameHasColon
+		);
 	}
 }

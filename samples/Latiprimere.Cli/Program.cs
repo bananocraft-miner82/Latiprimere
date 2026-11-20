@@ -13,6 +13,9 @@ internal static class Program
 	/// <summary>The environment variable listing extra IPP printer URIs.</summary>
 	private const string IppPrintersVariable = "LATIPRIMERE_IPP_PRINTERS";
 
+	/// <summary>The environment variable listing the SHA-256 fingerprints of printer certificates to trust over IPPS.</summary>
+	internal const string IppFingerprintsVariable = "LATIPRIMERE_IPP_FINGERPRINTS";
+
 	/// <summary>
 	/// Runs the command named on the command line.
 	/// </summary>
@@ -85,12 +88,23 @@ internal static class Program
 
 	/// <summary>
 	/// Configures direct IPP printing: discovery, plus any printer URIs listed (comma-separated) in the
-	/// <c>LATIPRIMERE_IPP_PRINTERS</c> environment variable.
+	/// <c>LATIPRIMERE_IPP_PRINTERS</c> environment variable, and the certificates of printers reached over IPPS listed
+	/// by SHA-256 fingerprint in <c>LATIPRIMERE_IPP_FINGERPRINTS</c>.
 	/// </summary>
 	/// <param name="options">The options to configure.</param>
-	/// <exception cref="ArgumentException">A value in the variable isn't an absolute <c>ipp</c> or <c>ipps</c> URI.</exception>
+	/// <exception cref="ArgumentException">A value in the first variable isn't an absolute <c>ipp</c> or <c>ipps</c>
+	/// URI. A fingerprint that isn't one is refused as the options are registered.</exception>
 	private static void ConfigureIpp(IppNetworkOptions options)
 	{
+		// Printers present certificates they made themselves, so one is trusted only once its fingerprint is listed,
+		// checked against the printer's own web page
+		string fingerprints = Environment.GetEnvironmentVariable(Program.IppFingerprintsVariable) ?? string.Empty;
+
+		foreach (string fingerprint in fingerprints.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+		{
+			options.TrustedCertificateFingerprints.Add(fingerprint);
+		}
+
 		string configuredPrinters = Environment.GetEnvironmentVariable(Program.IppPrintersVariable) ?? string.Empty;
 		IEnumerable<string> uris = configuredPrinters.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 

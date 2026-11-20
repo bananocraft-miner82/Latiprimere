@@ -1,3 +1,4 @@
+using Latiprimere.Ipp;
 using Latiprimere.Ipp.Testing.Builders;
 using Latiprimere.Ipp.Testing.Fakes;
 using Latiprimere.Windows.DirectIpp;
@@ -28,7 +29,7 @@ public sealed class WindowsPrinterIppRoutingTests : IDisposable
 	/// </summary>
 	public WindowsPrinterIppRoutingTests()
 	{
-		this.route = new WindowsIppRoute(new IppPrintContextBuilder().WithClient(this.client).Build(), []);
+		this.route = new WindowsIppRoute(new IppPrintContextBuilder().WithClient(this.client).WithDocumentFormats(IppDocumentFormats.Standard).Build(), []);
 	}
 
 	[Fact]
@@ -56,6 +57,95 @@ public sealed class WindowsPrinterIppRoutingTests : IDisposable
 		Assert.Equal("print-quality", Assert.Single(this.client.LastVendorAttributes?.Job ?? []).Name);
 		Assert.Null(this.rasterizer.LastDocument);
 		Assert.Null(this.gdi.LastRequest);
+	}
+
+	[Fact]
+	public async Task GivenPrinterTakingJpegWhenJpegSubmittedThenSendsItOverIppAsItIs()
+	{
+		// Arrange
+		this.AddPrinter("application/pdf", "image/jpeg");
+		WindowsPrinter printer = this.CreatePrinter();
+		byte[] jpeg = WindowsPrinterImageTests.Jpeg(400, 300);
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromJpeg(new MemoryStream(jpeg)), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal("ipp:77", job.Id);
+		Assert.Equal("image/jpeg", this.client.LastPrintJobRequest?.OperationAttributes?.DocumentFormat?.Value.Value);
+		Assert.Equal(jpeg, Assert.Single(this.client.ReceivedDocuments));
+		Assert.Null(this.gdi.LastRequest);
+	}
+
+	[Fact]
+	public async Task GivenPrinterTakingPdfWhenPngSubmittedThenSendsItOverIppAsAPdf()
+	{
+		// Arrange — the printer's default paper, read for the image's page
+		this.AddPrinter("application/pdf");
+		this.client.SetAttributeList(WindowsPrinterIppRoutingTests.PrinterUri, [new IppAttribute(Tag.Keyword, "media-default", "iso_a4_210x297mm")]);
+		WindowsPrinter printer = this.CreatePrinter();
+		using MemoryStream png = new MemoryStream(Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg=="));
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPng(png), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal("ipp:77", job.Id);
+		Assert.Equal("application/pdf", this.client.LastPrintJobRequest?.OperationAttributes?.DocumentFormat?.Value.Value);
+		Assert.StartsWith("%PDF-1.7", System.Text.Encoding.Latin1.GetString(Assert.Single(this.client.ReceivedDocuments), 0, 8), StringComparison.Ordinal);
+		Assert.Null(this.gdi.LastRequest);
+	}
+
+	[Fact]
+	public async Task GivenPrinterTakingPdfWhenTextSubmittedThenSendsItOverIppLaidOutAsAPdf()
+	{
+		// Arrange — a text-only driver too, which couldn't print it, though the printer behind it can
+		this.AddPrinter("application/pdf");
+		this.client.SetAttributeList(WindowsPrinterIppRoutingTests.PrinterUri, [new IppAttribute(Tag.Keyword, "media-default", "na_letter_8.5x11in")]);
+		WindowsPrinter printer = this.CreatePrinter(driverName: "Generic / Text Only");
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromText("Hello"), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal("ipp:77", job.Id);
+		Assert.Equal("application/pdf", this.client.LastPrintJobRequest?.OperationAttributes?.DocumentFormat?.Value.Value);
+		Assert.Contains("/MediaBox [0 0 612 792]", System.Text.Encoding.Latin1.GetString(Assert.Single(this.client.ReceivedDocuments)), StringComparison.Ordinal);
+		Assert.Null(this.gdi.LastRequest);
+	}
+
+	[Fact]
+	public async Task GivenTextWithACharacterNoLayoutShowsWhenSentOverIppThenItIsRefusedWithoutTryingTheDriver()
+	{
+		// Arrange
+		this.AddPrinter("application/pdf");
+		this.client.SetAttributeList(WindowsPrinterIppRoutingTests.PrinterUri, [new IppAttribute(Tag.Keyword, "media-default", "iso_a4_210x297mm")]);
+		WindowsPrinter printer = this.CreatePrinter();
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromText("日本"), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert — the character's refusal, not one from the driver's path
+		NotSupportedException exception = await Assert.ThrowsAnyAsync<NotSupportedException>(submit);
+		Assert.Contains("U+65E5", exception.Message, StringComparison.Ordinal);
+		Assert.Null(this.rasterizer.LastContent);
+		Assert.Null(this.gdi.LastRequest);
+	}
+
+	[Fact]
+	public async Task GivenATextOnlyDriverWhosePrinterTakesPdfWhenCapabilitiesAreReadThenTheyListWhatGoesOverIpp()
+	{
+		// Arrange — the driver takes raw data only; the printer behind it takes PDF
+		this.AddPrinter("application/pdf");
+		FakeWinSpool spool = new FakeWinSpool();
+		spool.SetCapabilities(WindowsPrinterIppRoutingTests.PrinterName, new WindowsCapabilitiesRecord());
+		WindowsPrinter printer = this.CreatePrinter(spool: spool, driverName: "Generic / Text Only");
+
+		// Act
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal([DocumentFormat.Pdf, DocumentFormat.Raw, DocumentFormat.Jpeg, DocumentFormat.Png, DocumentFormat.Text], capabilities.DocumentFormats);
 	}
 
 	[Fact]

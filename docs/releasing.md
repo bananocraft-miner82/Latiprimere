@@ -22,6 +22,8 @@ The repository variable `RELEASE_PREVIEW` switches this, under **Settings → Se
 
 Anything else stops the release before it starts. The change applies from the next release; versions already published keep their suffix. A stable version sorts after every preview with a lower build number, so `11.0.43` comes after `11.0.42-preview`.
 
+The README's status line must agree: [prepare-release.sh](../tools/releasing/prepare-release.sh) stops a preview while it says `stable`, and a stable release while it says `preview`, before anything changes ([check-readme-status.sh](../tools/releasing/check-readme-status.sh)). So the switch is made once, with [switch-to-stable.sh](../tools/releasing/switch-to-stable.sh), as [The first stable release](#the-first-stable-release-10) describes. CI checks these scripts on every push, since they run so rarely: ShellCheck, and [test-release-scripts.sh](../tools/releasing/test-release-scripts.sh), which runs the switch and the status check on scratch copies of the files, with LF and CRLF line endings.
+
 ## One-time setup (owner)
 
 1. **nuget.org account.** Sign in at nuget.org with a Microsoft account. Packages belong to this account, or to an organisation it creates.
@@ -45,7 +47,7 @@ Anything else stops the release before it starts. The change applies from the ne
 
    Each clone that still has `origin/release/v0.1.1-preview` can't fetch the new branch until that is pruned: `git fetch --prune`.
 6. **Let workflows open pull requests:** in **Settings → Actions → General → Workflow permissions**, tick **Allow GitHub Actions to create and approve pull requests**. The Release workflow needs it for the post-release pull request.
-7. **Repository variable `RELEASE_PREVIEW`** (optional): leave it unset or `true` while releases should be previews, and set it to `false` once testing with real printers is confirmed ([Preview releases](#preview-releases)).
+7. **Repository variable `RELEASE_PREVIEW`** (optional): leave it unset or `true` while releases should be previews, and set it to `false` at the first stable release, once testing with real printers is confirmed ([The first stable release](#the-first-stable-release-10)).
 8. **Repository secret `NUGET_USER`:** your nuget.org user name (profile name, not email address). In **Settings → Secrets and variables → Actions**, either as a repository secret or a `release` environment secret.
 9. **Update the website automatically.** latiprimere.com reads the changelog and the docs from this repository only when it is built. The "Update website" workflow ([update-website.yml](../.github/workflows/update-website.yml)) rebuilds it after each release has published its packages, and again when the release's post-release pull request is merged. The first rebuild already shows the new version: the website takes its changelog notes from the release's tag while `main` doesn't have them dated. Other merges to `main` don't rebuild it: the site shows the docs of the newest release and only released versions from the changelog, so they wouldn't change anything. It needs a deploy hook:
    1. In the Cloudflare dashboard, go to **Workers & Pages**, select the website's Worker, then **Settings → Builds → Deploy Hooks**.
@@ -86,6 +88,69 @@ The script also runs locally from the repository root, for example to see what a
 **If a run fails or is cancelled before publish,** nothing is published: fix the cause on `main` and release again, which takes the same number. **If it fails during publish or finish,** use **Re-run failed jobs**, which keeps the version; packages that already arrived are skipped. Don't use **Re-run all jobs** once anything is published: it would make a new release commit and stop, because the version is already on nuget.org. Approve a waiting publish within 7 days, while build.yml's packages are kept. Delete the leftover `post-release/v<version>` branch of a release that never published.
 
 A published version can't be deleted from nuget.org, only unlisted. Its version number is used for good, and it keeps its licence.
+
+## The first stable release (1.0)
+
+"1.0" names the first stable release; its version is the next `11.0.<n>` without `-preview` (decision D8 of the [Phase 3 plan](phase-3-plan.md)). [ADR 0028](decisions/0028-automated-releases.md) keeps releases as previews until manual testing with real printers is confirmed, so the sign-off comes first.
+
+### 1. The sign-off
+
+Each check prints only when you say so (decision D9: about ten sheets in all). Record each result in [progress.md](progress.md), with the harness's report.
+
+- [ ] **The HP over IPP** (P3-1, P3-3): every manual check, with PDFs sent as Apple raster, as the HP takes no PDF:
+
+  ```bash
+  dotnet run --project tests/Latiprimere.TestHarness -f net11.0 -- manual --printer "ipp:ipp://<the HP's address>/ipp/print"
+  ```
+
+- [ ] **A refused option fails before the upload** (P3-1): an option the HP doesn't list, such as print quality 6 when it lists 3 to 5, fails at once with IPP status `0x040B`, and nothing prints:
+
+  ```bash
+  LATIPRIMERE_IPP_PRINTERS=ipp://<the HP's address>/ipp/print dotnet run --project samples/Latiprimere.Cli -f net11.0 -- print "ipp:ipp://<the HP's address>/ipp/print" tools/test-documents/three-pages.pdf --option ipp:print-quality=6
+  ```
+
+- [ ] **The HP over IPPS** (P3-5): first without `--fingerprint`, which fails giving the certificate's fingerprint; check it against the HP's own web page, then run the checks with it pinned:
+
+  ```bash
+  dotnet run --project tests/Latiprimere.TestHarness -f net11.0 -- manual --printer "ipp:ipps://<the HP's address>:443/ipp/print" --fingerprint <the fingerprint> manual.test-page
+  ```
+
+- [ ] **The HP's Windows queue sent over IPP** (P3-4), with the HP's WSD queue added back to Windows:
+
+  ```bash
+  dotnet run --project tests/Latiprimere.TestHarness -f net11.0 -- manual --printer "windows:HP ENVY 5640 series" manual.windows-queue-over-ipp
+  ```
+
+- [ ] **A Mac** (P3-8): the manual checks against a CUPS queue and a printer over direct IPP, and the Phase 0 checklists for [Spike 1](manual-tests/spike-1-macos.md) and [Spike 4](manual-tests/spike-4-network.md). Record them in [manual-tests](manual-tests/README.md).
+- [ ] **CI is green** on all three runners, the CUPS integration tests among them.
+
+Anything that fails is fixed and released as a preview first. Then run the checks it touched again.
+
+### 2. The switch
+
+1. **Merge the last preview's post-release pull request,** so `main` has its release commit.
+2. **On a branch from `main`,** run:
+
+   ```bash
+   sh tools/releasing/switch-to-stable.sh
+   ```
+
+   It changes the wording only:
+   - the README's and the package README's status say stable;
+   - `--prerelease` goes from the install commands;
+   - the changelog's notes start with what 1.0 means.
+
+   Read the changelog paragraph against the sign-off: it says the release was checked on paper on a real printer, through the Windows spooler and over IPP and IPPS, and on a Mac. Change it if the sign-off covered less.
+3. **Tick plan.md** ("macOS verification on real hardware", "`1.0.0` release", and the open Phase 0 and 3 items the sign-off closes), and add a progress.md entry.
+4. **Merge the branch into `main`.**
+
+### 3. The release
+
+1. **Set `RELEASE_PREVIEW` to `false`** ([Preview releases](#preview-releases)). Until then, any release stops, as the README already says stable.
+2. **Release as usual** ([Each release](#each-release)): a pull request from `main` into `release`. It publishes `11.0.<n>`, which nuget.org lists as the latest stable version.
+3. **Merge its post-release pull request.**
+4. **latiprimere.com** rebuilds from the release's docs and changelog. Its own pages, in the website's repository, may still call Latiprimere a preview: change them there.
+5. **Leave `RELEASE_PREVIEW` at `false`:** previews end with 1.0.
 
 ## Before the first release only
 

@@ -24,6 +24,22 @@
 		<value>The print system at '{0}' did not answer in time.</value>
 		<comment>{0} is the printer or server URI. Raised when the connection doesn't open within the connect timeout, or a request other than Print-Job doesn't finish within the response timeout.</comment>
 	</data>
+	<data name="IppUploadStalled" xml:space="preserve">
+		<value>The printer at '{0}' stopped taking the document: nothing more could be sent to it for {1} seconds. Check the printer, then print the job again.</value>
+		<comment>{0} is the printer URI; {1} is IppNetworkOptions.UploadStallTimeout in seconds. Raised when a write of a Print-Job's document doesn't finish within the stall timeout.</comment>
+	</data>
+	<data name="IppResponseStalled" xml:space="preserve">
+		<value>The printer at '{0}' was sent the whole document but did not answer within {1} seconds, so it is not known whether it will print it. Check the printer before printing the job again.</value>
+		<comment>{0} is the printer URI; {1} is IppNetworkOptions.UploadStallTimeout in seconds. Raised when no answer comes within the stall timeout of a Print-Job's document being sent. "Sent", not "received": the last of it may still be in the network's buffers.</comment>
+	</data>
+	<data name="IppTransferStalledSending" xml:space="preserve">
+		<value>Nothing more of the request could be sent for {0} seconds.</value>
+		<comment>{0} is the stall timeout in seconds. The inner exception of IppUploadStalled.</comment>
+	</data>
+	<data name="IppTransferStalledAwaitingResponse" xml:space="preserve">
+		<value>No answer came within {0} seconds of the request being sent.</value>
+		<comment>{0} is the stall timeout in seconds. The inner exception of IppResponseStalled.</comment>
+	</data>
 	<data name="IppAuthenticationRequired" xml:space="preserve">
 		<value>The print system at '{0}' needs a user name and password for this request.</value>
 		<comment>{0} is the printer or server URI. Raised for HTTP 401 or IPP client-error-not-authenticated when no credentials were configured.</comment>
@@ -67,6 +83,10 @@
 	<data name="OutputFileNotSupported" xml:space="preserve">
 		<value>IPP and CUPS printers cannot print to a file. Remove PrintOptions.OutputFile, or use a Windows printer.</value>
 	</data>
+	<data name="DocumentFormatUnknown" xml:space="preserve">
+		<value>Printing over IPP doesn't support documents of format '{0}'.</value>
+		<comment>{0} is a DocumentFormat value this version of Latiprimere.Ipp doesn't know, such as one added in a later version of Latiprimere.Abstractions.</comment>
+	</data>
 	<data name="DocumentFormatNotSupportedByPrinter" xml:space="preserve">
 		<value>The printer does not accept '{0}' documents. It accepts: {1}.</value>
 		<comment>{0} is the MIME type sent, {1} the comma-separated MIME types the printer reports.</comment>
@@ -86,6 +106,9 @@
 	<data name="VendorOptionSetTwice" xml:space="preserve">
 		<value>The vendor options '{0}' and '{1}' both set {2}. Use one of them.</value>
 		<comment>{0} and {1} are the keys, such as ipp:print-quality and cups:print-quality; {2} the IPP attribute name.</comment>
+	</data>
+	<data name="PclmNotOneBit" xml:space="preserve">
+		<value>PCLm has no 1-bit form: its pages are 8-bit grey or 24-bit colour.</value>
 	</data>
 	<data name="AppleRasterNotOneBit" xml:space="preserve">
 		<value>Apple raster has no 1-bit form: its pages are 8-bit grey or 24-bit colour.</value>
@@ -119,6 +142,65 @@
 		<value>The printer at '{0}' asks for a user name and password, which Latiprimere sends only over an encrypted connection. Print to its ipps:// address instead.</value>
 		<comment>{0} is the printer URI, an ipp:// one.</comment>
 	</data>
+	<data name="IppAuthenticationSecureAddress" xml:space="preserve">
+		<value>It lists '{0}' as its encrypted address: print to that, with a user name and password set for it.</value>
+		<comment>Added to a PrintAuthenticationException's message. {0} is an ipps:// URI from the printer's printer-uri-supported, at the host it was reached at.</comment>
+	</data>
+	<data name="IppAuthenticationMethodNotSupported" xml:space="preserve">
+		<value>It asks for '{0}' authentication, which Latiprimere can't give: it sends a user name and password with HTTP Basic only.</value>
+		<comment>Added to a PrintAuthenticationException's message. {0} is the printer's uri-authentication-supported keyword, such as digest, certificate or negotiate.</comment>
+	</data>
+	<data name="ImageNotJpeg" xml:space="preserve">
+		<value>The document isn't a JPEG image: it doesn't start as one.</value>
+	</data>
+	<data name="ImageJpegDamaged" xml:space="preserve">
+		<value>The JPEG image is damaged: it ends before its frame header, or a segment runs past its end.</value>
+	</data>
+	<data name="ImageJpegCodingUnsupported" xml:space="preserve">
+		<value>The JPEG image uses a coding PDF can't carry, such as lossless, hierarchical or arithmetic coding. Save it as a baseline or progressive JPEG to print it.</value>
+	</data>
+	<data name="ImageJpegPrecisionUnsupported" xml:space="preserve">
+		<value>The JPEG image has {0} bits a sample; only 8 can be printed.</value>
+		<comment>{0} is the bits in each sample.</comment>
+	</data>
+	<data name="ImageJpegComponentsUnsupported" xml:space="preserve">
+		<value>The JPEG image has {0} colour components; grey (1), colour (3) and CMYK (4) can be printed.</value>
+		<comment>{0} is the number of components.</comment>
+	</data>
+	<data name="ImageNotPng" xml:space="preserve">
+		<value>The document isn't a PNG image: it doesn't start with PNG's signature.</value>
+	</data>
+	<data name="ImagePngChunkDamaged" xml:space="preserve">
+		<value>The PNG image is damaged at its {0} chunk.</value>
+		<comment>{0} is the four-letter chunk type, such as IHDR.</comment>
+	</data>
+	<data name="ImagePngDataDamaged" xml:space="preserve">
+		<value>The PNG image is damaged: its image data ends early, or can't be decompressed.</value>
+	</data>
+	<data name="ImagePngHeaderInvalid" xml:space="preserve">
+		<value>The PNG image's header isn't valid: {0} by {1} pixels, bit depth {2}, colour type {3}.</value>
+		<comment>{0} and {1} are the width and height, {2} the bit depth and {3} the colour type.</comment>
+	</data>
+	<data name="ImageTooLarge" xml:space="preserve">
+		<value>The image is {0} by {1} pixels; images up to 100000 pixels across and down, and 300 million pixels in all, can be printed.</value>
+		<comment>{0} and {1} are the width and height in pixels.</comment>
+	</data>
+	<data name="ImageFileTooLarge" xml:space="preserve">
+		<value>The image is {0} bytes; image files up to 2 GB can be printed.</value>
+		<comment>{0} is the file's size in bytes.</comment>
+	</data>
+	<data name="ConvertedDocumentNotSupportedByPrinter" xml:space="preserve">
+		<value>The printer doesn't accept {0} documents, and Latiprimere can't convert them for it: it accepts {1}. Images and text are converted to PDF, and for a printer that doesn't take PDF rendered as raster, which needs a PDF rasteriser, such as Latiprimere.Rendering.Pdfium, and a raster format the printer takes in IppNetworkOptions.RasterFormats.</value>
+		<comment>{0} is the image or text MIME type, {1} the comma-separated MIME types the printer reports.</comment>
+	</data>
+	<data name="TextCharacterUnsupported" xml:space="preserve">
+		<value>The text can't be printed: line {1}, column {2} has the character {0}, which Courier can't show without an embedded font. Text Latiprimere lays out is limited to the Windows-1252 characters, which cover Western European languages, and to tabs, line breaks and form feeds among control characters. CUPS lays text out itself, without this limit; otherwise print the text as a PDF.</value>
+		<comment>{0} is the code point, such as U+4E2D; {1} and {2} the line and column, from 1.</comment>
+	</data>
+	<data name="PdfRasterFormatsExcluded" xml:space="preserve">
+		<value>The printer doesn't accept PDF documents, and the raster formats it takes, {0}, are left out of the ones PDFs may be rendered into: add them to IppNetworkOptions.RasterFormats, or WindowsOptions.IppRasterFormats, to print PDFs to it.</value>
+		<comment>{0} is the comma-separated MIME types of the raster formats the printer takes.</comment>
+	</data>
 	<data name="PdfNeedsRasterizerForPrinter" xml:space="preserve">
 		<value>The printer doesn't accept PDF documents; it accepts: {0}. PDFs can be printed to it as raster images with a PDF rasteriser: add Latiprimere.Rendering.Pdfium and call AddLatiprimerePdfium(), or pass a PdfiumRasterizer to IppNetworkPrintSystemFactory.Create.</value>
 		<comment>{0} is the comma-separated MIME types the printer reports.</comment>
@@ -138,5 +220,45 @@
 	<data name="RasterMediaUnknown" xml:space="preserve">
 		<value>A PDF sent as raster needs the paper size, and the printer's default paper '{0}' doesn't give it. Choose one with PrintOptions.MediaSize.</value>
 		<comment>{0} is the printer's media-default keyword, or empty if it reports none.</comment>
+	</data>
+	<data name="PdfHeaderCommentInvalid" xml:space="preserve">
+		<value>The PDF header comment '{0}' must be one line of printable ASCII.</value>
+		<comment>{0} is the comment given. An internal error: Latiprimere writes its own comments.</comment>
+	</data>
+	<data name="PdfObjectNotReserved" xml:space="preserve">
+		<value>PDF object {0} isn't reserved, or is written already.</value>
+		<comment>{0} is the object number. An internal error in the PDF writer.</comment>
+	</data>
+	<data name="PdfObjectNotWritten" xml:space="preserve">
+		<value>PDF object {0} was reserved but never written.</value>
+		<comment>{0} is the object number. An internal error in the PDF writer.</comment>
+	</data>
+	<data name="PdfFileFinished" xml:space="preserve">
+		<value>The PDF file is finished, so nothing more can be written to it.</value>
+		<comment>An internal error in the PDF writer.</comment>
+	</data>
+	<data name="PdfPageAlreadyStarted" xml:space="preserve">
+		<value>A PDF page is started already: end it before starting another.</value>
+		<comment>An internal error in the PDF writer.</comment>
+	</data>
+	<data name="PdfPageNotStarted" xml:space="preserve">
+		<value>No PDF page is started: start one first.</value>
+		<comment>An internal error in the PDF writer.</comment>
+	</data>
+	<data name="PdfPageNotEnded" xml:space="preserve">
+		<value>The PDF page wasn't ended before the document was.</value>
+		<comment>An internal error in the PDF writer.</comment>
+	</data>
+	<data name="PdfDocumentWithoutPages" xml:space="preserve">
+		<value>A PDF document needs at least one page.</value>
+		<comment>An internal error in the PDF writer.</comment>
+	</data>
+	<data name="PdfImageInvalid" xml:space="preserve">
+		<value>A PDF image needs a width and height of at least 1, 1, 2, 4, 8 or 16 bits per sample, and either a filter for data compressed already or an encoding for the writer, not both.</value>
+		<comment>An internal error in the PDF writer.</comment>
+	</data>
+	<data name="PdfTextCharacterUnsupported" xml:space="preserve">
+		<value>The character {0}, at position {1}, can't be printed: text is set in Courier, which shows the Windows-1252 characters of Western European languages.</value>
+		<comment>{0} is the character's code, such as U+0100; {1} its zero-based position in the text.</comment>
 	</data>
 </root>

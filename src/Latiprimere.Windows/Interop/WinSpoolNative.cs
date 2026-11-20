@@ -51,6 +51,34 @@ internal static unsafe partial class WinSpoolNative
 		IntPtr                printerDefaults
 	);
 
+	/// <summary>FindFirstPrinterChangeNotification: opens a notification signalled when a printer or its jobs
+	/// change.</summary>
+	/// <param name="printerHandle">The printer, which must stay open while the notification is.</param>
+	/// <param name="filter">PRINTER_CHANGE_* flags.</param>
+	/// <param name="options">Must be 0.</param>
+	/// <param name="notifyOptions">PRINTER_NOTIFY_OPTIONS, or null.</param>
+	/// <returns>The notification's handle, or INVALID_HANDLE_VALUE.</returns>
+	[LibraryImport(WinSpoolConstants.LibraryName, EntryPoint = "FindFirstPrinterChangeNotification", SetLastError = true)]
+	internal static partial IntPtr FindFirstPrinterChangeNotification(SafePrinterHandle printerHandle, uint filter, uint options, IntPtr notifyOptions);
+
+	/// <summary>FindNextPrinterChangeNotification: collects a signalled change, so the handle can be signalled
+	/// again.</summary>
+	/// <param name="changeHandle">The notification.</param>
+	/// <param name="change">The PRINTER_CHANGE_* flags that changed.</param>
+	/// <param name="options">PRINTER_NOTIFY_OPTIONS, or null.</param>
+	/// <param name="notifyInfo">Receives PRINTER_NOTIFY_INFO, or null not to.</param>
+	/// <returns><see langword="true"/> on success.</returns>
+	[LibraryImport(WinSpoolConstants.LibraryName, EntryPoint = "FindNextPrinterChangeNotification", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	internal static partial bool FindNextPrinterChangeNotification(IntPtr changeHandle, out uint change, IntPtr options, IntPtr notifyInfo);
+
+	/// <summary>FindClosePrinterChangeNotification: closes a change notification.</summary>
+	/// <param name="changeHandle">The notification.</param>
+	/// <returns><see langword="true"/> on success.</returns>
+	[LibraryImport(WinSpoolConstants.LibraryName, EntryPoint = "FindClosePrinterChangeNotification", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	internal static partial bool FindClosePrinterChangeNotification(IntPtr changeHandle);
+
 	/// <summary>ClosePrinter: closes a printer handle.</summary>
 	/// <param name="printerHandle">The handle.</param>
 	/// <returns><see langword="true"/> on success.</returns>

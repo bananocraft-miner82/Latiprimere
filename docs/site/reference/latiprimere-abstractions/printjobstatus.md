@@ -62,6 +62,18 @@ public string? StateMessage { get; init; }
 
 Gets additional detail about the state from the print system, if any.
 
+The printer's or server's own message when it gives one. For a printer reached over IPP or a CUPS queue that gives none, it says what [PrintJobStatus.StateReasons](/docs/reference/latiprimere-abstractions/printjobstatus/#statereasons) means, when Latiprimere knows the reason, such as a job cancelled at the printer, or one it can't print with the options chosen.
+
+### StateReasons
+
+```csharp
+public IReadOnlyList<string> StateReasons { get; init; }
+```
+
+Gets why the job is in its state, as IPP `job-state-reasons` keywords, such as `job-canceled-at-device`, `aborted-by-system` or `printer-stopped`; or none, when the print system gives no reason.
+
+Reported by printers reached over IPP and by CUPS, in the order they give them, without `none`. The Windows spooler gives none, except for jobs it sends to a queue's IPP printer. The keywords are defined by RFC 8011, section 5.3.8, and the PWG; printers may add their own.
+
 ### Timestamp
 
 ```csharp

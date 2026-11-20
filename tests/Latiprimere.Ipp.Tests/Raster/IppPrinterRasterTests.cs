@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using Latiprimere.Rendering;
+using Latiprimere.Ipp.Raster;
 using Latiprimere.Ipp.Testing.Builders;
 using Latiprimere.Ipp.Testing.Fakes;
 using Latiprimere.Testing.Raster;
@@ -70,6 +71,79 @@ public sealed class IppPrinterRasterTests
 		Assert.Equal(2, raster.Pages.Count);
 		Assert.All(raster.Pages, page => Assert.Equal((24, 300), (page.BitsPerPixel, page.DpiX)));
 	}
+
+	[Fact]
+	public async Task GivenAPclmOnlyPrinterWhenAPdfIsSubmittedThenItsPagesAreSentAsGzippedPclmStrips()
+	{
+		// Arrange — the HP's attributes, taking PCLm but not Apple raster
+		FakeIppClient client = IppPrinterRasterTests.CreateClient(RasterJobPlannerTests.HpAttributes());
+
+		IppPrinter printer = IppPrinterRasterTests.CreatePrinter
+		(
+			client,
+			new QuadrantRasterizer(pageCount: 2),
+			["application/octet-stream", "application/PCLm", "image/jpeg"],
+			maxRenderDpi: 300
+		);
+
+		// Act
+		await printer.SubmitAsync(IppPrinterRasterTests.Pdf(), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert — A4 at 300 dpi is 3507 lines: 109 strips of 32 and one of 19 a page
+		PrintJobRequest request = Assert.IsType<PrintJobRequest>(client.LastPrintJobRequest);
+		Assert.Equal("application/PCLm", request.OperationAttributes?.DocumentFormat?.Value.Value);
+		Assert.Equal(Compression.Gzip, request.OperationAttributes?.Compression?.Value);
+		byte[] pclm = IppPrinterRasterTests.Gunzip(Assert.Single(client.ReceivedDocuments));
+		Assert.StartsWith("%PDF-1.7\n%PCLm 1.0\n", System.Text.Encoding.Latin1.GetString(pclm, 0, 32), StringComparison.Ordinal);
+
+		IReadOnlyList<PclmStrip> strips = PclmStrip.ReadAll(pclm);
+		Assert.Equal(2 * 110, strips.Count);
+		Assert.All(strips, strip => Assert.Equal((2480, 3), (strip.Width, strip.BytesPerPixel)));
+		Assert.Equal(2 * 3507, strips.Sum(strip => strip.Height));
+		Assert.Equal(2 * 109, strips.Count(strip => strip.Height == 32));
+	}
+
+	[Fact]
+	public async Task GivenRasterFormatsPuttingPclmFirstWhenAPdfIsSubmittedThenItIsSentAsPclm()
+	{
+		// Arrange — the HP takes Apple raster too, which comes first by default
+		FakeIppClient client = IppPrinterRasterTests.CreateClient(RasterJobPlannerTests.HpAttributes());
+
+		IppPrinter printer = IppPrinterRasterTests.CreatePrinter
+		(
+			client,
+			new QuadrantRasterizer(pageCount: 1),
+			["image/urf", "application/PCLm"],
+			maxRenderDpi: 100,
+			rasterFormats: [RasterFormat.Pclm, RasterFormat.AppleRaster]
+		);
+
+		// Act
+		await printer.SubmitAsync(IppPrinterRasterTests.Pdf(), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal("application/PCLm", client.LastPrintJobRequest?.OperationAttributes?.DocumentFormat?.Value.Value);
+	}
+
+	[Fact]
+	public async Task GivenNoRasterFormatsWhenAPdfIsSubmittedToARasterPrinterThenNotSupportedAndNothingRendered()
+	{
+		// Arrange — the application allows no raster format
+		FakeIppClient client = IppPrinterRasterTests.CreateClient(RasterJobPlannerTests.HpAttributes());
+		QuadrantRasterizer rasterizer = new QuadrantRasterizer(pageCount: 1);
+		IppPrinter printer = IppPrinterRasterTests.CreatePrinter(client, rasterizer, ["image/urf", "application/PCLm"], rasterFormats: []);
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(IppPrinterRasterTests.Pdf(), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert — the message names the formats left out, and where to allow them
+		NotSupportedException exception = await Assert.ThrowsAsync<NotSupportedException>(submit);
+		Assert.Contains("image/urf, application/PCLm", exception.Message, StringComparison.Ordinal);
+		Assert.Contains("IppNetworkOptions.RasterFormats", exception.Message, StringComparison.Ordinal);
+		Assert.Empty(rasterizer.Opened);
+		Assert.Null(client.LastPrintJobRequest);
+	}
+
 	[Fact]
 	public async Task GivenValidateJobWhenAPdfIsSentAsRasterThenTheRasterFormatIsValidated()
 	{
@@ -228,6 +302,7 @@ public sealed class IppPrinterRasterTests
 	/// <param name="formats">The formats the printer takes.</param>
 	/// <param name="maxRenderDpi">The raster resolution limit, or <see langword="null"/>.</param>
 	/// <param name="busyRetryDuration">How long to resend a job the printer is too busy for.</param>
+	/// <param name="rasterFormats">The raster formats allowed, in order, or <see langword="null"/> for the default.</param>
 	/// <returns>The printer.</returns>
 	private static IppPrinter CreatePrinter
 	(
@@ -235,7 +310,8 @@ public sealed class IppPrinterRasterTests
 		QuadrantRasterizer rasterizer,
 		string[]           formats,
 		int?               maxRenderDpi = null,
-		TimeSpan           busyRetryDuration = default
+		TimeSpan           busyRetryDuration = default,
+		RasterFormat[]?    rasterFormats = null
 	)
 	{
 		IppPrintContextBuilder builder = new IppPrintContextBuilder()
@@ -247,6 +323,11 @@ public sealed class IppPrinterRasterTests
 		if (maxRenderDpi is not null)
 		{
 			builder.WithMaxRenderDpi(maxRenderDpi.Value);
+		}
+
+		if (rasterFormats is not null)
+		{
+			builder.WithRasterFormats(rasterFormats);
 		}
 
 		return new IppPrinter(builder.Build(), IppPrinterRasterTests.PrinterUri, new PrinterInfo { Id = "ipp:x", Name = "x" }, formats);

@@ -1,3 +1,4 @@
+using Latiprimere.Ipp.Documents;
 using Latiprimere.Ipp.Raster;
 using SharpIpp.Protocol.Models;
 using Xunit;
@@ -33,6 +34,142 @@ public sealed class RasterJobPlannerTests
 
 		// Assert
 		Assert.Null(format);
+	}
+
+	[Fact]
+	public void GivenTheHpsFormatsWhenChoosingInTheDefaultOrderThenAppleRasterBeforePclm()
+	{
+		// Arrange — the HP takes both, and PCLm comes last by default
+		string[] formats = ["application/vnd.hp-PCL", "image/jpeg", "application/PCLm", "image/urf", "application/octet-stream"];
+
+		// Act
+		RasterFormat? format = RasterJobPlanner.ChooseFormat(formats);
+
+		// Assert
+		Assert.Equal(RasterFormat.AppleRaster, format);
+	}
+
+	[Theory]
+	[InlineData(new[] { (int)RasterFormat.Pclm, (int)RasterFormat.AppleRaster }, (int)RasterFormat.Pclm)]
+	[InlineData(new[] { (int)RasterFormat.PwgRaster, (int)RasterFormat.Pclm }, (int)RasterFormat.Pclm)]
+	[InlineData(new[] { (int)RasterFormat.AppleRaster }, (int)RasterFormat.AppleRaster)]
+	public void GivenAnOrderWhenChoosingThenTheFirstThePrinterTakes(int[] order, int expected)
+	{
+		// Arrange — the HP's raster formats, in the order an application set (provided by InlineData above)
+		string[] formats = ["image/jpeg", "APPLICATION/PCLM", "image/urf"];
+
+		// Act
+		RasterFormat? format = RasterJobPlanner.ChooseFormat(formats, order.Select(value => (RasterFormat)value).ToArray());
+
+		// Assert
+		Assert.Equal((RasterFormat)expected, format);
+	}
+
+	[Theory]
+	[InlineData(new int[0])]
+	[InlineData(new[] { (int)RasterFormat.PwgRaster })]
+	public void GivenAnOrderThePrinterTakesNoneOfWhenChoosingThenNone(int[] order)
+	{
+		// Arrange — nothing allowed, or only a format the HP doesn't take (provided by InlineData above)
+		string[] formats = ["application/PCLm", "image/urf"];
+
+		// Act
+		RasterFormat? format = RasterJobPlanner.ChooseFormat(formats, order.Select(value => (RasterFormat)value).ToArray());
+
+		// Assert
+		Assert.Null(format);
+	}
+
+	[Fact]
+	public void GivenTheHpsAttributesWhenPlannedAsPclmThenColourAt600DpiInRunLengthStripsOf32WithRotatedBackSides()
+	{
+		// Arrange — rle is the first it prefers that Latiprimere writes
+		IReadOnlyList<IppAttribute> attributes = RasterJobPlannerTests.HpAttributes();
+
+		// Act
+		RasterJobPlan plan = RasterJobPlanner.Plan(RasterFormat.Pclm, attributes, PrintOptions.Default, maxRenderDpi: null);
+
+		// Assert
+		Assert.Equal("application/PCLm", plan.MimeType);
+		Assert.True(plan.Gzip);
+		Assert.Equal(RasterFormat.Pclm, plan.Settings.Format);
+		Assert.Equal(RasterColorSpace.Srgb8, plan.Settings.ColorSpace);
+		Assert.Equal(600, plan.Settings.Dpi);
+		Assert.Equal(32, plan.Settings.PclmStripHeight);
+		Assert.Equal(PdfStreamEncoding.RunLength, plan.Settings.PclmCompression);
+		Assert.Equal(RasterBackSide.Rotated, plan.Settings.BackSide);
+	}
+
+	[Fact]
+	public void GivenAPclmPrinterWhenPlannedInMonochromeWithALimitThenGreyAtTheLimit()
+	{
+		// Arrange
+		PrintOptions options = new PrintOptions { ColorMode = ColorMode.Monochrome };
+
+		// Act
+		RasterJobPlan plan = RasterJobPlanner.Plan(RasterFormat.Pclm, RasterJobPlannerTests.HpAttributes(), options, maxRenderDpi: 300);
+
+		// Assert
+		Assert.Equal(RasterColorSpace.Gray8, plan.Settings.ColorSpace);
+		Assert.Equal(300, plan.Settings.Dpi);
+	}
+
+	[Theory]
+	[InlineData(null, null, new[] { "jpeg" }, 16, (int)PdfStreamEncoding.Flate)]
+	[InlineData(null, new[] { 128, 64 }, new[] { "flate", "rle" }, 64, (int)PdfStreamEncoding.Flate)]
+	[InlineData(100000, null, null, 16, (int)PdfStreamEncoding.Flate)]
+	[InlineData(8, new[] { 8, 16 }, new[] { "jpeg", "rle" }, 8, (int)PdfStreamEncoding.RunLength)]
+	public void GivenPclmStripAttributesWhenPlannedThenChoosesTheStripHeightAndCompression
+	(
+		int? preferred,
+		int[]? supported,
+		string[]? compression,
+		int expectedHeight,
+		int expectedCompression
+	)
+	{
+		// Arrange — nothing preferred and only JPEG, which Latiprimere doesn't write; the lowest supported; a preferred
+		// height too large to trust; a small preferred height, and rle after jpeg (provided by InlineData above)
+		List<IppAttribute> attributes =
+		[
+			new IppAttribute(Tag.Resolution, "pclm-source-resolution-supported", new Resolution(300, 300, ResolutionUnit.DotsPerInch)),
+			new IppAttribute(Tag.Keyword, "media-default", "iso_a4_210x297mm"),
+		];
+
+		if (preferred is not null)
+		{
+			attributes.Add(new IppAttribute(Tag.Integer, "pclm-strip-height-preferred", preferred.Value));
+		}
+
+		attributes.AddRange((supported ?? []).Select((height, index) => new IppAttribute(Tag.Integer, index == 0 ? "pclm-strip-height-supported" : string.Empty, height)));
+		attributes.AddRange((compression ?? []).Select((method, index) => new IppAttribute(Tag.Keyword, index == 0 ? "pclm-compression-method-preferred" : string.Empty, method)));
+
+		// Act
+		RasterJobPlan plan = RasterJobPlanner.Plan(RasterFormat.Pclm, attributes, PrintOptions.Default, maxRenderDpi: null);
+
+		// Assert
+		Assert.Equal(expectedHeight, plan.Settings.PclmStripHeight);
+		Assert.Equal((PdfStreamEncoding)expectedCompression, plan.Settings.PclmCompression);
+		Assert.Equal(300, plan.Settings.Dpi);
+		Assert.Equal(RasterBackSide.Normal, plan.Settings.BackSide);
+	}
+
+	[Fact]
+	public void GivenAPclmPrinterListingNoResolutionWhenPlannedThenNotSupported()
+	{
+		// Arrange — only an Apple raster resolution, which PCLm doesn't use
+		List<IppAttribute> attributes =
+		[
+			new IppAttribute(Tag.Keyword, "urf-supported", "RS300"),
+			new IppAttribute(Tag.Keyword, "media-default", "iso_a4_210x297mm"),
+		];
+
+		// Act
+		Action plan = () => RasterJobPlanner.Plan(RasterFormat.Pclm, attributes, PrintOptions.Default, maxRenderDpi: null);
+
+		// Assert
+		NotSupportedException exception = Assert.Throws<NotSupportedException>(plan);
+		Assert.Contains("application/PCLm", exception.Message, StringComparison.Ordinal);
 	}
 
 	[Fact]
@@ -327,6 +464,17 @@ public sealed class RasterJobPlannerTests
 		attributes.Add(new IppAttribute(Tag.Resolution, "printer-resolution-default", new Resolution(600, 600, ResolutionUnit.DotsPerInch)));
 		attributes.Add(new IppAttribute(Tag.Keyword, "compression-supported", "none"));
 		attributes.Add(new IppAttribute(Tag.Keyword, string.Empty, "gzip"));
+
+		// Its PCLm attributes
+		attributes.Add(new IppAttribute(Tag.Resolution, "pclm-source-resolution-supported", new Resolution(300, 300, ResolutionUnit.DotsPerInch)));
+		attributes.Add(new IppAttribute(Tag.Resolution, string.Empty, new Resolution(600, 600, ResolutionUnit.DotsPerInch)));
+		attributes.Add(new IppAttribute(Tag.Resolution, "pclm-source-resolution-default", new Resolution(600, 600, ResolutionUnit.DotsPerInch)));
+		attributes.Add(new IppAttribute(Tag.Integer, "pclm-strip-height-preferred", 32));
+		attributes.Add(new IppAttribute(Tag.Integer, "pclm-strip-height-supported", 32));
+		attributes.Add(new IppAttribute(Tag.Keyword, "pclm-compression-method-preferred", "rle"));
+		attributes.Add(new IppAttribute(Tag.Keyword, string.Empty, "jpeg"));
+		attributes.Add(new IppAttribute(Tag.Keyword, string.Empty, "flate"));
+		attributes.Add(new IppAttribute(Tag.Keyword, "pclm-raster-back-side", "rotated"));
 
 		return attributes;
 	}

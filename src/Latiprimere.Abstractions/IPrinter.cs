@@ -12,8 +12,7 @@ public interface IPrinter
 	/// Gets information about the printer, as read when the printer was looked up.
 	/// </summary>
 	/// <remarks>
-	/// It isn't updated afterwards: to see the printer's current state, look it up again with
-	/// <see cref="IPrinterCatalog.GetPrinterAsync"/>.
+	/// It isn't updated afterwards: to see the printer's current state, use <see cref="GetStatusAsync"/>.
 	/// </remarks>
 	PrinterInfo Info { get; }
 
@@ -55,4 +54,50 @@ public interface IPrinter
 	/// <returns>The capabilities. Anything the print system doesn't report is left empty.</returns>
 	/// <exception cref="PrintException">The print system or printer couldn't be asked.</exception>
 	Task<PrinterCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Reads the printer's current state from the print system.
+	/// </summary>
+	/// <param name="cancellationToken">A token to cancel the operation.</param>
+	/// <returns>The printer's current status.</returns>
+	/// <exception cref="PrintException">The print system failed to report the printer's state, or no longer has the
+	/// printer.</exception>
+	/// <remarks>
+	/// The default implementation gives the state in <see cref="Info"/>, as read when the printer was looked up.
+	/// </remarks>
+	Task<PrinterStatus> GetStatusAsync(CancellationToken cancellationToken = default)
+	{
+		PrinterStatus status = new PrinterStatus
+		{
+			PrinterId = this.Info.Id,
+			State     = this.Info.State,
+			Timestamp = DateTimeOffset.UtcNow
+		};
+
+		return Task.FromResult(status);
+	}
+
+	/// <summary>
+	/// Follows the printer's state, reporting each change as it happens, until cancelled.
+	/// </summary>
+	/// <param name="pollInterval">How long to wait between reads of the state when the print system can't say when
+	/// it changes, so it is polled.</param>
+	/// <param name="cancellationToken">A token to stop following the printer.</param>
+	/// <returns>
+	/// The printer's status, then each change of its state, message, reasons or whether it accepts jobs, never twice
+	/// the same. A printer has no final state, so this goes on until <paramref name="cancellationToken"/> is
+	/// cancelled, which ends it with <see cref="OperationCanceledException"/>.
+	/// </returns>
+	/// <exception cref="ArgumentOutOfRangeException"><paramref name="pollInterval"/> is zero or negative.</exception>
+	/// <remarks>
+	/// The Windows spooler signals each change to a printer, so its state is read when one comes, and at least every
+	/// 30 seconds. CUPS and network printers are read every <paramref name="pollInterval"/>. A state that can't be
+	/// read, as when the printer is off or the network drops, is reported as <see cref="PrinterState.Unknown"/>
+	/// with why as its message, and the watch goes on, reporting the printer's state again once it can be read. The
+	/// default implementation reads <see cref="GetStatusAsync"/> every <paramref name="pollInterval"/>.
+	/// </remarks>
+	IAsyncEnumerable<PrinterStatus> WatchStatusAsync(TimeSpan pollInterval, CancellationToken cancellationToken = default)
+	{
+		return StatusPolling.WatchPrinterAsync(this, pollInterval, cancellationToken);
+	}
 }

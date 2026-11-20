@@ -91,6 +91,9 @@ Discovery only sees printers on the same part of the network, and needs multicas
 **A network printer's `ipps://` address "presented a certificate that isn't trusted".**
 Printers make their own certificates, which no computer trusts. Check the fingerprint, in the message and in the `PrintCertificateException`'s `CertificateFingerprint`, against the printer's web page, then pin it: see [Secure network printers](/docs/print-systems/secure-printers/).
 
+**A network printer "stopped taking the document" or "did not answer".**
+The printer took no more of the job, or didn't answer once it had been sent it all, for `UploadStallTimeout`, five minutes by default: it may have jammed, run out of paper with nowhere to keep the job, or dropped off the network. Check the printer. If it "did not answer", it may still print the job, so look before printing it again. A printer that reads slowly but steadily is never cut short; raise the limit only for one that pauses longer between pages: see [Network printers over IPP](/docs/print-systems/network-printers/).
+
 **Microsoft Print to PDF fails with "The printer driver's request was cancelled".**
 The driver wanted to show a Save dialog, which an app without a user interface can't. Set `PrintOptions.OutputFile`: see [CUPS servers and the Windows spooler](/docs/print-systems/cups-and-windows/).
 
@@ -102,5 +105,6 @@ The print system isn't reporting the job's state, so it stays `Unknown`. Always 
 - **Don't retry** `PrinterNotFoundException`, `PrintAuthenticationException`, `PrintCertificateException` or `NotSupportedException`: the same request fails the same way.
 - **A `PrintException`** for a printer or server that couldn't be reached may succeed later, once the printer is back.
 - **Busy network printers** are retried for you, for two minutes by default.
+- **A network printer that stopped taking a job** isn't retried for you, as some of it may already be on paper.
 
 The code on this page is in [HandlingErrors.cs](https://github.com/bananocraft-miner82/Latiprimere/blob/main/samples/Latiprimere.Examples/HandlingErrors.cs).

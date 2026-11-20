@@ -162,4 +162,20 @@ internal static class IppJobTemplateMapper
 			_                         => null,
 		};
 	}
+
+	/// <summary>
+	/// Maps how an image is sized to the IPP <c>print-scaling</c> keyword.
+	/// </summary>
+	/// <param name="scaling">The scaling.</param>
+	/// <returns>The <c>print-scaling</c> value, or <see langword="null"/> to use the printer's default.</returns>
+	internal static PrintScaling? ToPrintScaling(ScalingMode scaling)
+	{
+		return scaling switch
+		{
+			ScalingMode.Fit  => PrintScaling.Fit,
+			ScalingMode.Fill => PrintScaling.Fill,
+			ScalingMode.None => PrintScaling.None,
+			_                => (PrintScaling?)null,
+		};
+	}
 }

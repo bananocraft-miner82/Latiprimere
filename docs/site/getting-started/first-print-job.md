@@ -83,7 +83,7 @@ Job 42: Completed
 1. **Registering.** `AddLatiprimere()` adds the printer catalog, and each `Add…` call adds a print system. The ones that can't work on this machine are left out, which is why the same program runs everywhere.
 2. **Finding the default printer.** `GetDefaultPrinterAsync()` returns `null` when there isn't one, so check for it. [Finding printers](/docs/getting-started/finding-printers/) shows how to list printers and choose one.
 3. **Sending the document.** `PrintContent.FromPdf` wraps your stream. You own the stream, so dispose it, as `using` does here. `PrintOptions.Default` prints one copy with the printer's own settings; [Print options and following jobs](/docs/guides/print-options-and-jobs/) covers the rest.
-4. **Following the job.** `WatchStatusAsync()` checks the job twice a second and reports each change. It ends when the job reaches a final state: completed, cancelled or aborted.
+4. **Following the job.** `WatchStatusAsync()` reports each change: as it happens on Windows, which signals changes, and by checking the job twice a second elsewhere. It ends when the job reaches a final state: completed, cancelled or aborted.
 
 `SubmitAsync` returns once the print system has accepted the job, not when it has printed. Following the job is optional: if you don't need to know when it finishes, stop after `SubmitAsync`.
 
