@@ -98,6 +98,16 @@ Gets a file to print to instead of the printer's device, or `null` to print norm
 
 Supported by the Windows spooler, where it is required for virtual printers such as Microsoft Print to PDF in applications without a user interface. Print systems that can't print to a file throw [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) when this is set, rather than ignoring it.
 
+### Scaling
+
+```csharp
+public ScalingMode Scaling { get; init; }
+```
+
+Gets how an image is sized on the paper: by default, shrunk to fit if it is larger, otherwise at its own size.
+
+It applies to images, from [PrintContent.FromJpeg](/docs/reference/latiprimere-abstractions/printcontent/#fromjpeg) and [PrintContent.FromPng](/docs/reference/latiprimere-abstractions/printcontent/#frompng), and is ignored for other documents.
+
 ### VendorOptions
 
 ```csharp

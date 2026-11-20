@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Net;
 using Latiprimere.EndToEnd.Support;
 using Latiprimere.FakeIppPrinter;
 using Latiprimere.Testing.Fixtures;
@@ -36,6 +37,19 @@ public static class WindowsIppRouteScenarios
 		Title = "A PDF to Microsoft Print to PDF's queue, mapped to a printer with the HP ENVY's attributes, which takes Apple raster but not PDF, reaches it as three gzipped Apple raster pages at MaxRenderDpi, under the Windows printer ID, and completes",
 		Needs = TargetNeeds.MicrosoftPrintToPdf,
 		RunAsync = WindowsIppRouteScenarios.RasterToPrinterAsync
+	};
+
+	/// <summary>
+	/// A PDF to a queue whose IPP printer is reached over IPPS, with its certificate pinned and a password, goes to it
+	/// there (ADR 0042).
+	/// </summary>
+	public static readonly Scenario PasswordOverIpps = new Scenario
+	{
+		Id = "windows.ipp-route.password-over-ipps",
+		Area = ScenarioArea.Submission,
+		Title = "A PDF to Microsoft Print to PDF's queue, mapped to an ipps:// printer with a self-signed certificate that asks for a password, reaches it with the certificate pinned and the password in WindowsOptions, every request carrying it, and completes",
+		Needs = TargetNeeds.MicrosoftPrintToPdf,
+		RunAsync = WindowsIppRouteScenarios.PasswordOverIppsAsync
 	};
 
 	/// <summary>
@@ -84,6 +98,53 @@ public static class WindowsIppRouteScenarios
 		context.CheckEqual("as application/pdf", "application/pdf", printJobs[0].Find("document-format")?.Value);
 		context.CheckEqual("with copies 2", "2", printJobs[0].Find("copies")?.Value);
 		context.Check("the PDF arrives unchanged, not rendered", printJobs[0].Document.AsSpan().SequenceEqual(pdf), $"{printJobs[0].Document.Length} bytes received, {pdf.Length} sent");
+	}
+
+	/// <summary>
+	/// Runs <see cref="PasswordOverIpps"/>.
+	/// </summary>
+	/// <param name="context">The scenario's context.</param>
+	/// <returns>A task that completes when the scenario has run.</returns>
+	private static async Task PasswordOverIppsAsync(ScenarioContext context)
+	{
+		if (!OperatingSystem.IsWindows())
+		{
+			throw new PlatformNotSupportedException("The Windows print system needs Windows.");
+		}
+
+		NetworkCredential credentials = new NetworkCredential("latiprimere", "test-password");
+		await using FakePrinter fake = await FakePrinters.StartAsync(context, new FakePrinterOptions { UseTls = true, RequiredCredentials = credentials });
+		context.Note($"Its certificate's fingerprint: {fake.CertificateFingerprint}");
+
+		await using CatalogFixture fixture = new CatalogFixture
+		(
+			services => services.AddLatiprimerePdfium().AddLatiprimereWindows
+			(
+				options =>
+				{
+					options.PrintPdfOverIpp = true;
+					options.IppPrinterUris[TestPrinters.MicrosoftPrintToPdfName] = fake.PrinterUri;
+					options.IppTrustedCertificateFingerprints.Add(fake.CertificateFingerprint!);
+					options.IppPrinterCredentials[fake.PrinterUri] = credentials;
+				}
+			)
+		);
+
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(TestPrinters.MicrosoftPrintToPdf, context.CancellationToken);
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+
+		// Held in case the job falls back to the driver, which can't share with another process
+		using SharedPrinterLock printerLock = new SharedPrinterLock(TestPrinters.MicrosoftPrintToPdfName);
+
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, context.CancellationToken);
+		PrintJobStatus status = await JobFollower.WaitUntilFinishedAsync(context, job);
+		await FakePrinters.SaveRequestsAsync(context, fake);
+
+		context.CheckEqual("the printer's URI is ipps", "ipps", fake.PrinterUri.Scheme);
+		context.Check("the job is the printer's", job.Id.StartsWith("ipp:", StringComparison.Ordinal), job.Id);
+		context.CheckEqual("the job completes", PrintJobState.Completed, status.State);
+		context.CheckEqual("the printer received one Print-Job", 1, fake.GetRequests(IppOperation.PrintJob).Count);
+		context.Check("every request carried the password", fake.Requests.Count > 0 && fake.Requests.All(request => request.HasAuthorization));
 	}
 
 	/// <summary>

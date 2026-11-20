@@ -131,4 +131,31 @@ public sealed class IppNetworkPrintSystemFactoryTests
 		// Assert
 		Assert.Equal(expected, trusted);
 	}
+
+	[Fact]
+	public void GivenRasterFormatsWithRepeatsAndAnUnknownValueWhenConvertedThenTheirOrderWithoutEither()
+	{
+		// Arrange
+		IppRasterFormat[] formats = [IppRasterFormat.Pclm, (IppRasterFormat)99, IppRasterFormat.PwgRaster, IppRasterFormat.Pclm];
+
+		// Act
+		IReadOnlyList<Latiprimere.Ipp.Raster.RasterFormat> order = IppNetworkPrintSystemFactory.ToRasterFormats(formats);
+
+		// Assert
+		Assert.Equal([Latiprimere.Ipp.Raster.RasterFormat.Pclm, Latiprimere.Ipp.Raster.RasterFormat.PwgRaster], order);
+	}
+
+	[Fact]
+	public void GivenNoRasterFormatsWhenConvertedThenNone()
+	{
+		// Arrange
+		IppNetworkOptions options = new IppNetworkOptions();
+		options.RasterFormats.Clear();
+
+		// Act
+		IReadOnlyList<Latiprimere.Ipp.Raster.RasterFormat> order = IppNetworkPrintSystemFactory.ToRasterFormats(options.RasterFormats);
+
+		// Assert
+		Assert.Empty(order);
+	}
 }

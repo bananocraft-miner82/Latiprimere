@@ -70,7 +70,31 @@ internal sealed class FakeWinSpool : IWinSpool
 	/// <param name="printer">The printer.</param>
 	public void AddPrinter(WindowsPrinterRecord printer)
 	{
-		this.printers.Add(printer);
+		lock (this.printers)
+		{
+			this.printers.Add(printer);
+		}
+	}
+
+	/// <summary>Removes a printer, as when it is deleted; safe while a watcher reads it.</summary>
+	/// <param name="printerName">The printer's name.</param>
+	public void RemovePrinter(string printerName)
+	{
+		lock (this.printers)
+		{
+			this.printers.RemoveAll(existing => string.Equals(existing.Name, printerName, StringComparison.OrdinalIgnoreCase));
+		}
+	}
+
+	/// <summary>Replaces a printer's record, as when its status changes; safe while a watcher reads it.</summary>
+	/// <param name="printer">The printer's new record, found by its name.</param>
+	public void SetPrinter(WindowsPrinterRecord printer)
+	{
+		lock (this.printers)
+		{
+			int index = this.printers.FindIndex(existing => string.Equals(existing.Name, printer.Name, StringComparison.OrdinalIgnoreCase));
+			this.printers[index] = printer;
+		}
 	}
 
 	/// <summary>Sets what the spooler reports for a job; <see langword="null"/> means it has left the queue.</summary>
@@ -78,7 +102,10 @@ internal sealed class FakeWinSpool : IWinSpool
 	/// <param name="job">The job record, or <see langword="null"/>.</param>
 	public void SetJob(int jobId, WindowsJobRecord? job)
 	{
-		this.jobs[jobId] = job;
+		lock (this.jobs)
+		{
+			this.jobs[jobId] = job;
+		}
 	}
 
 	/// <summary>Returns the printers added.</summary>
@@ -102,12 +129,15 @@ internal sealed class FakeWinSpool : IWinSpool
 	/// <returns>The printer, or <see langword="null"/>.</returns>
 	public WindowsPrinterRecord? GetPrinter(string printerName)
 	{
-		this.OpenedPrinterNames.Add(printerName);
+		lock (this.printers)
+		{
+			this.OpenedPrinterNames.Add(printerName);
 
-		return this.printers.FirstOrDefault
-		(
-			printer => string.Equals(printer.Name, printerName, StringComparison.OrdinalIgnoreCase)
-		);
+			return this.printers.FirstOrDefault
+			(
+				printer => string.Equals(printer.Name, printerName, StringComparison.OrdinalIgnoreCase)
+			);
+		}
 	}
 
 	/// <summary>Returns the configured default printer name.</summary>
@@ -162,7 +192,10 @@ internal sealed class FakeWinSpool : IWinSpool
 	/// <returns>The job, or <see langword="null"/>.</returns>
 	public WindowsJobRecord? GetJob(string printerName, int jobId)
 	{
-		return this.jobs.GetValueOrDefault(jobId);
+		lock (this.jobs)
+		{
+			return this.jobs.GetValueOrDefault(jobId);
+		}
 	}
 
 	/// <summary>Deletes a job that is still listed; returns false for one that has left the queue.</summary>
@@ -205,6 +238,34 @@ internal sealed class FakeWinSpool : IWinSpool
 		return includePrintSchema || record is null
 			? record
 			: record with { PrintCapabilities = null, DefaultPrintTicket = null, PrintSchemaFailure = null };
+	}
+
+	/// <summary>Gets or sets a value indicating whether change notifications can be opened; without them the
+	/// watchers poll, as for a queue the spooler can't signal.</summary>
+	public bool SignalsChanges { get; set; }
+
+	/// <summary>Gets the change notifications opened, in order.</summary>
+	public List<FakeChangeNotification> ChangeNotifications { get; } = [];
+
+	/// <summary>Opens a notification a test signals, when <see cref="SignalsChanges"/> is set.</summary>
+	/// <param name="printerName">The printer name.</param>
+	/// <param name="changes">What it is for.</param>
+	/// <returns>The notification, or <see langword="null"/>.</returns>
+	public IWindowsChangeNotification? OpenChangeNotification(string printerName, WindowsChanges changes)
+	{
+		if (!this.SignalsChanges)
+		{
+			return null;
+		}
+
+		FakeChangeNotification notification = new FakeChangeNotification { Changes = changes };
+
+		lock (this.ChangeNotifications)
+		{
+			this.ChangeNotifications.Add(notification);
+		}
+
+		return notification;
 	}
 
 	/// <summary>Gets how many capability reads asked for the Print Capabilities too.</summary>

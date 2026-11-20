@@ -166,7 +166,14 @@ public static class ManualScenarios
 			return;
 		}
 
-		IppCaptureResult capture = await IppCapture.CaptureAsync(ippUri, context.EvidenceDirectory, "printer-attributes", context.CancellationToken);
+		IppCaptureResult capture = await IppCapture.CaptureAsync
+		(
+			ippUri,
+			context.EvidenceDirectory,
+			"printer-attributes",
+			context.Targets.ManualCertificateFingerprints,
+			context.CancellationToken
+		);
 		context.AddEvidence(capture.IppPath, "The printer's Get-Printer-Attributes response");
 		context.AddEvidence(capture.TextPath, "The same attributes as text");
 		context.Check("the printer's IPP attributes are saved", capture.AttributeCount > 0, $"{capture.AttributeCount} attributes");

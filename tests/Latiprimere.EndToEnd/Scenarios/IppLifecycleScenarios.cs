@@ -28,7 +28,7 @@ public static class IppLifecycleScenarios
 	{
 		Id = "ipp.lifecycle.aborted-with-reason",
 		Area = ScenarioArea.Lifecycle,
-		Title = "A job the printer aborts ends Aborted, with the printer's job-state-message as the reason",
+		Title = "A job the printer aborts ends Aborted, with the printer's job-state-message as the reason and aborted-by-system among its reasons",
 		Needs = TargetNeeds.None,
 		RunAsync = IppLifecycleScenarios.AbortedWithReasonAsync
 	};
@@ -40,7 +40,7 @@ public static class IppLifecycleScenarios
 	{
 		Id = "ipp.lifecycle.stopped-printer",
 		Area = ScenarioArea.Lifecycle,
-		Title = "A printer out of paper is Stopped when looked up (listing doesn't ask it, so shows Unknown); its job waits Pending, then completes once the printer starts again",
+		Title = "A printer out of paper is Stopped when looked up (listing doesn't ask it, so shows Unknown); its job waits Pending, with printer-stopped as its reason, explained, then completes once the printer starts again",
 		Needs = TargetNeeds.None,
 		RunAsync = IppLifecycleScenarios.StoppedPrinterAsync
 	};
@@ -52,7 +52,7 @@ public static class IppLifecycleScenarios
 	{
 		Id = "ipp.lifecycle.cancel-waiting-job",
 		Area = ScenarioArea.Lifecycle,
-		Title = "A job waiting on a stopped IPP printer is cancelled, ends Cancelled, and a second cancel reports it already finished",
+		Title = "A job waiting on a stopped IPP printer is cancelled, ends Cancelled with job-canceled-by-user as its reason, explained, and a second cancel reports it already finished",
 		Needs = TargetNeeds.None,
 		RunAsync = IppLifecycleScenarios.CancelWaitingJobAsync
 	};
@@ -95,6 +95,7 @@ public static class IppLifecycleScenarios
 
 		context.CheckEqual("the job ends Aborted", PrintJobState.Aborted, status.State);
 		context.Check("its message is the printer's reason", status.StateMessage?.Contains(reason, StringComparison.Ordinal) == true, status.StateMessage ?? "no message");
+		context.Check("its reasons include aborted-by-system", status.StateReasons.Contains("aborted-by-system"), string.Join(", ", status.StateReasons));
 	}
 
 	/// <summary>
@@ -122,6 +123,8 @@ public static class IppLifecycleScenarios
 		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, context.CancellationToken);
 		PrintJobStatus waiting = await job.GetStatusAsync(context.CancellationToken);
 		context.CheckEqual("the job waits Pending", PrintJobState.Pending, waiting.State);
+		context.Check("its reason is printer-stopped", waiting.StateReasons.Contains("printer-stopped"), string.Join(", ", waiting.StateReasons));
+		context.CheckEqual("which its message explains", "The job is waiting: the printer is stopped.", waiting.StateMessage);
 
 		// Paper is loaded
 		fake.Behaviour.IsStopped = false;
@@ -148,6 +151,8 @@ public static class IppLifecycleScenarios
 		context.Check("cancelling it is accepted", isCancelled);
 		PrintJobStatus status = await JobFollower.WaitUntilFinishedAsync(context, job);
 		context.CheckEqual("the job ends Cancelled", PrintJobState.Canceled, status.State);
+		context.Check("its reason is job-canceled-by-user", status.StateReasons.Contains("job-canceled-by-user"), string.Join(", ", status.StateReasons));
+		context.CheckEqual("which its message explains", "The job was cancelled by the user who sent it.", status.StateMessage);
 
 		bool isCancelledAgain = await job.CancelAsync(context.CancellationToken);
 		await FakePrinters.SaveRequestsAsync(context, fake);

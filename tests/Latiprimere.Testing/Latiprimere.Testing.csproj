@@ -20,6 +20,7 @@
 	<!-- The shared test documents, copied into Data/ here and in every project that references this one -->
 	<ItemGroup>
 		<None Include="..\..\tools\test-documents\*.pdf" Link="Data\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+		<None Include="..\..\tools\test-documents\*.png;..\..\tools\test-documents\*.jpg;..\..\tools\test-documents\*.txt" Link="Data\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
 </Project>

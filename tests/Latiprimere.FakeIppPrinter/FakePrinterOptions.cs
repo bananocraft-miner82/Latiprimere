@@ -45,6 +45,13 @@ public sealed class FakePrinterOptions
 	public NetworkCredential? RequiredCredentials { get; init; }
 
 	/// <summary>
+	/// Gets a value indicating whether <see cref="RequiredCredentials"/> are asked for only to print, with Print-Job
+	/// and Validate-Job, as most printers that ask for a password do; anyone may ask what the printer takes. Defaults to
+	/// <see langword="false"/>: every request needs them.
+	/// </summary>
+	public bool RequiresCredentialsForJobsOnly { get; init; }
+
+	/// <summary>
 	/// Gets an action called with each request once it is answered, for showing requests as they arrive.
 	/// </summary>
 	public Action<RecordedRequest>? RequestRecorded { get; init; }

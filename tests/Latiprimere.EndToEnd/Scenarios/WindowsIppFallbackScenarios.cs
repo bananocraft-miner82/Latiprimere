@@ -62,6 +62,19 @@ public static class WindowsIppFallbackScenarios
 	};
 
 	/// <summary>
+	/// A printer that says, in <c>uri-authentication-supported</c>, that it wants a password for jobs leaves them to the
+	/// spooler without being sent one (ADR 0042).
+	/// </summary>
+	public static readonly Scenario PasswordForJobs = new Scenario
+	{
+		Id = "windows.ipp-route.fallback-password-for-jobs",
+		Area = ScenarioArea.Submission,
+		Title = "A PDF to a queue whose IPP printer answers questions freely but says it asks for a password to print goes to the spooler without Validate-Job or Print-Job being sent (which refuses it for its text-only driver)",
+		Needs = TargetNeeds.WindowsTestPrinters,
+		RunAsync = WindowsIppFallbackScenarios.PasswordForJobsAsync
+	};
+
+	/// <summary>
 	/// A printer that refuses the job is reported, and the spooler doesn't print it as well.
 	/// </summary>
 	public static readonly Scenario RefusalThrown = new Scenario
@@ -162,6 +175,32 @@ public static class WindowsIppFallbackScenarios
 
 		context.Check("the printer asked for a password", fake.Requests.Any(request => request.HttpStatus == 401));
 		context.Check("the printer got no job", fake.GetRequests(IppOperation.PrintJob).All(request => request.StatusCode is null));
+	}
+
+	/// <summary>
+	/// Runs <see cref="PasswordForJobs"/>.
+	/// </summary>
+	/// <param name="context">The scenario's context.</param>
+	/// <returns>A task that completes when the scenario has run.</returns>
+	private static async Task PasswordForJobsAsync(ScenarioContext context)
+	{
+		FakePrinterOptions options = new FakePrinterOptions
+		{
+			RequiredCredentials            = new NetworkCredential("latiprimere", "test-password"),
+			RequiresCredentialsForJobsOnly = true
+		};
+
+		await using FakePrinter fake = await FakePrinters.StartAsync(context, options);
+		await using CatalogFixture fixture = WindowsIppFallbackScenarios.CreateCatalog(WindowsIppFallbackScenarios.PausedPrinterName, fake.PrinterUri);
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync("windows:" + WindowsIppFallbackScenarios.PausedPrinterName, context.CancellationToken);
+
+		await WindowsIppFallbackScenarios.SubmitToSpoolerAsync(context, printer);
+		await FakePrinters.SaveRequestsAsync(context, fake);
+
+		context.Check("the printer was asked what it takes", fake.GetRequests(IppOperation.GetPrinterAttributes).Count > 0);
+		context.Check("it was never refused for a password, as nothing was sent that needed one", fake.Requests.All(request => request.HttpStatus != 401));
+		context.CheckEqual("no Validate-Job was sent", 0, fake.GetRequests(IppOperation.ValidateJob).Count);
+		context.CheckEqual("no Print-Job was sent", 0, fake.GetRequests(IppOperation.PrintJob).Count);
 	}
 
 	/// <summary>

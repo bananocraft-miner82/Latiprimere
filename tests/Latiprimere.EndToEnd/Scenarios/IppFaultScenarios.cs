@@ -50,6 +50,19 @@ public static class IppFaultScenarios
 	};
 
 	/// <summary>
+	/// A printer that stops reading a job partway through fails the submission once the stall timeout runs out,
+	/// rather than holding it forever.
+	/// </summary>
+	public static readonly Scenario StalledUpload = new Scenario
+	{
+		Id = "ipp.faults.stalled-upload",
+		Area = ScenarioArea.Faults,
+		Title = "A printer that stops reading a job partway through fails the submission with a PrintException once the upload stall timeout (2 s here) runs out, and the job isn't sent again",
+		Needs = TargetNeeds.None,
+		RunAsync = IppFaultScenarios.StalledUploadAsync
+	};
+
+	/// <summary>
 	/// A printer slow to answer still prints the job and is followed to the end.
 	/// </summary>
 	public static readonly Scenario SlowPrinter = new Scenario
@@ -174,6 +187,33 @@ public static class IppFaultScenarios
 		context.Check("it isn't mistaken for an authentication problem", exception is not PrintAuthenticationException);
 		context.CheckEqual("the job is sent once, not resent", 1, fake.GetRequests(IppOperation.PrintJob).Count);
 		context.Check("it is reported at once rather than waited on", stopwatch.Elapsed < TimeSpan.FromSeconds(10), $"{stopwatch.Elapsed.TotalSeconds:0.0} s");
+	}
+
+	/// <summary>
+	/// Runs <see cref="StalledUpload"/>.
+	/// </summary>
+	/// <param name="context">The scenario's context.</param>
+	/// <returns>A task that completes when the scenario has run.</returns>
+	private static async Task StalledUploadAsync(ScenarioContext context)
+	{
+		await using FakePrinter fake = await FakePrinters.StartAsync(context);
+		fake.Behaviour.StallPrintJobUpload = true;
+		await using CatalogFixture fixture = FakePrinters.CreateCatalog(fake.PrinterUri, options => options.UploadStallTimeout = TimeSpan.FromSeconds(2));
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(FakePrinters.GetPrinterId(fake), context.CancellationToken);
+
+		// Far more than the printer's and the network's buffers hold, so the upload can't finish unless the printer reads
+		using MemoryStream data = new MemoryStream(new byte[64 * 1024 * 1024]);
+
+		Stopwatch stopwatch = Stopwatch.StartNew();
+		PrintException? exception = await IppFaultScenarios.CatchAsync(() => printer.SubmitAsync(PrintContent.FromRaw(data), PrintOptions.Default, context.CancellationToken));
+		stopwatch.Stop();
+		await FakePrinters.SaveRequestsAsync(context, fake);
+
+		context.Require("submitting throws a PrintException", exception is not null);
+		context.Note($"{exception!.GetType().Name}: {exception.Message}");
+		context.Check("it says the printer stopped taking the document", exception.Message.Contains("stopped taking the document", StringComparison.Ordinal), exception.Message);
+		context.CheckEqual("the printer was sent the job once, not resent", 1, fake.StalledPrintJobs);
+		context.Check("it gave up soon after the 2 s stall timeout", stopwatch.Elapsed < TimeSpan.FromSeconds(15), $"{stopwatch.Elapsed.TotalSeconds:0.0} s");
 	}
 
 	/// <summary>

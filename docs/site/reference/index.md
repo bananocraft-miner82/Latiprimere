@@ -34,6 +34,7 @@ The interfaces, records, enums and exceptions every package shares, in the `Lati
 - [PrinterInfo](/docs/reference/latiprimere-abstractions/printerinfo/): Describes a printer known to a print system.
 - [PrinterNotFoundException](/docs/reference/latiprimere-abstractions/printernotfoundexception/): The exception thrown when a requested printer does not exist.
 - [PrinterState](/docs/reference/latiprimere-abstractions/printerstate/): Enumerates the states a printer can report.
+- [PrinterStatus](/docs/reference/latiprimere-abstractions/printerstatus/): Describes a printer's state at a point in time.
 - [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The exception thrown when a printing operation fails. Base class for all Latiprimere exceptions.
 - [PrintJobState](/docs/reference/latiprimere-abstractions/printjobstate/): Enumerates the states a print job can be in. Modelled on the IPP job states.
 - [PrintJobStatus](/docs/reference/latiprimere-abstractions/printjobstatus/): Describes the status of a print job at a point in time.
@@ -41,6 +42,7 @@ The interfaces, records, enums and exceptions every package shares, in the `Lati
 - [PrintSystemUnavailableException](/docs/reference/latiprimere-abstractions/printsystemunavailableexception/): The exception thrown when a print system can't be used: no supported print system is available on the current platform, usually because no Latiprimere platform adapter has been registered for it, or a print system's own service isn't running, such as the Windows Print Spooler.
 - [RasterBand](/docs/reference/latiprimere-abstractions/rasterband/): Describes one horizontal band of a page rendered at a given pixel size.
 - [RasterRotation](/docs/reference/latiprimere-abstractions/rasterrotation/): How far to turn a page as it is rendered, clockwise, in quarter turns.
+- [ScalingMode](/docs/reference/latiprimere-abstractions/scalingmode/): Enumerates the ways an image is sized on the paper, as IPP's `print-scaling` has them.
 - [VendorOption](/docs/reference/latiprimere-abstractions/vendoroption/): A setting a printer offers beyond the typed options in [PrintOptions](/docs/reference/latiprimere-abstractions/printoptions/), such as print quality, stapling or a driver's own settings, with the values it takes.
 - [VendorOptionChoice](/docs/reference/latiprimere-abstractions/vendoroptionchoice/): One of the values a [VendorOption](/docs/reference/latiprimere-abstractions/vendoroption/) can be set to.
 - [VendorOptionKind](/docs/reference/latiprimere-abstractions/vendoroptionkind/): What kind of value a [VendorOption](/docs/reference/latiprimere-abstractions/vendoroption/) takes.
@@ -51,6 +53,7 @@ The printer catalog, which brings the print systems together, and following a jo
 
 - [LatiprimereServiceCollectionExtensions](/docs/reference/latiprimere/latiprimereservicecollectionextensions/): Registers Latiprimere services with a dependency injection container.
 - [PrinterCatalog](/docs/reference/latiprimere/printercatalog/): Finds printers across every print system supported on the current platform.
+- [PrinterExtensions](/docs/reference/latiprimere/printerextensions/): Provides helper methods for following printers.
 - [PrintJobExtensions](/docs/reference/latiprimere/printjobextensions/): Provides helper methods for following print jobs.
 
 ## Latiprimere.Ipp
@@ -59,6 +62,7 @@ Printing straight to network printers over IPP and IPPS, on every platform.
 
 - [IppNetworkOptions](/docs/reference/latiprimere-ipp/ippnetworkoptions/): Configures printing directly to IPP network printers, without CUPS or the Windows spooler.
 - [IppNetworkPrintSystemFactory](/docs/reference/latiprimere-ipp/ippnetworkprintsystemfactory/): Creates the IPP network print system, for applications that don't use dependency injection.
+- [IppRasterFormat](/docs/reference/latiprimere-ipp/ipprasterformat/): The raster formats Latiprimere can render a PDF into for a printer that can't take PDF, for [IppNetworkOptions.RasterFormats](/docs/reference/latiprimere-ipp/ippnetworkoptions/#rasterformats).
 - [LatiprimereIppServiceCollectionExtensions](/docs/reference/latiprimere-ipp/latiprimereippservicecollectionextensions/): Registers the IPP network print system with a dependency injection container.
 
 ## Latiprimere.Cups

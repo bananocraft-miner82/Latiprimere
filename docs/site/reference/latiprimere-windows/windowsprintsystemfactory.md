@@ -35,7 +35,7 @@ The print system. On platforms other than Windows it reports itself as unsupport
 
 **Exceptions**
 
-- [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): A URI in [WindowsOptions.IppPrinterUris](/docs/reference/latiprimere-windows/windowsoptions/#ippprinteruris) isn't an absolute `ipp`, `ipps`, `http` or `https` URI.
+- [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): With [WindowsOptions.PrintPdfOverIpp](/docs/reference/latiprimere-windows/windowsoptions/#printpdfoveripp) on: a URI in [WindowsOptions.IppPrinterUris](/docs/reference/latiprimere-windows/windowsoptions/#ippprinteruris) isn't an absolute `ipp`, `ipps`, `http` or `https` URI; a fingerprint in [WindowsOptions.IppTrustedCertificateFingerprints](/docs/reference/latiprimere-windows/windowsoptions/#ipptrustedcertificatefingerprints) isn't 32 bytes in hexadecimal; a credential has no user name, or one containing a colon; or a URI in [WindowsOptions.IppPrinterCredentials](/docs/reference/latiprimere-windows/windowsoptions/#ippprintercredentials) isn't an absolute `ipp` or `ipps` URI.
 
 ```csharp
 public static IPrintSystem Create(IPdfRasterizer? pdfRasterizer, WindowsOptions? options, ILoggerFactory? loggerFactory)
@@ -55,4 +55,4 @@ The print system. On platforms other than Windows it reports itself as unsupport
 
 **Exceptions**
 
-- [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): A URI in [WindowsOptions.IppPrinterUris](/docs/reference/latiprimere-windows/windowsoptions/#ippprinteruris) isn't an absolute `ipp`, `ipps`, `http` or `https` URI.
+- [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): With [WindowsOptions.PrintPdfOverIpp](/docs/reference/latiprimere-windows/windowsoptions/#printpdfoveripp) on: a URI in [WindowsOptions.IppPrinterUris](/docs/reference/latiprimere-windows/windowsoptions/#ippprinteruris) isn't an absolute `ipp`, `ipps`, `http` or `https` URI; a fingerprint in [WindowsOptions.IppTrustedCertificateFingerprints](/docs/reference/latiprimere-windows/windowsoptions/#ipptrustedcertificatefingerprints) isn't 32 bytes in hexadecimal; a credential has no user name, or one containing a colon; or a URI in [WindowsOptions.IppPrinterCredentials](/docs/reference/latiprimere-windows/windowsoptions/#ippprintercredentials) isn't an absolute `ipp` or `ipps` URI.

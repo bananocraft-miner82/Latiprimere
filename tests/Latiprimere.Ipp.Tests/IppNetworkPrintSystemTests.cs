@@ -560,6 +560,34 @@ public sealed class IppNetworkPrintSystemTests
 	}
 
 	[Fact]
+	public async Task GivenPrinterListingWhatEachAddressAsksForWhenFindPrinterThenKeepsItForItsAddress()
+	{
+		// Arrange — the printer names itself by its .local name, and asks for a password on plain IPP
+		FakeIppClient client = new FakeIppClient();
+
+		client.AddPrinter
+		(
+			IppNetworkPrintSystemTests.OfficeUri,
+			new PrinterAttributesBuilder()
+				.WithName("Office")
+				.WithUriAuthentication(("ipp://office.local:631/ipp/print", "basic"), ("ipps://office.local:443/ipp/print", "basic"))
+				.Build()
+		);
+
+		IppNetworkOptions options = new IppNetworkOptions { PrinterUris = { IppNetworkPrintSystemTests.OfficeUri } };
+		using IppNetworkPrintSystem printSystem = IppNetworkPrintSystemTests.CreatePrintSystem(client, options: options);
+
+		// Act
+		IPrinter? printer = await printSystem.FindPrinterAsync("ipp:" + IppNetworkPrintSystemTests.OfficeUri, TestContext.Current.CancellationToken);
+
+		// Assert — the requested attributes include what each address asks for
+		IppPrinter ippPrinter = Assert.IsType<IppPrinter>(printer);
+		Assert.True(ippPrinter.UriRequirements?.AsksForPassword);
+		Assert.Equal(new Uri("ipps://192.168.1.20:443/ipp/print"), ippPrinter.UriRequirements?.SecureAlternative);
+		Assert.Contains(IppRequestedAttributes.UriAuthenticationSupported, client.GetPrinterAttributesRequests[0].OperationAttributes?.RequestedAttributes?.Value ?? []);
+	}
+
+	[Fact]
 	public async Task GivenAnnouncedPrinterWhenFindPrinterByItsUriThenFindsIt()
 	{
 		// Arrange — listing found the printer on the network, so its URI is known

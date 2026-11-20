@@ -68,6 +68,38 @@ internal sealed class IppCertificateTrust
 	}
 
 	/// <summary>
+	/// Creates the check direct IPP uses for printers' certificates (ADR 0037). With a shared password, the system's
+	/// trust is enough only for the hosts the application named: a printer found on the network could be announced at
+	/// any host, including one with a certificate from a public authority, so its certificate must be pinned or
+	/// accepted by the callback before the password goes to it.
+	/// </summary>
+	/// <param name="pinnedFingerprints">SHA-256 fingerprints of certificates to trust.</param>
+	/// <param name="callback">The application's check, or <see langword="null"/>.</param>
+	/// <param name="sharedCredentials">The credentials for every printer, or <see langword="null"/>.</param>
+	/// <param name="configuredUris">The printer URIs the application named; relative ones are left out.</param>
+	/// <returns>The check.</returns>
+	/// <exception cref="ArgumentException">A fingerprint isn't 32 bytes in hexadecimal.</exception>
+	public static IppCertificateTrust CreateForPrinters
+	(
+		IEnumerable<string>                  pinnedFingerprints,
+		RemoteCertificateValidationCallback? callback,
+		System.Net.NetworkCredential?        sharedCredentials,
+		IEnumerable<Uri?>                    configuredUris
+	)
+	{
+		ArgumentNullException.ThrowIfNull(configuredUris);
+
+		IEnumerable<string>? systemTrustHosts = sharedCredentials is null
+			? null
+			: configuredUris
+				.Where(uri => uri is { IsAbsoluteUri: true })
+				.Select(uri => uri!.IdnHost)
+				.ToList();
+
+		return new IppCertificateTrust(pinnedFingerprints, callback, systemTrustHosts);
+	}
+
+	/// <summary>
 	/// Gets a value indicating whether anything beyond the system's trust is configured: pinned certificates or a
 	/// callback. Only then are printers' IPPS addresses preferred (decision D4).
 	/// </summary>

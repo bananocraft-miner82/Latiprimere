@@ -52,6 +52,12 @@ public sealed class HarnessTargets
 	public string? ManualPrinterId { get; init; }
 
 	/// <summary>
+	/// Gets the SHA-256 fingerprints of certificates to trust for the printer named for manual checks, when it is
+	/// reached over IPPS; empty to trust only what the system does.
+	/// </summary>
+	public IReadOnlyList<string> ManualCertificateFingerprints { get; init; } = Array.Empty<string>();
+
+	/// <summary>
 	/// Gets the DNS-SD instance name of an IPP printer announcing itself over mDNS, or <see langword="null"/>.
 	/// </summary>
 	public string? MdnsPrinterName { get; init; }
@@ -152,6 +158,30 @@ public sealed class HarnessTargets
 	}
 
 	/// <summary>
+	/// Makes a copy of these targets that pins the given certificates for the printer named for manual checks.
+	/// </summary>
+	/// <param name="fingerprints">The SHA-256 fingerprints, as its web page shows them.</param>
+	/// <returns>The copy.</returns>
+	public HarnessTargets WithManualCertificateFingerprints(IReadOnlyList<string> fingerprints)
+	{
+		ArgumentNullException.ThrowIfNull(fingerprints);
+
+		return new HarnessTargets
+		{
+			CupsServer                    = this.CupsServer,
+			CupsOutputDirectory           = this.CupsOutputDirectory,
+			CupsSetup                     = this.CupsSetup,
+			IppPrinterUri                 = this.IppPrinterUri,
+			WindowsOutputDirectory        = this.WindowsOutputDirectory,
+			HasMicrosoftPrintToPdf        = this.HasMicrosoftPrintToPdf,
+			HasPerson                     = this.HasPerson,
+			ManualPrinterId               = this.ManualPrinterId,
+			ManualCertificateFingerprints = fingerprints.ToArray(),
+			MdnsPrinterName               = this.MdnsPrinterName
+		};
+	}
+
+	/// <summary>
 	/// Says why a scenario with these needs can't run here.
 	/// </summary>
 	/// <param name="needs">What the scenario needs.</param>
@@ -227,6 +257,7 @@ public sealed class HarnessTargets
 			$"Microsoft Print to PDF: {(this.HasMicrosoftPrintToPdf ? "yes" : "no")}",
 			$"Person at the keyboard: {(this.HasPerson ? "yes" : "no")}",
 			$"Printer for manual checks: {this.ManualPrinterId ?? "none"}",
+			$"Pinned certificates for it: {(this.ManualCertificateFingerprints.Count == 0 ? "none" : string.Join(", ", this.ManualCertificateFingerprints))}",
 			$"Printer announced over mDNS: {this.MdnsPrinterName ?? "none"}",
 			$"Latiprimere under test: {HarnessTargets.LatiprimereVersion}"
 		];

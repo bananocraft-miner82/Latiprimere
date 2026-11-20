@@ -22,7 +22,7 @@ Provides helper methods for following print jobs.
 public static IAsyncEnumerable<PrintJobStatus> WatchStatusAsync(this IPrintJob job)
 ```
 
-Follows a job until it reaches a final state, checking its status every [PrintJobExtensions.DefaultPollInterval](/docs/reference/latiprimere/printjobextensions/#defaultpollinterval).
+Follows a job until it reaches a final state, as [IPrintJob.WatchStatusAsync](/docs/reference/latiprimere-abstractions/iprintjob/#watchstatusasync) does, checking its status every [PrintJobExtensions.DefaultPollInterval](/docs/reference/latiprimere/printjobextensions/#defaultpollinterval) when the print system can't say when it changes.
 
 Overloads are used rather than optional parameters, so that more can be added later without breaking compiled callers (RS0026 and RS0027 of the public API analyzer).
 
@@ -32,7 +32,7 @@ Overloads are used rather than optional parameters, so that more can be added la
 
 **Returns**
 
-Each distinct status the job reports, ending with its final status (completed, cancelled or aborted).
+Each distinct status the job reports, ending with its final status (completed, canceled or aborted).
 
 **Exceptions**
 
@@ -42,7 +42,7 @@ Each distinct status the job reports, ending with its final status (completed, c
 public static IAsyncEnumerable<PrintJobStatus> WatchStatusAsync(this IPrintJob job, CancellationToken cancellationToken)
 ```
 
-Follows a job until it reaches a final state, checking its status every [PrintJobExtensions.DefaultPollInterval](/docs/reference/latiprimere/printjobextensions/#defaultpollinterval).
+Follows a job until it reaches a final state, as [IPrintJob.WatchStatusAsync](/docs/reference/latiprimere-abstractions/iprintjob/#watchstatusasync) does, checking its status every [PrintJobExtensions.DefaultPollInterval](/docs/reference/latiprimere/printjobextensions/#defaultpollinterval) when the print system can't say when it changes.
 
 **Parameters**
 
@@ -51,7 +51,7 @@ Follows a job until it reaches a final state, checking its status every [PrintJo
 
 **Returns**
 
-Each distinct status the job reports, ending with its final status (completed, cancelled or aborted).
+Each distinct status the job reports, ending with its final status (completed, canceled or aborted).
 
 **Exceptions**
 
@@ -61,24 +61,21 @@ Each distinct status the job reports, ending with its final status (completed, c
 public static IAsyncEnumerable<PrintJobStatus> WatchStatusAsync(this IPrintJob job, TimeSpan pollInterval, CancellationToken cancellationToken)
 ```
 
-Follows a job until it reaches a final state, checking its status at the given interval.
-
-Arguments are validated when enumeration starts. A job whose state the print system doesn't report is [PrintJobState.Unknown](/docs/reference/latiprimere-abstractions/printjobstate/#values), which isn't final, so following it continues until `cancellationToken` is cancelled: pass one with a timeout when that matters.
+Follows a job until it reaches a final state. Kept so code compiled against earlier versions still runs: code compiled now calls [IPrintJob.WatchStatusAsync](/docs/reference/latiprimere-abstractions/iprintjob/#watchstatusasync) for the same arguments.
 
 **Parameters**
 
 - `job`: The job to follow.
-- `pollInterval`: How long to wait between status checks.
+- `pollInterval`: How long to wait between status checks when the print system can't say when the status changes.
 - `cancellationToken`: A token to stop following the job. This does not cancel the job itself.
 
 **Returns**
 
-Each distinct status the job reports, ending with its final status (completed, cancelled or aborted). A status is reported again only when its state, message or page count changes.
+Each distinct status the job reports, ending with its final status.
 
 **Exceptions**
 
 - [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `job` is `null`.
-- [ArgumentOutOfRangeException](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception): `pollInterval` is zero or negative, which would ask the print system for the status again and again without pause.
 
 ## Fields
 
@@ -88,4 +85,4 @@ Each distinct status the job reports, ending with its final status (completed, c
 public static readonly TimeSpan DefaultPollInterval
 ```
 
-The interval between status checks used when none is specified.
+The interval between status checks used when none is specified, for print systems that can't say when a job's status changes.

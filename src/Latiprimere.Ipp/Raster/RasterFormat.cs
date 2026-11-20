@@ -1,7 +1,7 @@
 namespace Latiprimere.Ipp.Raster;
 
 /// <summary>
-/// The raster document formats Latiprimere writes, for printers that don't take PDF (ADR 0034).
+/// The raster document formats Latiprimere writes, for printers that don't take PDF (ADR 0034, ADR 0046).
 /// </summary>
 internal enum RasterFormat
 {
@@ -10,4 +10,7 @@ internal enum RasterFormat
 
 	/// <summary>Apple raster (<c>image/urf</c>), which AirPrint printers must take.</summary>
 	AppleRaster = 1,
+
+	/// <summary>PCLm (<c>application/PCLm</c>, Mopria): a restricted PDF holding each page as image strips.</summary>
+	Pclm = 2,
 }

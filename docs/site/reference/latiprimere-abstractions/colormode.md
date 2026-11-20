@@ -14,6 +14,8 @@ public enum ColorMode
 
 Enumerates the ways a printer can render colour.
 
+Later versions may add modes, as IPP has more, such as bi-level. Treat one you don't know as [ColorMode.PrinterDefault](/docs/reference/latiprimere-abstractions/colormode/#values), as print systems do.
+
 ## Values
 
 - **`PrinterDefault`** (`0`): Use the printer's default setting.

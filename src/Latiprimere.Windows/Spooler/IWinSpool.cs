@@ -114,4 +114,13 @@ internal interface IWinSpool
 	/// <param name="portName">The port's name, such as <c>WSD-adb74ae8-…</c>.</param>
 	/// <returns>The UUID as recorded, or <see langword="null"/> if the port isn't a WSD port or records none.</returns>
 	string? GetWsdPrinterUuid(string portName);
+
+	/// <summary>
+	/// Opens a notification signalled when a printer, or a job in its queue, changes (ADR 0049).
+	/// </summary>
+	/// <param name="printerName">The printer name.</param>
+	/// <param name="changes">What to be signalled for.</param>
+	/// <returns>The notification, which the caller disposes; or <see langword="null"/> if the spooler can't give one,
+	/// and the caller polls instead.</returns>
+	IWindowsChangeNotification? OpenChangeNotification(string printerName, WindowsChanges changes);
 }

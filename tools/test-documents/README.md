@@ -7,6 +7,9 @@ Documents used to exercise Latiprimere's print paths. They are small and safe to
 | `three-pages.pdf` | 3 | Plain text (150 numbered lines) | `cupsfilter` in the CUPS test container |
 | `mixed-1-page.pdf` | 1 | A4: heading, text block, filled shapes, a rule and an embedded colour image | Ghostscript from `mixed-content.ps` |
 | `mixed-100-pages.pdf` | 100 | The same page, numbered 1 to 100, for timing and memory measurements | Ghostscript from `mixed-content.ps` |
+| `photo-300x200.png` | 1 | A 300 × 200 colour image at 96 dpi: a gradient, a black bar along the top, a red square bottom right, and a transparent disc | `make-images.py`, Python's standard library only |
+| `text-2-pages.txt` | 2 | UTF-8 text: a tabbed table with accented words, a line long enough to wrap, 30 numbered lines, then a form feed and a second page of Windows-1252 punctuation | By hand |
+| `photo-300x200.jpg` | 1 | The same image as a JPEG, quality 90, its disc white | `make-images.ps1`, Windows' `System.Drawing`, from the PNG |
 
 ## Regenerating the mixed-content PDFs
 
@@ -20,3 +23,7 @@ docker run --rm -v "$PWD:/work" -w /work debian:bookworm-slim sh -c \
 ```
 
 Run it from this folder. On Windows with Git Bash, set `MSYS_NO_PATHCONV=1` and use `$(cygpath -w "$PWD")` for the volume path.
+
+## Regenerating the images
+
+Run `python make-images.py`, then, on Windows, `./make-images.ps1`, from this folder. The PNG needs nothing beyond Python; the JPEG needs Windows' `System.Drawing`, which draws the PNG over white first, as JPEG has no transparency.

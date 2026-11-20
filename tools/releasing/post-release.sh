@@ -35,6 +35,7 @@ if ! tr -d '\r' < "$PROPS" | grep -q '<PackageValidationBaselineVersion>.*</Pack
 fi
 
 # CRLF in a Windows checkout, LF otherwise; Git Bash's grep doesn't see carriage returns, so compare instead
+# shellcheck disable=SC2094 # Both sides only read the file
 if tr -d '\r' < "$PROPS" | cmp -s - "$PROPS"; then
 	tr -d '\r' < "$PROPS" \
 		| sed "s|<PackageValidationBaselineVersion>[^<]*</PackageValidationBaselineVersion>|<PackageValidationBaselineVersion>$VERSION</PackageValidationBaselineVersion>|" \

@@ -3,6 +3,10 @@ namespace Latiprimere;
 /// <summary>
 /// What kind of value a <see cref="VendorOption"/> takes.
 /// </summary>
+/// <remarks>
+/// Later versions may add kinds. Treat one you don't know as <see cref="Text"/>: the value you set in
+/// <see cref="PrintOptions.VendorOptions"/> goes to the print system as you give it.
+/// </remarks>
 public enum VendorOptionKind
 {
 	/// <summary>One of the option's <see cref="VendorOption.Choices"/>, or several when it allows that.</summary>

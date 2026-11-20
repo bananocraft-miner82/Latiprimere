@@ -39,15 +39,16 @@ public sealed class IppDocumentFormatsTests
 	}
 
 	[Fact]
-	public void GivenUnknownFormatWhenGetMimeTypeThenThrowsArgumentOutOfRangeException()
+	public void GivenUnknownFormatWhenGetMimeTypeThenThrowsNotSupportedException()
 	{
-		// Arrange
+		// Arrange — a format a later version may add, as SubmitAsync documents for one it can't send (ADR 0044)
 		DocumentFormat unknownFormat = (DocumentFormat)99;
 
 		// Act
 		Func<string> getMimeType = () => IppDocumentFormats.Cups.GetMimeType(unknownFormat);
 
 		// Assert
-		Assert.Throws<ArgumentOutOfRangeException>(getMimeType);
+		NotSupportedException exception = Assert.Throws<NotSupportedException>(getMimeType);
+		Assert.Contains("99", exception.Message, StringComparison.Ordinal);
 	}
 }

@@ -38,4 +38,35 @@ public interface IPrintJob
 	/// <exception cref="NotSupportedException">The print system can't cancel jobs.</exception>
 	/// <exception cref="PrintException">The print system refused or failed to cancel the job.</exception>
 	Task<bool> CancelAsync(CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Follows the job until it reaches a final state, reporting each change of its status as it happens.
+	/// </summary>
+	/// <param name="pollInterval">How long to wait between reads of the status when the print system can't say when
+	/// it changes, so it is polled (see the remarks).</param>
+	/// <param name="cancellationToken">A token to stop following the job. This doesn't cancel the job itself.</param>
+	/// <returns>
+	/// Each distinct status the job reports, ending with its final status (completed, canceled or aborted). A status
+	/// is reported again only when its state, message, reasons or page count change, never twice the same.
+	/// </returns>
+	/// <exception cref="ArgumentOutOfRangeException"><paramref name="pollInterval"/> is zero or negative, which would
+	/// ask the print system for the status again and again without pause.</exception>
+	/// <exception cref="PrintException">The print system failed to report the job's status.</exception>
+	/// <remarks>
+	/// <para>
+	/// The Windows spooler signals each change to its queue, so a job there is read when one comes, rather than every
+	/// <paramref name="pollInterval"/>, and at least every 30 seconds in case a change goes unsignalled. CUPS and
+	/// network printers are read every <paramref name="pollInterval"/>.
+	/// </para>
+	/// <para>
+	/// Arguments are checked when enumeration starts. A job whose state the print system doesn't report is
+	/// <see cref="PrintJobState.Unknown"/>, which isn't final, so following it goes on until
+	/// <paramref name="cancellationToken"/> is cancelled: pass one with a timeout when that matters. The default
+	/// implementation reads <see cref="GetStatusAsync"/> every <paramref name="pollInterval"/>.
+	/// </para>
+	/// </remarks>
+	IAsyncEnumerable<PrintJobStatus> WatchStatusAsync(TimeSpan pollInterval, CancellationToken cancellationToken = default)
+	{
+		return StatusPolling.WatchJobAsync(this, pollInterval, cancellationToken);
+	}
 }

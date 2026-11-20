@@ -46,6 +46,15 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0038](0038-remembered-addresses.md) | Remembered printer addresses that survive a restart | Accepted |
 | [0039](0039-api-reference.md) | API reference generated into committed pages | Accepted |
 | [0040](0040-api-review-1-0.md) | Public API for 1.0 | Accepted |
+| [0041](0041-upload-stall-timeout.md) | A time limit on a printer that stops taking a job | Accepted |
+| [0042](0042-ipps-for-windows-queues-and-uri-authentication.md) | IPPS for Windows queues, and what printers say they ask for | Accepted |
+| [0043](0043-job-state-reasons.md) | Why a job is in its state | Accepted |
+| [0044](0044-room-to-grow-after-1-0.md) | Room to grow after 1.0 | Accepted |
+| [0045](0045-pdf-writer.md) | A small PDF writer | Accepted |
+| [0046](0046-pclm-and-raster-format-order.md) | PCLm, and the order of raster formats | Accepted |
+| [0047](0047-printing-images.md) | Printing JPEG and PNG images | Accepted |
+| [0048](0048-printing-plain-text.md) | Printing plain text | Accepted |
+| [0049](0049-following-printers-and-jobs.md) | Following printers and jobs | Accepted |
 
 ## Template
 

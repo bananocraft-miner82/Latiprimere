@@ -151,6 +151,26 @@ public sealed class CupsPrintSystemIntegrationTests
 	}
 
 	[Fact]
+	public async Task GivenTwoSidedJobToOneSidedQueueWhenCupsCancelsItThenTheStatusSaysWhy()
+	{
+		// Arrange — CUPS accepts two-sided printing for the one-sided Virtual-IPP queue, then cancels the job when
+		// ippeveprinter refuses it (Spike 1); it gives job-state-reasons but no job-state-message
+		await using CatalogFixture fixture = CupsPrintSystemIntegrationTests.CreateCatalog();
+		IPrinter printer = await CupsPrintSystemIntegrationTests.GetPrinterAsync(fixture, CupsPrintSystemIntegrationTests.VirtualIppId);
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+		PrintOptions options = new PrintOptions { Duplex = DuplexMode.LongEdge };
+
+		// Act
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+		PrintJobStatus status = await PrintJobWaiter.WaitUntilFinishedAsync(job, TestContext.Current.CancellationToken);
+
+		// Assert — the reasons, and a message from them or from CUPS
+		Assert.True(status.State is PrintJobState.Canceled or PrintJobState.Aborted, $"The job ended {status.State}.");
+		Assert.NotEmpty(status.StateReasons);
+		Assert.False(string.IsNullOrWhiteSpace(status.StateMessage), "The job ended with no message; reasons: " + string.Join(", ", status.StateReasons));
+	}
+
+	[Fact]
 	public async Task GivenPdfWhenPrintedLandscapeToIppEverywhereQueueThenJobCompletes()
 	{
 		// Arrange
