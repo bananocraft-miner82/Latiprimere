@@ -4,7 +4,7 @@ What changed in each release of Latiprimere, newest first. All the packages shar
 
 Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` sections such as Added, Changed, Fixed, Removed and Known limitations. Work not yet released goes under `## Unreleased`, which the website doesn't show.
 
-## Unreleased
+## 11.0.7-preview - 2026-11-20
 
 The public API as it will be for 1.0 ([ADR 0040](docs/decisions/0040-api-review-1-0.md)).
 

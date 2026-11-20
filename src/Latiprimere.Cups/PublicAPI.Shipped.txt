@@ -20,5 +20,6 @@ Latiprimere.Cups.CupsOptions.UserName.set -> void
 Latiprimere.Cups.CupsPrintSystemFactory
 Microsoft.Extensions.DependencyInjection.LatiprimereCupsServiceCollectionExtensions
 static Latiprimere.Cups.CupsPrintSystemFactory.Create(Latiprimere.Cups.CupsOptions? options = null) -> Latiprimere.IPrintSystem!
+static Latiprimere.Cups.CupsPrintSystemFactory.Create(Latiprimere.Cups.CupsOptions? options, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory) -> Latiprimere.IPrintSystem!
 static Microsoft.Extensions.DependencyInjection.LatiprimereCupsServiceCollectionExtensions.AddLatiprimereCups(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Latiprimere.Cups.CupsOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static readonly Latiprimere.Cups.CupsOptions.DefaultConnectTimeout -> System.TimeSpan

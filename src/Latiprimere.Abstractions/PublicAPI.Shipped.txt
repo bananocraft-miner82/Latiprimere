@@ -24,6 +24,7 @@ Latiprimere.IPrintSystem.IsSupported.get -> bool
 Latiprimere.IPrintSystem.Name.get -> string!
 Latiprimere.IPrinter
 Latiprimere.IPrinter.GetCapabilitiesAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.PrinterCapabilities!>!
+Latiprimere.IPrinter.GetJobAsync(string! jobId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrintJob?>!
 Latiprimere.IPrinter.Info.get -> Latiprimere.PrinterInfo!
 Latiprimere.IPrinter.SubmitAsync(Latiprimere.PrintContent! content, Latiprimere.PrintOptions! options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrintJob!>!
 Latiprimere.IPrinterCatalog
@@ -43,13 +44,13 @@ Latiprimere.MediaSize.<Clone>$() -> Latiprimere.MediaSize!
 Latiprimere.MediaSize.DisplayName.get -> string!
 Latiprimere.MediaSize.DisplayName.init -> void
 Latiprimere.MediaSize.Equals(Latiprimere.MediaSize? other) -> bool
-Latiprimere.MediaSize.HeightMillimetres.get -> double
-Latiprimere.MediaSize.HeightMillimetres.init -> void
+Latiprimere.MediaSize.HeightMillimeters.get -> double
+Latiprimere.MediaSize.HeightMillimeters.init -> void
 Latiprimere.MediaSize.MediaSize() -> void
 Latiprimere.MediaSize.Name.get -> string!
 Latiprimere.MediaSize.Name.init -> void
-Latiprimere.MediaSize.WidthMillimetres.get -> double
-Latiprimere.MediaSize.WidthMillimetres.init -> void
+Latiprimere.MediaSize.WidthMillimeters.get -> double
+Latiprimere.MediaSize.WidthMillimeters.init -> void
 Latiprimere.PageOrientation
 Latiprimere.PageOrientation.Landscape = 2 -> Latiprimere.PageOrientation
 Latiprimere.PageOrientation.Portrait = 1 -> Latiprimere.PageOrientation
@@ -58,6 +59,14 @@ Latiprimere.PrintAuthenticationException
 Latiprimere.PrintAuthenticationException.PrintAuthenticationException() -> void
 Latiprimere.PrintAuthenticationException.PrintAuthenticationException(string! message) -> void
 Latiprimere.PrintAuthenticationException.PrintAuthenticationException(string! message, System.Exception! innerException) -> void
+Latiprimere.PrintCertificateException
+Latiprimere.PrintCertificateException.CertificateFingerprint.get -> string?
+Latiprimere.PrintCertificateException.CertificateFingerprint.init -> void
+Latiprimere.PrintCertificateException.PrintCertificateException() -> void
+Latiprimere.PrintCertificateException.PrintCertificateException(string! message) -> void
+Latiprimere.PrintCertificateException.PrintCertificateException(string! message, System.Exception! innerException) -> void
+Latiprimere.PrintCertificateException.PrinterUri.get -> System.Uri?
+Latiprimere.PrintCertificateException.PrinterUri.init -> void
 Latiprimere.PrintContent
 Latiprimere.PrintContent.Content.get -> System.IO.Stream!
 Latiprimere.PrintContent.Format.get -> Latiprimere.DocumentFormat
@@ -69,7 +78,7 @@ Latiprimere.PrintException.PrintException(string! message) -> void
 Latiprimere.PrintException.PrintException(string! message, System.Exception! innerException) -> void
 Latiprimere.PrintJobState
 Latiprimere.PrintJobState.Aborted = 6 -> Latiprimere.PrintJobState
-Latiprimere.PrintJobState.Cancelled = 5 -> Latiprimere.PrintJobState
+Latiprimere.PrintJobState.Canceled = 5 -> Latiprimere.PrintJobState
 Latiprimere.PrintJobState.Completed = 7 -> Latiprimere.PrintJobState
 Latiprimere.PrintJobState.Held = 2 -> Latiprimere.PrintJobState
 Latiprimere.PrintJobState.Pending = 1 -> Latiprimere.PrintJobState
@@ -205,8 +214,8 @@ Latiprimere.Rendering.RasterBand.Stride.init -> void
 Latiprimere.Rendering.RasterBand.Top.get -> int
 Latiprimere.Rendering.RasterBand.Top.init -> void
 Latiprimere.Rendering.RasterRotation
-Latiprimere.Rendering.RasterRotation.Anticlockwise90 = 3 -> Latiprimere.Rendering.RasterRotation
 Latiprimere.Rendering.RasterRotation.Clockwise90 = 1 -> Latiprimere.Rendering.RasterRotation
+Latiprimere.Rendering.RasterRotation.Counterclockwise90 = 3 -> Latiprimere.Rendering.RasterRotation
 Latiprimere.Rendering.RasterRotation.Half = 2 -> Latiprimere.Rendering.RasterRotation
 Latiprimere.Rendering.RasterRotation.None = 0 -> Latiprimere.Rendering.RasterRotation
 Latiprimere.VendorOption
@@ -224,10 +233,10 @@ Latiprimere.VendorOption.Key.get -> string!
 Latiprimere.VendorOption.Key.init -> void
 Latiprimere.VendorOption.Kind.get -> Latiprimere.VendorOptionKind
 Latiprimere.VendorOption.Kind.init -> void
-Latiprimere.VendorOption.MaximumValue.get -> long?
-Latiprimere.VendorOption.MaximumValue.init -> void
-Latiprimere.VendorOption.MinimumValue.get -> long?
-Latiprimere.VendorOption.MinimumValue.init -> void
+Latiprimere.VendorOption.MaxValue.get -> long?
+Latiprimere.VendorOption.MaxValue.init -> void
+Latiprimere.VendorOption.MinValue.get -> long?
+Latiprimere.VendorOption.MinValue.init -> void
 Latiprimere.VendorOption.VendorOption() -> void
 Latiprimere.VendorOptionChoice
 Latiprimere.VendorOptionChoice.<Clone>$() -> Latiprimere.VendorOptionChoice!
