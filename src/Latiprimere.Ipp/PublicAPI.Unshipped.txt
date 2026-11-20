@@ -1,2 +1,1 @@
 #nullable enable
-static Latiprimere.Ipp.IppNetworkPrintSystemFactory.Create(Latiprimere.Rendering.IPdfRasterizer? pdfRasterizer, Latiprimere.Ipp.IppNetworkOptions? options, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory) -> Latiprimere.IPrintSystem!

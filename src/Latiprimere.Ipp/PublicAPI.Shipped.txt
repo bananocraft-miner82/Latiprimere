@@ -30,6 +30,7 @@ Latiprimere.Ipp.IppNetworkPrintSystemFactory
 Microsoft.Extensions.DependencyInjection.LatiprimereIppServiceCollectionExtensions
 static Latiprimere.Ipp.IppNetworkPrintSystemFactory.Create(Latiprimere.Ipp.IppNetworkOptions? options = null) -> Latiprimere.IPrintSystem!
 static Latiprimere.Ipp.IppNetworkPrintSystemFactory.Create(Latiprimere.Rendering.IPdfRasterizer? pdfRasterizer, Latiprimere.Ipp.IppNetworkOptions? options) -> Latiprimere.IPrintSystem!
+static Latiprimere.Ipp.IppNetworkPrintSystemFactory.Create(Latiprimere.Rendering.IPdfRasterizer? pdfRasterizer, Latiprimere.Ipp.IppNetworkOptions? options, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory) -> Latiprimere.IPrintSystem!
 static Microsoft.Extensions.DependencyInjection.LatiprimereIppServiceCollectionExtensions.AddLatiprimereIpp(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Latiprimere.Ipp.IppNetworkOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static readonly Latiprimere.Ipp.IppNetworkOptions.DefaultBusyRetryDuration -> System.TimeSpan
 static readonly Latiprimere.Ipp.IppNetworkOptions.DefaultConnectTimeout -> System.TimeSpan
