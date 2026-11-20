@@ -389,18 +389,27 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 		{
 			// The TLS handshake failed, most often because the server's certificate isn't trusted: for a printer
 			// whose certificate was refused, say which, so it can be pinned
-			Connections.RefusedCertificate? refused = this.CertificateTrust is not null && Uri.TryCreate(target, UriKind.Absolute, out Uri? targetUri)
+			_ = Uri.TryCreate(target, UriKind.Absolute, out Uri? targetUri);
+
+			Connections.RefusedCertificate? refused = this.CertificateTrust is not null && targetUri is not null
 				? this.CertificateTrust.FindRefusal(targetUri.Host)
 				: null;
 
-			string message = refused switch
+			if (refused is null)
 			{
-				null                         => ExceptionMessages.FormatIppSecureConnectionFailed(target),
-				{ IsTrustedBySystem: true }  => ExceptionMessages.FormatIppCertificateNotVouchedForCredentials(target, refused.Fingerprint),
-				_                            => ExceptionMessages.FormatIppCertificateNotTrusted(target, refused.Fingerprint),
-			};
+				throw new PrintException(ExceptionMessages.FormatIppSecureConnectionFailed(target), exception);
+			}
 
-			throw new PrintException(message, exception);
+			// The fingerprint goes in the exception as well as the message, so an application can offer to pin it
+			string message = refused.IsTrustedBySystem
+				? ExceptionMessages.FormatIppCertificateNotVouchedForCredentials(target, refused.Fingerprint)
+				: ExceptionMessages.FormatIppCertificateNotTrusted(target, refused.Fingerprint);
+
+			throw new PrintCertificateException(message, exception)
+			{
+				CertificateFingerprint = refused.Fingerprint,
+				PrinterUri             = targetUri
+			};
 		}
 		catch (HttpRequestException exception)
 		{

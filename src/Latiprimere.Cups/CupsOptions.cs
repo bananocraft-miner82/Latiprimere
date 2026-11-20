@@ -29,13 +29,13 @@ public sealed class CupsOptions
 	public string? Server { get; set; }
 
 	/// <summary>
-	/// Gets or sets the user name sent with requests, which CUPS uses to decide who owns a job.
-	/// When <see langword="null"/>, the user name of <see cref="Credentials"/> is used if set, otherwise the current
-	/// operating-system user name.
+	/// Gets or sets the user name sent with requests as <c>requesting-user-name</c>, which CUPS uses to decide who
+	/// owns a job. When <see langword="null"/>, the user name of <see cref="Credentials"/> is used if set, otherwise
+	/// the current operating-system user name.
 	/// </summary>
 	/// <remarks>
-	/// CUPS trusts this name without checking it. Once a request is authenticated, CUPS uses the authenticated user
-	/// instead.
+	/// It isn't a login: CUPS trusts this name without checking it. For a server that asks for a password, set
+	/// <see cref="Credentials"/>; once a request is authenticated, CUPS uses the authenticated user instead.
 	/// </remarks>
 	public string? UserName { get; set; }
 

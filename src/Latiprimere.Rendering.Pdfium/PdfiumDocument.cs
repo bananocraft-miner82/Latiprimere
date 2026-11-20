@@ -105,7 +105,7 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 								&& band.Top >= 0
 								&& band.Height > 0
 								&& band.Top + band.Height <= band.PageHeight
-								&& band.Rotation is >= RasterRotation.None and <= RasterRotation.Anticlockwise90;
+								&& band.Rotation is >= RasterRotation.None and <= RasterRotation.Counterclockwise90;
 
 		if (!isInsidePage)
 		{

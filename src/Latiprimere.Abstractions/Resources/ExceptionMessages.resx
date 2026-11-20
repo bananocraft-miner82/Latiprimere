@@ -16,6 +16,10 @@
 		<value>The print system needs a user name and password that it accepts.</value>
 		<comment>Default message for PrintAuthenticationException.</comment>
 	</data>
+	<data name="CertificateNotTrusted" xml:space="preserve">
+		<value>The printer's certificate isn't trusted, so no encrypted connection was made to it.</value>
+		<comment>Default message for PrintCertificateException.</comment>
+	</data>
 	<data name="PrintFailed" xml:space="preserve">
 		<value>A printing operation failed.</value>
 		<comment>Default message for PrintException.</comment>

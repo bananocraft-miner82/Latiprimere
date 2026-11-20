@@ -104,8 +104,8 @@ public sealed class IppNetworkPrintSystemIntegrationTests
 				() => untrusted.Catalog.GetPrinterAsync(printerId, TestContext.Current.CancellationToken)
 			);
 
-			fingerprint = System.Text.RegularExpressions.Regex.Match(refused.Message, "([0-9A-F]{2}:){31}[0-9A-F]{2}").Value;
-			Assert.SkipWhen(fingerprint.Length == 0, $"This ippeveprinter didn't offer TLS: {refused.Message}");
+			fingerprint = (refused as PrintCertificateException)?.CertificateFingerprint;
+			Assert.SkipWhen(fingerprint is null, $"This ippeveprinter didn't offer TLS: {refused.Message}");
 		}
 
 		await using CatalogFixture pinned = new CatalogFixture
@@ -149,6 +149,28 @@ public sealed class IppNetworkPrintSystemIntegrationTests
 
 		// Assert
 		Assert.Equal(PrintJobState.Completed, status.State);
+	}
+
+	[Fact]
+	public async Task GivenPrintedJobWhenLookedUpByIdThenFoundUntilThePrinterForgetsIt()
+	{
+		// Arrange
+		Uri printerUri = IppNetworkPrintSystemIntegrationTests.GetPrinterUri();
+		await using CatalogFixture fixture = IppNetworkPrintSystemIntegrationTests.CreateCatalog(printerUri);
+		string printerId = IppNetworkPrintSystemIntegrationTests.GetPrinterId(printerUri);
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(printerId, TestContext.Current.CancellationToken);
+		using FileStream document = TestDocuments.Open(TestDocuments.ThreePages);
+		IPrintJob submitted = await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Act
+		IPrintJob? found = await printer.GetJobAsync(submitted.Id, TestContext.Current.CancellationToken);
+		IPrintJob? unknown = await printer.GetJobAsync("2147483647", TestContext.Current.CancellationToken);
+
+		// Assert — ippeveprinter keeps finished jobs for a while, as most printers do
+		Assert.NotNull(found);
+		Assert.Equal(submitted.Id, found.Id);
+		Assert.Equal(PrintJobState.Completed, (await PrintJobWaiter.WaitUntilFinishedAsync(found, TestContext.Current.CancellationToken)).State);
+		Assert.Null(unknown);
 	}
 
 	[Fact]
@@ -222,8 +244,8 @@ public sealed class IppNetworkPrintSystemIntegrationTests
 			{
 				Name              = "custom_latiprimere_123x45mm",
 				DisplayName       = "123 × 45 mm",
-				WidthMillimetres  = 123,
-				HeightMillimetres = 45
+				WidthMillimeters  = 123,
+				HeightMillimeters = 45
 			},
 			InputTray = withTray ? capabilities.InputTrays[^1] : null
 		};

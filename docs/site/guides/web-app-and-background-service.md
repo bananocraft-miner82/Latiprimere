@@ -172,10 +172,10 @@ The logging methods are `[LoggerMessage]` methods; the full class, with its cons
 
 ## Things to decide for your app
 
-- **Queued requests are lost on restart.** The queue is in memory. For documents that must not be lost, such as invoices, keep requests in a database or message queue, and remove each one once it's printed.
+- **Queued requests are lost on restart.** The queue is in memory. For documents that must not be lost, such as invoices, keep requests in a database or message queue, and remove each one once it's printed. Jobs already sent aren't lost: store each job's `PrinterId` and `Id`, and after a restart find it with `GetJobAsync` ([Find a job again](/docs/guides/print-options-and-jobs/#find-a-job-again)).
 - **One job at a time.** The worker waits for each job before starting the next, which keeps label and receipt printers in order. To print to several printers at once, run a worker per printer, or follow jobs without waiting.
 - **Stopping the app** stops following jobs, but jobs already sent carry on printing.
-- **Telling the client how it went.** Here the outcome is only logged. To report it, give each request an ID in the `202` response, record each job's final state, and add an endpoint to read it.
+- **Telling the client how it went.** Here the outcome is only logged. To report it, give each request an ID in the `202` response, record each job's IDs and final state, and add an endpoint to read it.
 
 ## Try it
 

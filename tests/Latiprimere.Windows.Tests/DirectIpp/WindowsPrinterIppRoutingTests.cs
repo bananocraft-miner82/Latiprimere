@@ -4,6 +4,7 @@ using Latiprimere.Windows.DirectIpp;
 using Latiprimere.Windows.Spooler;
 using Latiprimere.Windows.Tests.Builders;
 using Latiprimere.Windows.Tests.Fakes;
+using SharpIpp.Protocol.Models;
 using Xunit;
 
 namespace Latiprimere.Windows.Tests.DirectIpp;
@@ -31,7 +32,7 @@ public sealed class WindowsPrinterIppRoutingTests : IDisposable
 	}
 
 	[Fact]
-	public async Task GivenPrinterAcceptingPdfWhenPdfSubmittedThenSendsItOverIppKeepingTheWindowsId()
+	public async Task GivenPrinterAcceptingPdfWhenPdfSubmittedThenSendsItOverIppKeepingTheWindowsPrinterId()
 	{
 		// Arrange
 		this.AddPrinter("application/pdf", "image/urf");
@@ -48,7 +49,7 @@ public sealed class WindowsPrinterIppRoutingTests : IDisposable
 		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
 
 		// Assert — ipp: keys reach a routed job; neither the rasteriser nor GDI is used
-		Assert.Equal("77", job.Id);
+		Assert.Equal("ipp:77", job.Id);
 		Assert.Equal("windows:Office", job.PrinterId);
 		Assert.Equal(WindowsPrinterIppRoutingTests.PrinterUri, this.client.LastPrintJobRequest?.OperationAttributes?.PrinterUri?.Value);
 		Assert.Equal(2, this.client.LastPrintJobRequest?.JobTemplateAttributes?.Copies?.Value);
@@ -69,7 +70,7 @@ public sealed class WindowsPrinterIppRoutingTests : IDisposable
 		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
 
 		// Assert
-		Assert.Equal("77", job.Id);
+		Assert.Equal("ipp:77", job.Id);
 		Assert.NotNull(this.client.LastPrintJobRequest);
 		Assert.Null(this.gdi.LastRequest);
 	}
@@ -126,7 +127,7 @@ public sealed class WindowsPrinterIppRoutingTests : IDisposable
 
 		// Assert
 		Assert.Equal("5", firstJob.Id);
-		Assert.Equal("77", secondJob.Id);
+		Assert.Equal("ipp:77", secondJob.Id);
 	}
 
 	[Theory]
@@ -265,6 +266,72 @@ public sealed class WindowsPrinterIppRoutingTests : IDisposable
 		// Assert
 		Assert.NotNull(spool.LastSubmittedBytes);
 		Assert.Null(this.client.LastPrintJobRequest);
+	}
+
+	[Fact]
+	public async Task GivenJobSentOverIppWhenGetJobThenAsksThePrinterForIt()
+	{
+		// Arrange
+		this.AddPrinter("application/pdf");
+		WindowsPrinter printer = this.CreatePrinter();
+		using MemoryStream document = WindowsPrinterIppRoutingTests.CreatePdf();
+		IPrintJob submitted = await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+		this.client.JobAttributes = new JobDescriptionAttributes { JobState = new IppValue<JobState>(JobState.Processing) };
+
+		// Act
+		IPrintJob? found = await printer.GetJobAsync(submitted.Id, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.NotNull(found);
+		Assert.Equal("ipp:77", found.Id);
+		Assert.Equal("windows:Office", found.PrinterId);
+		Assert.Equal(77, this.client.LastGetJobAttributesRequest?.OperationAttributes?.JobId?.Value);
+		Assert.Equal(WindowsPrinterIppRoutingTests.PrinterUri, this.client.LastGetJobAttributesRequest?.OperationAttributes?.PrinterUri?.Value);
+	}
+
+	[Fact]
+	public async Task GivenRouteOffWhenGetJobSentOverIppThenReturnsNull()
+	{
+		// Arrange
+		this.AddPrinter("application/pdf");
+		WindowsPrinter printer = this.CreatePrinter(withRoute: false);
+
+		// Act
+		IPrintJob? found = await printer.GetJobAsync("ipp:77", TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Null(found);
+		Assert.Null(this.client.LastGetJobAttributesRequest);
+	}
+
+	[Fact]
+	public async Task GivenPrinterUnreachableWhenGetJobSentOverIppThenThrowsRatherThanSayingItIsGone()
+	{
+		// Arrange — the job may still be on the printer, which is switched off
+		this.AddPrinter("application/pdf");
+		this.client.JobFailureToThrow = new PrintException("Could not communicate.", new HttpRequestException(HttpRequestError.ConnectionError, "Gone."));
+		WindowsPrinter printer = this.CreatePrinter();
+
+		// Act
+		Func<Task> getJob = () => printer.GetJobAsync("ipp:77", TestContext.Current.CancellationToken);
+
+		// Assert
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(getJob);
+		Assert.Same(this.client.JobFailureToThrow, exception);
+	}
+
+	[Fact]
+	public async Task GivenQueueWithoutAnIppPrinterWhenGetJobSentOverIppThenReturnsNull()
+	{
+		// Arrange — a local port, with the route on: no job of this queue can have gone over IPP
+		WindowsPrinter printer = this.CreatePrinter(printerName: "Label Printer", portName: "USB001");
+
+		// Act
+		IPrintJob? found = await printer.GetJobAsync("ipp:77", TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Null(found);
+		Assert.Null(this.client.LastGetJobAttributesRequest);
 	}
 
 	/// <summary>

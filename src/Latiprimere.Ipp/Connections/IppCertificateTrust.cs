@@ -153,11 +153,47 @@ internal sealed class IppCertificateTrust
 	/// <returns>Whether to trust it.</returns>
 	internal bool Validate(object sender, string? host, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors errors)
 	{
+		bool isTrusted = this.IsTrusted(sender, host, certificate, chain, errors);
+
+		if (host is null)
+		{
+			return isTrusted;
+		}
+
+		string key = IppCertificateTrust.NormalizeHost(host);
+
+		if (isTrusted)
+		{
+			// A later failure there has another cause, so its message mustn't name a certificate refused before
+			this.refusedByHost.TryRemove(key, out _);
+		}
+		else if (certificate is not null)
+		{
+			this.refusedByHost[key] = new RefusedCertificate
+			{
+				Fingerprint       = IppCertificateTrust.GetFingerprint(certificate),
+				IsTrustedBySystem = errors == SslPolicyErrors.None
+			};
+		}
+
+		return isTrusted;
+	}
+
+	/// <summary>
+	/// Decides whether to trust a printer's certificate: the system's trust where it is enough, then the pins, then
+	/// the application's check.
+	/// </summary>
+	/// <param name="sender">The TLS stream, passed on to the application's check.</param>
+	/// <param name="host">The host connected to, or <see langword="null"/> if not known.</param>
+	/// <param name="certificate">The printer's certificate.</param>
+	/// <param name="chain">Its chain.</param>
+	/// <param name="errors">What the system's check found.</param>
+	/// <returns>Whether to trust it.</returns>
+	private bool IsTrusted(object sender, string? host, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors errors)
+	{
 		// The system's trust proves the certificate names the host, but anyone on the network can announce a printer
 		// at a host of their choosing; so with a shared password, it is enough only for hosts the application named
-		bool isTrustedBySystem = errors == SslPolicyErrors.None;
-
-		if (isTrustedBySystem && this.IsSystemTrustEnough(host))
+		if (errors == SslPolicyErrors.None && this.IsSystemTrustEnough(host))
 		{
 			return true;
 		}
@@ -167,29 +203,15 @@ internal sealed class IppCertificateTrust
 			return false;
 		}
 
+		// Pinned: trusted whatever name it carries, as printers' certificates rarely name the address used
 		string fingerprint = IppCertificateTrust.GetFingerprint(certificate);
 
-		// Pinned: trusted whatever name it carries, as printers' certificates rarely name the address used
 		if (this.pinned.Contains(fingerprint.Replace(":", string.Empty, StringComparison.Ordinal)))
 		{
 			return true;
 		}
 
-		if (this.callback?.Invoke(sender, certificate, chain, errors) == true)
-		{
-			return true;
-		}
-
-		if (host is not null)
-		{
-			this.refusedByHost[IppCertificateTrust.NormalizeHost(host)] = new RefusedCertificate
-			{
-				Fingerprint       = fingerprint,
-				IsTrustedBySystem = isTrustedBySystem
-			};
-		}
-
-		return false;
+		return this.callback?.Invoke(sender, certificate, chain, errors) == true;
 	}
 
 	/// <summary>

@@ -132,7 +132,7 @@ A job goes through the queue's driver as before when any of these is so:
 
 Those last two need a document stream that can seek, such as a file, to start again through the queue: from one that can't, the exception is thrown instead.
 
-Jobs sent over IPP bypass the Windows queue: they don't appear in its queue window, and its pause, permissions, pooling and accounting don't apply to them. Their job IDs are the printer's, `ipp:` vendor options are sent with them, and `MaxRenderDpi` limits the resolution of any raster. An `ipps://` address is trusted only if the computer trusts its certificate: pinned certificates and passwords are for [network printers](/docs/print-systems/secure-printers/) printed to directly.
+Jobs sent over IPP bypass the Windows queue: they don't appear in its queue window, and its pause, permissions, pooling and accounting don't apply to them. Their job IDs are the printer's, after `ipp:`, such as `ipp:42`, which `GetJobAsync` uses to ask the printer rather than the queue; `ipp:` vendor options are sent with them, and `MaxRenderDpi` limits the resolution of any raster. An `ipps://` address is trusted only if the computer trusts its certificate: pinned certificates and passwords are for [network printers](/docs/print-systems/secure-printers/) printed to directly.
 
 ### Printers on print servers
 

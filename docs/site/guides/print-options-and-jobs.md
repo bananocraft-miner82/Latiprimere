@@ -1,6 +1,6 @@
 ---
 title: Print options and following jobs
-description: Choose copies, two-sided printing and orientation, follow a job's progress with a timeout, and cancel it.
+description: Choose copies, two-sided printing and orientation, follow a job's progress with a timeout, cancel it, and find it again after a restart.
 sidebar:
   order: 1
 ---
@@ -88,7 +88,7 @@ static async Task PrintWithOptionsAsync(IPrinter printer, string pdfPath)
 | `Processing` | Being processed or printed                                       |       |
 | `Stopped`    | Stopped part-way, for example because the printer needs attention |      |
 | `Completed`  | Printed                                                          | Yes   |
-| `Cancelled`  | Cancelled                                                        | Yes   |
+| `Canceled`   | Cancelled                                                        | Yes   |
 | `Aborted`    | Ended by the print system because of an error                    | Yes   |
 | `Unknown`    | The print system didn't say                                      |       |
 
@@ -122,7 +122,7 @@ For a single check, call `job.GetStatusAsync()`.
 
 ## Cancel a job
 
-`CancelAsync` asks the print system to cancel the job. It returns `true` if the cancellation was accepted, after which the job reports `Cancelled`, and `false` if the job had already finished. This cancels a job that hasn't finished within a minute:
+`CancelAsync` asks the print system to cancel the job. It returns `true` if the cancellation was accepted, after which the job reports `Canceled`, and `false` if the job had already finished. This cancels a job that hasn't finished within a minute:
 
 ```csharp
 static async Task CancelIfSlowAsync(IPrintJob job)
@@ -148,5 +148,35 @@ static async Task CancelIfSlowAsync(IPrintJob job)
 Pages already sent to the printer may still come out. A print system that can't cancel jobs throws `NotSupportedException`.
 
 The cancellation token you pass to `SubmitAsync` works the same way: it cancels sending the job, but not a job the print system has already accepted. Use `CancelAsync` for that.
+
+## Find a job again
+
+A web service or worker that restarts loses its `IPrintJob` objects, but not its jobs. Store the job's `PrinterId` and `Id` when you submit it, and after a restart look the printer up and ask it for the job with `GetJobAsync`:
+
+```csharp
+static async Task ReportStoredJobAsync(IPrinterCatalog catalog, string printerId, string jobId, CancellationToken cancellationToken)
+{
+	IPrinter printer = await catalog.GetPrinterAsync(printerId, cancellationToken);
+	IPrintJob? job = await printer.GetJobAsync(jobId, cancellationToken);
+
+	if (job is null)
+	{
+		// Print systems forget finished jobs, so it has most likely finished
+		Console.WriteLine("The print system no longer knows the job.");
+
+		return;
+	}
+
+	PrintJobStatus status = await job.GetStatusAsync(cancellationToken);
+	Console.WriteLine(status.State);
+}
+```
+
+The job found can be followed and cancelled like the one `SubmitAsync` returned. `GetJobAsync` returns `null` for a job the print system no longer knows:
+
+- **Windows** removes a job from the queue as soon as it has printed, unless the printer's **Keep printed documents** setting is on.
+- **CUPS** keeps finished jobs for a while, as its `PreserveJobHistory` setting says; a printer printed to directly, until it needs the memory.
+
+So a job that isn't found has most likely finished, but whether it printed can't be told. To know that, follow the job until it ends while your application is running.
 
 The code on this page is in [PrintOptionsAndJobs.cs](https://github.com/bananocraft-miner82/Latiprimere/blob/main/samples/Latiprimere.Examples/PrintOptionsAndJobs.cs).

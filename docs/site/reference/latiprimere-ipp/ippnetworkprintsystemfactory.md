@@ -54,3 +54,23 @@ The print system. It holds an HTTP connection, so dispose it, for example with `
 **Exceptions**
 
 - [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): A fingerprint in [IppNetworkOptions.TrustedCertificateFingerprints](/docs/reference/latiprimere-ipp/ippnetworkoptions/#trustedcertificatefingerprints) isn't 32 bytes in hexadecimal; a credential has no user name, or one containing a colon; or a URI in [IppNetworkOptions.PrinterCredentials](/docs/reference/latiprimere-ipp/ippnetworkoptions/#printercredentials) isn't an absolute ipp or ipps URI.
+
+```csharp
+public static IPrintSystem Create(IPdfRasterizer? pdfRasterizer, IppNetworkOptions? options, ILoggerFactory? loggerFactory)
+```
+
+Creates a print system that prints directly to IPP printers on the network, renders PDFs as raster for printers that can't take PDF, and logs what it carries on without.
+
+**Parameters**
+
+- `pdfRasterizer`: The rasteriser that renders PDFs for printers that don't take PDF, such as `PdfiumRasterizer` from Latiprimere.Rendering.Pdfium; or `null` to refuse PDFs to such printers.
+- `options`: The configuration, or `null` for discovery only.
+- `loggerFactory`: The application's logger factory, or `null` to log nothing. The print system logs under the category `Latiprimere.Ipp`.
+
+**Returns**
+
+The print system. It holds an HTTP connection, so dispose it, for example with `using`, when it is no longer needed.
+
+**Exceptions**
+
+- [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): A fingerprint in [IppNetworkOptions.TrustedCertificateFingerprints](/docs/reference/latiprimere-ipp/ippnetworkoptions/#trustedcertificatefingerprints) isn't 32 bytes in hexadecimal; a credential has no user name, or one containing a colon; or a URI in [IppNetworkOptions.PrinterCredentials](/docs/reference/latiprimere-ipp/ippnetworkoptions/#printercredentials) isn't an absolute ipp or ipps URI.

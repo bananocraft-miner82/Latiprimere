@@ -40,7 +40,7 @@ public sealed class IppPrinterRasterTests
 
 		// Landscape on portrait paper: turned a quarter
 		QuadrantDocument document = Assert.Single(rasterizer.Opened);
-		Assert.All(document.Bands, band => Assert.Equal(RasterRotation.Anticlockwise90, band.Rotation));
+		Assert.All(document.Bands, band => Assert.Equal(RasterRotation.Counterclockwise90, band.Rotation));
 		Assert.True(document.IsDisposed);
 	}
 

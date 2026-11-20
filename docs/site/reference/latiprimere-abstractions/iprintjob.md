@@ -50,7 +50,7 @@ Asks the print system to cancel the job.
 
 **Returns**
 
-`true` if the print system accepted the cancellation; the job then reports [PrintJobState.Cancelled](/docs/reference/latiprimere-abstractions/printjobstate/#values) once it has stopped. `false` if the job had already finished, which can happen between reading its status and asking to cancel it.
+`true` if the print system accepted the cancellation; the job then reports [PrintJobState.Canceled](/docs/reference/latiprimere-abstractions/printjobstate/#values) once it has stopped. `false` if the job had already finished, which can happen between reading its status and asking to cancel it.
 
 **Exceptions**
 

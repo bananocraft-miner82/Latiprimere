@@ -147,7 +147,7 @@ public static class IppLifecycleScenarios
 		bool isCancelled = await job.CancelAsync(context.CancellationToken);
 		context.Check("cancelling it is accepted", isCancelled);
 		PrintJobStatus status = await JobFollower.WaitUntilFinishedAsync(context, job);
-		context.CheckEqual("the job ends Cancelled", PrintJobState.Cancelled, status.State);
+		context.CheckEqual("the job ends Cancelled", PrintJobState.Canceled, status.State);
 
 		bool isCancelledAgain = await job.CancelAsync(context.CancellationToken);
 		await FakePrinters.SaveRequestsAsync(context, fake);

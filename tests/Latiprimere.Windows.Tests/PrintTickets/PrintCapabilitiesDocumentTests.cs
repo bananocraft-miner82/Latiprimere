@@ -168,8 +168,8 @@ public sealed class PrintCapabilitiesDocumentTests
 		VendorOption darkness = Assert.Single(options, option => option.Key == "windows:parameter:ns0000:JobDarkness");
 		Assert.Equal(VendorOptionKind.Number, darkness.Kind);
 		Assert.Equal("Darkness", darkness.DisplayName);
-		Assert.Equal(-5, darkness.MinimumValue);
-		Assert.Equal(5, darkness.MaximumValue);
+		Assert.Equal(-5, darkness.MinValue);
+		Assert.Equal(5, darkness.MaxValue);
 		Assert.Equal("2", darkness.DefaultValue);
 
 		VendorOption password = Assert.Single(options, option => option.Key == "windows:parameter:ns0000:DocumentUserPassword");
@@ -336,7 +336,7 @@ public sealed class PrintCapabilitiesDocumentTests
 		// Arrange — like IPP, a typed option and a vendor option may not both set the same thing
 		PrintCapabilitiesDocument document = PrintCapabilitiesDocumentTests.Parse();
 		Dictionary<string, string> vendorOptions = new Dictionary<string, string> { ["windows:feature:psk:PageMediaSize"] = "psk:ISOA4" };
-		MediaSize a4 = new MediaSize { Name = "iso_a4_210x297mm", DisplayName = "A4", WidthMillimetres = 210, HeightMillimetres = 297 };
+		MediaSize a4 = new MediaSize { Name = "iso_a4_210x297mm", DisplayName = "A4", WidthMillimeters = 210, HeightMillimeters = 297 };
 
 		// Act
 		byte[]? alone = document.CreateTicket(PrintCapabilitiesDocumentTests.Printer, vendorOptions, new PrintOptions());

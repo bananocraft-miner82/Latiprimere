@@ -52,13 +52,13 @@ public sealed record VendorOption
 	/// Gets the smallest value an <see cref="VendorOptionKind.Number"/> option takes, or <see langword="null"/> if
 	/// not reported.
 	/// </summary>
-	public long? MinimumValue { get; init; }
+	public long? MinValue { get; init; }
 
 	/// <summary>
 	/// Gets the largest value an <see cref="VendorOptionKind.Number"/> option takes, or <see langword="null"/> if
 	/// not reported.
 	/// </summary>
-	public long? MaximumValue { get; init; }
+	public long? MaxValue { get; init; }
 
 	/// <summary>
 	/// Gets whether a job can set several of the <see cref="Choices"/> at once, separated by commas, as with IPP

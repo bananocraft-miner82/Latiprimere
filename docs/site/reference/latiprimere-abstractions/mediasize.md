@@ -32,10 +32,10 @@ public required string DisplayName { get; init; }
 
 Gets a name to show people, such as "A4" or "Letter". Comes from the printer driver where it has one.
 
-### HeightMillimetres
+### HeightMillimeters
 
 ```csharp
-public required double HeightMillimetres { get; init; }
+public required double HeightMillimeters { get; init; }
 ```
 
 Gets the height in millimetres, with the paper in portrait.
@@ -48,10 +48,10 @@ public required string Name { get; init; }
 
 Gets the PWG self-describing name, such as `iso_a4_210x297mm`.
 
-### WidthMillimetres
+### WidthMillimeters
 
 ```csharp
-public required double WidthMillimetres { get; init; }
+public required double WidthMillimeters { get; init; }
 ```
 
 Gets the width in millimetres, with the paper in portrait.

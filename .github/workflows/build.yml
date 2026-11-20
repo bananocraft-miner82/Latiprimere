@@ -155,13 +155,13 @@ jobs:
           cat /tmp/latiprimere-test-printers/ippeveprinter.log || true
           sudo tail -n 300 /var/log/cups/error_log || true
 
-  # ADR 0029, decision 6: the end-to-end harness's mDNS discovery scenario, on trial. The test container runs on the
-  # runner's own network, so the Avahi announcement of its ippeveprinter reaches the harness. It can't fail the build
-  # while on trial, and is dropped if it proves flaky. The rest of the harness doesn't run in CI (decision 4).
+  # ADR 0029, decision 6: the end-to-end harness's mDNS discovery scenario. The test container runs on the runner's own
+  # network, so the Avahi announcement of its ippeveprinter reaches the harness. On trial from 2026-11-17, when it
+  # couldn't fail the build; it passed in every run from then to 2026-11-19, so now it can. The rest of the harness
+  # doesn't run in CI (decision 4).
   mdns:
-    name: mDNS discovery (trial, Ubuntu)
+    name: mDNS discovery (Ubuntu)
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Check out

@@ -12,7 +12,7 @@ namespace Latiprimere.Ipp.Tests.Raster;
 /// </summary>
 public sealed class RasterPdfRoundTripTests
 {
-	private static readonly MediaSize A4 = new MediaSize { Name = "iso_a4_210x297mm", DisplayName = "A4", WidthMillimetres = 210, HeightMillimetres = 297 };
+	private static readonly MediaSize A4 = new MediaSize { Name = "iso_a4_210x297mm", DisplayName = "A4", WidthMillimeters = 210, HeightMillimeters = 297 };
 
 	[Theory]
 	[InlineData(TestDocuments.ThreePages, RasterFormat.PwgRaster, RasterColorSpace.Gray8, 150)]

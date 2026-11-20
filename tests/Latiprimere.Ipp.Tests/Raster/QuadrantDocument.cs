@@ -66,7 +66,7 @@ internal sealed class QuadrantDocument : IRasterDocument
 		this.Bands.Add(band);
 
 		// The unturned page's size in pixels
-		bool quarter = band.Rotation is RasterRotation.Clockwise90 or RasterRotation.Anticlockwise90;
+		bool quarter = band.Rotation is RasterRotation.Clockwise90 or RasterRotation.Counterclockwise90;
 		int sourceWidth = quarter ? band.PageHeight : band.PageWidth;
 		int sourceHeight = quarter ? band.PageWidth : band.PageHeight;
 
@@ -79,7 +79,7 @@ internal sealed class QuadrantDocument : IRasterDocument
 				// Where this output pixel comes from on the unturned page
 				(int sx, int sy) = band.Rotation switch
 				{
-					RasterRotation.Anticlockwise90 => (sourceWidth - 1 - y, x),
+					RasterRotation.Counterclockwise90 => (sourceWidth - 1 - y, x),
 					RasterRotation.Clockwise90 => (y, sourceHeight - 1 - x),
 					RasterRotation.Half => (sourceWidth - 1 - x, sourceHeight - 1 - y),
 					_ => (x, y),

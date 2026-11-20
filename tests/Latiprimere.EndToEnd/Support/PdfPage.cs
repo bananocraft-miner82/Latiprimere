@@ -25,7 +25,7 @@ public sealed record PdfPage(PageSize Size, double Ink, double Colour)
 	/// <summary>
 	/// Gets the page's width in millimetres.
 	/// </summary>
-	public double WidthMillimetres
+	public double WidthMillimeters
 	{
 		get
 		{
@@ -36,7 +36,7 @@ public sealed record PdfPage(PageSize Size, double Ink, double Colour)
 	/// <summary>
 	/// Gets the page's height in millimetres.
 	/// </summary>
-	public double HeightMillimetres
+	public double HeightMillimeters
 	{
 		get
 		{
@@ -47,17 +47,17 @@ public sealed record PdfPage(PageSize Size, double Ink, double Colour)
 	/// <summary>
 	/// Says whether the page is a paper size, either way round, within a tolerance.
 	/// </summary>
-	/// <param name="widthMillimetres">The paper's width.</param>
-	/// <param name="heightMillimetres">The paper's height.</param>
-	/// <param name="toleranceMillimetres">How far each side may be out, for rounding in drivers.</param>
+	/// <param name="widthMillimeters">The paper's width.</param>
+	/// <param name="heightMillimeters">The paper's height.</param>
+	/// <param name="toleranceMillimeters">How far each side may be out, for rounding in drivers.</param>
 	/// <returns><see langword="true"/> if it is.</returns>
-	public bool IsPaper(double widthMillimetres, double heightMillimetres, double toleranceMillimetres = 2)
+	public bool IsPaper(double widthMillimeters, double heightMillimeters, double toleranceMillimeters = 2)
 	{
-		double shortSide = Math.Min(this.WidthMillimetres, this.HeightMillimetres);
-		double longSide = Math.Max(this.WidthMillimetres, this.HeightMillimetres);
+		double shortSide = Math.Min(this.WidthMillimeters, this.HeightMillimeters);
+		double longSide = Math.Max(this.WidthMillimeters, this.HeightMillimeters);
 
-		return Math.Abs(shortSide - Math.Min(widthMillimetres, heightMillimetres)) <= toleranceMillimetres
-			&& Math.Abs(longSide - Math.Max(widthMillimetres, heightMillimetres)) <= toleranceMillimetres;
+		return Math.Abs(shortSide - Math.Min(widthMillimeters, heightMillimeters)) <= toleranceMillimeters
+			&& Math.Abs(longSide - Math.Max(widthMillimeters, heightMillimeters)) <= toleranceMillimeters;
 	}
 
 	/// <summary>
@@ -69,7 +69,7 @@ public sealed record PdfPage(PageSize Size, double Ink, double Colour)
 		return string.Create
 		(
 			CultureInfo.InvariantCulture,
-			$"{this.WidthMillimetres:0} x {this.HeightMillimetres:0} mm {(this.IsLandscape ? "landscape" : "portrait")}, ink {this.Ink:P1}, colour {this.Colour:P1}"
+			$"{this.WidthMillimeters:0} x {this.HeightMillimeters:0} mm {(this.IsLandscape ? "landscape" : "portrait")}, ink {this.Ink:P1}, colour {this.Colour:P1}"
 		);
 	}
 }

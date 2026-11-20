@@ -242,8 +242,8 @@ internal sealed class PrintCapabilitiesDocument
 				DisplayName  = PrintCapabilitiesDocument.ReadDisplayName(parameter) ?? PrintCapabilitiesDocument.DescribeName(name),
 				Kind         = isNumber ? VendorOptionKind.Number : VendorOptionKind.Text,
 				DefaultValue = defaultValues.GetValueOrDefault(name) ?? PrintCapabilitiesDocument.ReadProperty(parameter, PrintCapabilitiesDocument.DefaultValueProperty),
-				MinimumValue = isNumber ? PrintCapabilitiesDocument.ParseLong(PrintCapabilitiesDocument.ReadProperty(parameter, PrintCapabilitiesDocument.MinValueProperty)) : null,
-				MaximumValue = isNumber ? PrintCapabilitiesDocument.ParseLong(PrintCapabilitiesDocument.ReadProperty(parameter, PrintCapabilitiesDocument.MaxValueProperty)) : null
+				MinValue = isNumber ? PrintCapabilitiesDocument.ParseLong(PrintCapabilitiesDocument.ReadProperty(parameter, PrintCapabilitiesDocument.MinValueProperty)) : null,
+				MaxValue = isNumber ? PrintCapabilitiesDocument.ParseLong(PrintCapabilitiesDocument.ReadProperty(parameter, PrintCapabilitiesDocument.MaxValueProperty)) : null
 			});
 		}
 

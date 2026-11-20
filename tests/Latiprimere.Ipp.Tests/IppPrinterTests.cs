@@ -57,8 +57,8 @@ public sealed class IppPrinterTests
 			{
 				Name              = "iso_a5_148x210mm",
 				DisplayName       = "A5",
-				WidthMillimetres  = 148,
-				HeightMillimetres = 210
+				WidthMillimeters  = 148,
+				HeightMillimeters = 210
 			},
 			InputTray = new InputTray { Id = "manual", Name = "Manual" }
 		};
@@ -508,9 +508,12 @@ public sealed class IppPrinterTests
 	[Fact]
 	public async Task GivenPrinterBusyThroughoutWhenRetryTimeRunsOutThenThrowsBusyError()
 	{
-		// Arrange
+		// Arrange — a clock that moves 10 ms each time it's read, so the retry time runs out after the same number of
+		// attempts however slow the machine: the waits of 1, 2, 4 and 4 ms each still fit within 50 ms after the first
+		// four attempts, and the wait after the fifth doesn't
 		FakeIppClient client = new FakeIppClient { BusyPrintJobCount = int.MaxValue };
-		IppPrinter printer = IppPrinterTests.CreateRetryingPrinter(client, TimeSpan.FromMilliseconds(50));
+		SteppingTimeProvider clock = new SteppingTimeProvider(TimeSpan.FromMilliseconds(10));
+		IppPrinter printer = IppPrinterTests.CreateRetryingPrinter(client, TimeSpan.FromMilliseconds(50), clock);
 		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
 
 		// Act
@@ -524,7 +527,7 @@ public sealed class IppPrinterTests
 		// Assert
 		PrintException exception = await Assert.ThrowsAsync<PrintException>(submit);
 		Assert.Equal(IppPrinterTests.ServerErrorBusy, exception.NativeErrorCode);
-		Assert.True(client.ReceivedDocuments.Count > 1, "The job was sent only once.");
+		Assert.Equal(5, client.ReceivedDocuments.Count);
 	}
 
 	[Fact]
@@ -572,17 +575,177 @@ public sealed class IppPrinterTests
 		Assert.Empty(client.ReceivedDocuments);
 	}
 
+	[Fact]
+	public async Task GivenJobOnThisQueueWhenGetJobThenAsksForItAndReturnsIt()
+	{
+		// Arrange — CUPS names the queue by its own host and port, which differ from the ones used to reach it
+		FakeIppClient client = new FakeIppClient
+		{
+			JobAttributes = new JobDescriptionAttributes
+			{
+				JobState      = new IppValue<JobState>(JobState.Processing),
+				JobPrinterUri = new IppValue<Uri>(new Uri("ipp://printserver.local:631/printers/Office"))
+			}
+		};
+
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+
+		// Act
+		IPrintJob? job = await printer.GetJobAsync("42", TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.NotNull(job);
+		Assert.Equal("42", job.Id);
+		Assert.Equal("cups:Office", job.PrinterId);
+		GetJobAttributesRequest request = Assert.IsType<GetJobAttributesRequest>(client.LastGetJobAttributesRequest);
+		Assert.Equal(42, request.OperationAttributes?.JobId?.Value);
+		Assert.Equal(IppPrinterTests.PrinterUri, request.OperationAttributes?.PrinterUri?.Value);
+		Assert.Equal("tester", request.OperationAttributes?.RequestingUserName?.Value);
+	}
+
+	[Fact]
+	public async Task GivenJobFoundWhenGetJobThenTheJobReportsItsStatus()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient
+		{
+			JobAttributes = new JobDescriptionAttributes { JobState = new IppValue<JobState>(JobState.Pending) }
+		};
+
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+		IPrintJob? job = await printer.GetJobAsync("7", TestContext.Current.CancellationToken);
+		Assert.NotNull(job);
+
+		// Act
+		PrintJobStatus status = await job.GetStatusAsync(TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(PrintJobState.Pending, status.State);
+		Assert.Equal("7", status.JobId);
+	}
+
+	[Fact]
+	public async Task GivenJobThePrinterNoLongerKnowsWhenGetJobThenReturnsNull()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient
+		{
+			JobFailureToThrow = new PrintException("Not found.") { NativeErrorCode = (int)IppStatusCode.ClientErrorNotFound }
+		};
+
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+
+		// Act
+		IPrintJob? job = await printer.GetJobAsync("42", TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Null(job);
+	}
+
+	[Fact]
+	public async Task GivenJobOnAnotherCupsQueueWhenGetJobThenReturnsNull()
+	{
+		// Arrange — CUPS numbers jobs across its queues, so another queue's job answers too
+		FakeIppClient client = new FakeIppClient
+		{
+			JobAttributes = new JobDescriptionAttributes
+			{
+				JobState      = new IppValue<JobState>(JobState.Pending),
+				JobPrinterUri = new IppValue<Uri>(new Uri("ipp://localhost:631/printers/Warehouse"))
+			}
+		};
+
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+
+		// Act
+		IPrintJob? job = await printer.GetJobAsync("42", TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Null(job);
+	}
+
+	[Fact]
+	public async Task GivenPrinterFailsWhenGetJobThenThrowsItsPrintException()
+	{
+		// Arrange
+		PrintException failure = new PrintException("Internal error.") { NativeErrorCode = (int)IppStatusCode.ServerErrorInternalError };
+		FakeIppClient client = new FakeIppClient { JobFailureToThrow = failure };
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+
+		// Act
+		Func<Task> getJob = () => printer.GetJobAsync("42", TestContext.Current.CancellationToken);
+
+		// Assert
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(getJob);
+		Assert.Same(failure, exception);
+	}
+
+	[Theory]
+	[InlineData("")]
+	[InlineData("abc")]
+	[InlineData("0")]
+	[InlineData("-1")]
+	[InlineData(" 42")]
+	[InlineData("ipp:42")]
+	[InlineData("99999999999")]
+	public async Task GivenIdThePrinterCouldNotHaveGivenWhenGetJobThenReturnsNullWithoutAsking(string jobId)
+	{
+		// Arrange — jobId is not a positive job-id (provided by InlineData above)
+		FakeIppClient client = new FakeIppClient();
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+
+		// Act
+		IPrintJob? job = await printer.GetJobAsync(jobId, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Null(job);
+		Assert.Null(client.LastGetJobAttributesRequest);
+	}
+
+	[Fact]
+	public async Task GivenJobIdPrefixWhenSubmitThenGetJobThenTheIdsCarryItAndFindTheJob()
+	{
+		// Arrange — as for a Windows queue's printer, whose spooler job IDs are numbers too
+		FakeIppClient client = new FakeIppClient
+		{
+			PrintJobId    = 42,
+			JobAttributes = new JobDescriptionAttributes { JobState = new IppValue<JobState>(JobState.Pending) }
+		};
+
+		IppPrintContext context = new IppPrintContextBuilder().WithClient(client).Build();
+		IppPrinter printer = new IppPrinter(context, IppPrinterTests.PrinterUri, new PrinterInfo { Id = "windows:Office", Name = "Office" })
+		{
+			JobIdPrefix = "ipp:"
+		};
+
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+		IPrintJob submitted = await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Act
+		IPrintJob? found = await printer.GetJobAsync(submitted.Id, TestContext.Current.CancellationToken);
+		IPrintJob? unprefixed = await printer.GetJobAsync("42", TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal("ipp:42", submitted.Id);
+		Assert.NotNull(found);
+		Assert.Equal("ipp:42", found.Id);
+		Assert.Equal(42, client.LastGetJobAttributesRequest?.OperationAttributes?.JobId?.Value);
+		Assert.Null(unprefixed);
+	}
+
 	/// <summary>
 	/// Creates a printer that resends jobs turned away as busy, with millisecond waits between attempts.
 	/// </summary>
 	/// <param name="client">The fake IPP client.</param>
 	/// <param name="busyRetryDuration">How long to keep resending.</param>
+	/// <param name="timeProvider">The clock the retries are timed by, or <see langword="null"/> for the system's.</param>
 	/// <returns>The printer.</returns>
-	private static IppPrinter CreateRetryingPrinter(FakeIppClient client, TimeSpan busyRetryDuration)
+	private static IppPrinter CreateRetryingPrinter(FakeIppClient client, TimeSpan busyRetryDuration, TimeProvider? timeProvider = null)
 	{
 		IppPrintContext context = new IppPrintContextBuilder()
 			.WithClient(client)
 			.WithBusyRetryDuration(busyRetryDuration)
+			.WithTimeProvider(timeProvider ?? TimeProvider.System)
 			.Build();
 		PrinterInfo info = new PrinterInfo { Id = "ipp:ipp://printer.local/ipp/print", Name = "Office" };
 

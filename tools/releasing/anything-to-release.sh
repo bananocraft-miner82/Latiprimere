@@ -3,8 +3,9 @@
 # files are exactly the latest release's (docs/releasing.md, ADR 0030).
 #
 # The latest release is the v<version> tag with the highest build number, as next-version.sh counts them. "false" is
-# what merging a post-release pull request's commit, and nothing else, from main into release gives: the release
-# commit's files again, which would only republish the same packages under a new version.
+# what merging a post-release pull request's commits, and nothing else, from main into release gives: the release
+# commit's files again, which would only republish the same packages under a new version. The post-release commit's own
+# changes (post-release.sh) don't count: the package validation baseline, and the compatibility suppressions removed.
 #
 # Usage: sh tools/releasing/anything-to-release.sh [<commit>], from the repository root, with the tags fetched.
 set -eu
@@ -28,8 +29,18 @@ if [ -z "$LATEST_TAG" ]; then
 	exit 0
 fi
 
+# src/Directory.Build.props, without its package validation baseline
+props_without_baseline()
+{
+	git show "$1:src/Directory.Build.props" 2> /dev/null | tr -d '\r' | grep -v '<PackageValidationBaselineVersion>' || true
+}
+
 if [ "$(git rev-parse "$LATEST_TAG^{tree}")" = "$TREE" ]; then
 	echo "$COMMIT has the same files as $LATEST_TAG, the latest release." >&2
+	echo false
+elif git diff --quiet "$LATEST_TAG" "$COMMIT" -- . ':(exclude)src/Directory.Build.props' ':(exclude,glob)src/*/CompatibilitySuppressions.xml' \
+	&& [ "$(props_without_baseline "$LATEST_TAG")" = "$(props_without_baseline "$COMMIT")" ]; then
+	echo "$COMMIT has the files of $LATEST_TAG, the latest release, but for its post-release changes." >&2
 	echo false
 else
 	echo true

@@ -33,3 +33,7 @@ Further rules:
 - One command per OS brings up the virtual printers and runs every scenario this machine can run, with a report to paste into [progress.md](../progress.md).
 - CI time is unchanged until a scheduled run or the mDNS check is added.
 - The scenario library can't use internals, which keeps the later packaged and Native AOT modes possible.
+
+## Outcome of the mDNS trial
+
+Decision 6's trial ran as the `mdns` job in `build.yml` from 2026-11-17. After the CI fixes of that day it passed in every run, 17 in a row up to 2026-11-19, on pushes, pull requests and the 11.0.6-preview release. It isn't flaky, so it stays, and since 2026-11-19 it can fail the build like any other job (P3-9 housekeeping).

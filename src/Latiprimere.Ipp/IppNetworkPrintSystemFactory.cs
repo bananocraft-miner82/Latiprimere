@@ -28,11 +28,11 @@ public static class IppNetworkPrintSystemFactory
 	(
 		"ApiDesign",
 		"RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads",
-		Justification = "Shipped before the overload with a rasteriser, whose parameters are both required so that Create(null) stays unambiguous."
+		Justification = "Shipped before the overload with a rasteriser and a logger factory, whose parameters are all required so that Create(null) stays unambiguous."
 	)]
 	public static IPrintSystem Create(IppNetworkOptions? options = null)
 	{
-		return IppNetworkPrintSystemFactory.Create(options, pdfRasterizer: null, loggerFactory: null);
+		return IppNetworkPrintSystemFactory.Create(pdfRasterizer: null, options, loggerFactory: null);
 	}
 
 	/// <summary>
@@ -53,18 +53,30 @@ public static class IppNetworkPrintSystemFactory
 	/// <see cref="IppNetworkOptions.PrinterCredentials"/> isn't an absolute ipp or ipps URI.</exception>
 	public static IPrintSystem Create(IPdfRasterizer? pdfRasterizer, IppNetworkOptions? options)
 	{
-		return IppNetworkPrintSystemFactory.Create(options, pdfRasterizer, loggerFactory: null);
+		return IppNetworkPrintSystemFactory.Create(pdfRasterizer, options, loggerFactory: null);
 	}
 
 	/// <summary>
-	/// Creates the direct IPP print system, logging through a logger factory when there is one.
+	/// Creates a print system that prints directly to IPP printers on the network, renders PDFs as raster for
+	/// printers that can't take PDF, and logs what it carries on without.
 	/// </summary>
-	/// <param name="options">How to find and reach printers, or <see langword="null"/> for the defaults.</param>
-	/// <param name="pdfRasterizer">The PDF rasteriser for printers that can't take PDF, or <see langword="null"/>.</param>
-	/// <param name="loggerFactory">The application's logger factory, or <see langword="null"/> to log nothing.</param>
-	/// <returns>The print system.</returns>
-	/// <exception cref="ArgumentException">The options' trust or credentials are invalid.</exception>
-	internal static IPrintSystem Create(IppNetworkOptions? options, IPdfRasterizer? pdfRasterizer, ILoggerFactory? loggerFactory)
+	/// <param name="pdfRasterizer">
+	/// The rasteriser that renders PDFs for printers that don't take PDF, such as <c>PdfiumRasterizer</c> from
+	/// Latiprimere.Rendering.Pdfium; or <see langword="null"/> to refuse PDFs to such printers.
+	/// </param>
+	/// <param name="options">The configuration, or <see langword="null"/> for discovery only.</param>
+	/// <param name="loggerFactory">
+	/// The application's logger factory, or <see langword="null"/> to log nothing. The print system logs under the
+	/// category <c>Latiprimere.Ipp</c>.
+	/// </param>
+	/// <returns>
+	/// The print system. It holds an HTTP connection, so dispose it, for example with <c>using</c>, when it
+	/// is no longer needed.
+	/// </returns>
+	/// <exception cref="ArgumentException">A fingerprint in <see cref="IppNetworkOptions.TrustedCertificateFingerprints"/>
+	/// isn't 32 bytes in hexadecimal; a credential has no user name, or one containing a colon; or a URI in
+	/// <see cref="IppNetworkOptions.PrinterCredentials"/> isn't an absolute ipp or ipps URI.</exception>
+	public static IPrintSystem Create(IPdfRasterizer? pdfRasterizer, IppNetworkOptions? options, ILoggerFactory? loggerFactory)
 	{
 		options ??= new IppNetworkOptions();
 
@@ -98,7 +110,7 @@ public static class IppNetworkPrintSystemFactory
 	}
 
 	/// <summary>
-	/// Makes the checks <see cref="Create(IppNetworkOptions?, IPdfRasterizer?, ILoggerFactory?)"/> makes of the
+	/// Makes the checks <see cref="Create(IPdfRasterizer?, IppNetworkOptions?, ILoggerFactory?)"/> makes of the
 	/// options, without creating anything; so dependency injection can report a mistake when it is registered rather
 	/// than when the catalog is first resolved.
 	/// </summary>

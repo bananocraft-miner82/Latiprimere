@@ -25,10 +25,10 @@ public sealed record MediaSize
 	/// <summary>
 	/// Gets the width in millimetres, with the paper in portrait.
 	/// </summary>
-	public required double WidthMillimetres { get; init; }
+	public required double WidthMillimeters { get; init; }
 
 	/// <summary>
 	/// Gets the height in millimetres, with the paper in portrait.
 	/// </summary>
-	public required double HeightMillimetres { get; init; }
+	public required double HeightMillimeters { get; init; }
 }

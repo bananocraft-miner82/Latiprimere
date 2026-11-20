@@ -1,3 +1,4 @@
+using System.Globalization;
 using Latiprimere.Ipp.Mapping;
 using Latiprimere.Ipp.Raster;
 using Latiprimere.Ipp.Resources;
@@ -55,6 +56,12 @@ internal sealed class IppPrinter : IPrinter
 	/// <inheritdoc/>
 	public PrinterInfo Info { get; }
 
+	/// <summary>
+	/// Gets what goes before the IPP <c>job-id</c> in this printer's job IDs: empty, unless the printer is reached
+	/// on behalf of another print system whose own job IDs are numbers too, as a Windows queue's is (ADR 0040).
+	/// </summary>
+	internal string JobIdPrefix { get; init; } = string.Empty;
+
 	/// <inheritdoc/>
 	public async Task<IPrintJob> SubmitAsync(PrintContent content, PrintOptions options, CancellationToken cancellationToken = default)
 	{
@@ -105,7 +112,49 @@ internal sealed class IppPrinter : IPrinter
 			throw new PrintException(message);
 		}
 
-		return new IppPrintJob(this.context, this.printerUri, this.Info.Id, jobNumber);
+		return new IppPrintJob(this.context, this.printerUri, this.Info.Id, jobNumber, this.JobIdPrefix);
+	}
+
+	/// <inheritdoc/>
+	public async Task<IPrintJob?> GetJobAsync(string jobId, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(jobId);
+
+		// An ID this printer couldn't have given is one it doesn't know
+		if (!this.TryParseJobId(jobId, out int jobNumber))
+		{
+			return null;
+		}
+
+		GetJobAttributesRequest request = new GetJobAttributesRequest
+		{
+			OperationAttributes = new GetJobAttributesOperationAttributes
+			{
+				PrinterUri          = new IppValue<Uri>(this.printerUri),
+				JobId               = new IppValue<int>(jobNumber),
+				RequestingUserName  = new StringWithLanguage(this.context.RequestingUserName),
+				RequestedAttributes = new IppValue<string[]>(IppRequestedAttributes.JobLookupAttributes)
+			}
+		};
+
+		GetJobAttributesResponse response;
+
+		try
+		{
+			response = await this.context.Client.GetJobAttributesAsync(request, cancellationToken).ConfigureAwait(false);
+		}
+		catch (PrintException exception) when (exception.NativeErrorCode == (int)IppStatusCode.ClientErrorNotFound)
+		{
+			// Forgotten, or never there
+			return null;
+		}
+
+		if (!this.IsOwnJob(response.JobAttributes))
+		{
+			return null;
+		}
+
+		return new IppPrintJob(this.context, this.printerUri, this.Info.Id, jobNumber, this.JobIdPrefix);
 	}
 
 	/// <inheritdoc/>
@@ -368,5 +417,51 @@ internal sealed class IppPrinter : IPrinter
 			},
 			JobTemplateAttributes = jobAttributes
 		};
+	}
+
+	/// <summary>
+	/// Reads the IPP <c>job-id</c> from one of this printer's job IDs.
+	/// </summary>
+	/// <param name="jobId">The job ID.</param>
+	/// <param name="jobNumber">The <c>job-id</c>, if it is one.</param>
+	/// <returns>Whether it is an ID this printer could have given: its prefix, then a positive whole number.</returns>
+	private bool TryParseJobId(string jobId, out int jobNumber)
+	{
+		jobNumber = 0;
+
+		if (!jobId.StartsWith(this.JobIdPrefix, StringComparison.Ordinal))
+		{
+			return false;
+		}
+
+		return int.TryParse(jobId.AsSpan(this.JobIdPrefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out jobNumber)
+			&& jobNumber > 0;
+	}
+
+	/// <summary>
+	/// Checks that a job found by its ID is on this printer. CUPS numbers jobs across all its queues, so another
+	/// queue's job answers too; a network printer has only its own.
+	/// </summary>
+	/// <param name="attributes">The job's attributes, as the printer answered.</param>
+	/// <returns>
+	/// <see langword="false"/> only for a CUPS queue's job that names another queue; <see langword="true"/> otherwise,
+	/// including when the job doesn't say, as network printers don't always name themselves by the URI they were
+	/// reached at.
+	/// </returns>
+	private bool IsOwnJob(JobDescriptionAttributes? attributes)
+	{
+		string queuePath = this.printerUri.AbsolutePath.TrimEnd('/');
+		bool isCupsQueue = queuePath.StartsWith("/printers/", StringComparison.OrdinalIgnoreCase)
+			|| queuePath.StartsWith("/classes/", StringComparison.OrdinalIgnoreCase);
+
+		Uri? reportedUri = IppValueReader.ReadReference(attributes?.JobPrinterUri);
+
+		if (!isCupsQueue || reportedUri is not { IsAbsoluteUri: true })
+		{
+			return true;
+		}
+
+		// The host and port vary with how CUPS was reached; the queue's path doesn't
+		return string.Equals(reportedUri.AbsolutePath.TrimEnd('/'), queuePath, StringComparison.OrdinalIgnoreCase);
 	}
 }

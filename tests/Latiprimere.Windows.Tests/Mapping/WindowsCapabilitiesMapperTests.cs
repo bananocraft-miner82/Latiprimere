@@ -249,8 +249,8 @@ public sealed class WindowsCapabilitiesMapperTests
 
 		MediaSize label = capabilities.MediaSizes[1];
 		Assert.Equal("Label", label.DisplayName);
-		Assert.Equal(100.0, label.WidthMillimetres);
-		Assert.Equal(200.0, label.HeightMillimetres);
+		Assert.Equal(100.0, label.WidthMillimeters);
+		Assert.Equal(200.0, label.HeightMillimeters);
 	}
 
 	/// <summary>

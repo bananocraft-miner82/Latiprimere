@@ -1,5 +1,7 @@
 using System;
 using System.Net;
+using System.Threading.Tasks;
+using Latiprimere;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LatiprimereExamples;
@@ -29,7 +31,7 @@ internal static class SecurePrinters
 		{
 			options.PrinterUris.Add(new Uri(SecurePrinters.OfficePrinterUri));
 
-			// From the PrintException, checked against the printer's web page
+			// From the PrintCertificateException, checked against the printer's web page
 			options.TrustedCertificateFingerprints.Add(fingerprint);
 
 			// Sent to this printer only, and only over IPPS, never in clear text
@@ -37,5 +39,26 @@ internal static class SecurePrinters
 		});
 
 		return services.BuildServiceProvider();
+	}
+
+	/// <summary>
+	/// Looks a printer up, and if its certificate isn't trusted, shows the fingerprint to check before pinning it.
+	/// </summary>
+	/// <param name="catalog">The catalog.</param>
+	/// <param name="printerId">The printer's ID.</param>
+	/// <returns>The printer, or <see langword="null"/> if its certificate isn't trusted yet.</returns>
+	public static async Task<IPrinter?> FindPrinterAsync(IPrinterCatalog catalog, string printerId)
+	{
+		try
+		{
+			return await catalog.GetPrinterAsync(printerId);
+		}
+		catch (PrintCertificateException exception)
+		{
+			// Show it, to be checked against the printer's own web page, before pinning it
+			Console.WriteLine($"{exception.PrinterUri} presented a certificate with fingerprint {exception.CertificateFingerprint}.");
+
+			return null;
+		}
 	}
 }

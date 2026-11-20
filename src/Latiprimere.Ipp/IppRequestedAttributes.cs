@@ -74,6 +74,9 @@ internal static class IppRequestedAttributes
 	/// <summary>Detail about the job's state.</summary>
 	internal const string JobStateMessage = "job-state-message";
 
+	/// <summary>The URI of the printer or queue a job was submitted to.</summary>
+	internal const string JobPrinterUri = "job-printer-uri";
+
 	/// <summary>The number of impressions (page sides) printed so far.</summary>
 	internal const string JobImpressionsCompleted = "job-impressions-completed";
 
@@ -146,5 +149,15 @@ internal static class IppRequestedAttributes
 		IppRequestedAttributes.JobState,
 		IppRequestedAttributes.JobStateMessage,
 		IppRequestedAttributes.JobImpressionsCompleted
+	};
+
+	/// <summary>
+	/// The job attributes Latiprimere reads to find a job by its ID: whether it exists, and which printer it is on.
+	/// </summary>
+	internal static readonly string[] JobLookupAttributes = new string[]
+	{
+		IppRequestedAttributes.JobId,
+		IppRequestedAttributes.JobState,
+		IppRequestedAttributes.JobPrinterUri
 	};
 }

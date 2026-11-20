@@ -38,7 +38,7 @@ public sealed record PrintJobStatus
 		get
 		{
 			// Completed, cancelled and aborted jobs never change state again
-			return this.State is PrintJobState.Completed or PrintJobState.Cancelled or PrintJobState.Aborted;
+			return this.State is PrintJobState.Completed or PrintJobState.Canceled or PrintJobState.Aborted;
 		}
 	}
 }

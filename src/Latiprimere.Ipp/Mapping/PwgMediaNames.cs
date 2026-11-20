@@ -13,7 +13,7 @@ namespace Latiprimere.Ipp.Mapping;
 internal static partial class PwgMediaNames
 {
 	/// <summary>Millimetres in an inch.</summary>
-	private const decimal MillimetresPerInch = 25.4m;
+	private const decimal MillimetersPerInch = 25.4m;
 
 	/// <summary>The class of names that have no standard size name.</summary>
 	private const string CustomClass = "custom";
@@ -51,14 +51,14 @@ internal static partial class PwgMediaNames
 		decimal width = decimal.Parse(dimensions.Groups["width"].Value, CultureInfo.InvariantCulture);
 		decimal height = decimal.Parse(dimensions.Groups["height"].Value, CultureInfo.InvariantCulture);
 		string unit = dimensions.Groups["unit"].Value;
-		decimal scale = unit == "in" ? PwgMediaNames.MillimetresPerInch : 1m;
+		decimal scale = unit == "in" ? PwgMediaNames.MillimetersPerInch : 1m;
 
 		return new MediaSize
 		{
 			Name              = name,
 			DisplayName       = PwgMediaNames.ToDisplayName(parts[0], sizeName, width, height, unit),
-			WidthMillimetres  = (double)Math.Round(width * scale, 2, MidpointRounding.AwayFromZero),
-			HeightMillimetres = (double)Math.Round(height * scale, 2, MidpointRounding.AwayFromZero)
+			WidthMillimeters  = (double)Math.Round(width * scale, 2, MidpointRounding.AwayFromZero),
+			HeightMillimeters = (double)Math.Round(height * scale, 2, MidpointRounding.AwayFromZero)
 		};
 	}
 

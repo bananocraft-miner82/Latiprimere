@@ -88,9 +88,9 @@ Use it to trust a server's self-signed certificate, by comparing the certificate
 public string? UserName { get; set; }
 ```
 
-Gets or sets the user name sent with requests, which CUPS uses to decide who owns a job. When `null`, the user name of [CupsOptions.Credentials](/docs/reference/latiprimere-cups/cupsoptions/#credentials) is used if set, otherwise the current operating-system user name.
+Gets or sets the user name sent with requests as `requesting-user-name`, which CUPS uses to decide who owns a job. When `null`, the user name of [CupsOptions.Credentials](/docs/reference/latiprimere-cups/cupsoptions/#credentials) is used if set, otherwise the current operating-system user name.
 
-CUPS trusts this name without checking it. Once a request is authenticated, CUPS uses the authenticated user instead.
+It isn't a login: CUPS trusts this name without checking it. For a server that asks for a password, set [CupsOptions.Credentials](/docs/reference/latiprimere-cups/cupsoptions/#credentials); once a request is authenticated, CUPS uses the authenticated user instead.
 
 ## Fields
 

@@ -1,1 +1,2 @@
 #nullable enable
+static Latiprimere.Cups.CupsPrintSystemFactory.Create(Latiprimere.Cups.CupsOptions? options, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory) -> Latiprimere.IPrintSystem!

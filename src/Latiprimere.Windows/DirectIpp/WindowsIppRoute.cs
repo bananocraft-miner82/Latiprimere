@@ -151,6 +151,30 @@ internal sealed class WindowsIppRoute : IDisposable
 	}
 
 	/// <summary>
+	/// Checks whether a queue can have an IPP printer to send to, without searching for it: a URI configured or named
+	/// by its port, or, for a WSD queue, a UUID to search for.
+	/// </summary>
+	/// <param name="printerName">The spooler's name for the queue.</param>
+	/// <param name="portName">The queue's port name, or <see langword="null"/> if not known.</param>
+	/// <param name="spool">The spooler, which records a WSD port's UUID.</param>
+	/// <returns>Whether <see cref="FindTargetAsync"/> could find one.</returns>
+	public bool MayHaveTarget(string printerName, string? portName, IWinSpool spool)
+	{
+		ArgumentNullException.ThrowIfNull(printerName);
+		ArgumentNullException.ThrowIfNull(spool);
+
+		if (this.FindPrinterUri(printerName, portName) is not null)
+		{
+			return true;
+		}
+
+		return this.discovery is not null
+			&& portName is not null
+			&& !printerName.StartsWith(WindowsIppRoute.PrintServerPrefix, StringComparison.Ordinal)
+			&& DnsSdServiceMapper.NormalizeUuid(spool.GetWsdPrinterUuid(portName)) is not null;
+	}
+
+	/// <summary>
 	/// Forgets where the printer with a UUID was found, because it didn't answer there, or another printer did, so
 	/// the next job searches for it again.
 	/// </summary>

@@ -71,12 +71,12 @@ internal sealed class FakePrintJob : IPrintJob
 	/// finished.</returns>
 	public Task<bool> CancelAsync(CancellationToken cancellationToken = default)
 	{
-		bool hasFinished = this.currentState is PrintJobState.Completed or PrintJobState.Cancelled or PrintJobState.Aborted;
+		bool hasFinished = this.currentState is PrintJobState.Completed or PrintJobState.Canceled or PrintJobState.Aborted;
 
 		if (!hasFinished)
 		{
 			this.upcomingStates.Clear();
-			this.currentState = PrintJobState.Cancelled;
+			this.currentState = PrintJobState.Canceled;
 		}
 
 		return Task.FromResult(!hasFinished);

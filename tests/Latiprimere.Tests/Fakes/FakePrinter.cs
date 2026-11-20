@@ -44,6 +44,17 @@ internal sealed class FakePrinter : IPrinter
 	}
 
 	/// <summary>
+	/// Finds no job, as a printer that has forgotten its jobs.
+	/// </summary>
+	/// <param name="jobId">The job's identifier. Not used.</param>
+	/// <param name="cancellationToken">Not used.</param>
+	/// <returns><see langword="null"/>.</returns>
+	public Task<IPrintJob?> GetJobAsync(string jobId, CancellationToken cancellationToken)
+	{
+		return Task.FromResult<IPrintJob?>(null);
+	}
+
+	/// <summary>
 	/// Returns capabilities that report nothing.
 	/// </summary>
 	/// <param name="cancellationToken">Not used.</param>

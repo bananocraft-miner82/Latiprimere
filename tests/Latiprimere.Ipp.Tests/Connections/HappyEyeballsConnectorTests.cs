@@ -178,15 +178,17 @@ public sealed class HappyEyeballsConnectorTests
 	[Fact]
 	public async Task GivenLoserConnectsAfterWinnerWhenConnectThenLoserConnectionIsClosed()
 	{
-		// Arrange — IPv6 opens after IPv4 has won, despite being abandoned
+		// Arrange — IPv6 opens after IPv4 has won, despite being abandoned. It opens when the test releases it rather
+		// than after a delay, which a busy CI runner could stretch past IPv4's start, letting IPv6 win
 		FakeTcpConnector tcp = new FakeTcpConnector()
-			.AnswerAfter(HappyEyeballsConnectorTests.Ipv6First, TimeSpan.FromMilliseconds(300), ignoresCancellation: true)
+			.AnswerWhenReleased(HappyEyeballsConnectorTests.Ipv6First)
 			.AnswerAfter(HappyEyeballsConnectorTests.Ipv4First, TimeSpan.Zero);
 
 		HappyEyeballsConnector connector = HappyEyeballsConnectorTests.CreateConnector(tcp, TimeSpan.FromMilliseconds(50));
 
 		// Act
 		Stream stream = await connector.ConnectAsync(HappyEyeballsConnectorTests.Printer, TestContext.Current.CancellationToken);
+		tcp.Release(HappyEyeballsConnectorTests.Ipv6First);
 
 		// Assert
 		Assert.Equal(HappyEyeballsConnectorTests.Ipv4First, Assert.IsType<FakeConnectionStream>(stream).Address);

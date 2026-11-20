@@ -28,7 +28,7 @@ internal static class VendorOptions
 			string values = option.Kind switch
 			{
 				VendorOptionKind.Choice => string.Join(", ", option.Choices.Select(choice => $"{choice.Value} ({choice.DisplayName})")),
-				VendorOptionKind.Number => $"a number from {option.MinimumValue?.ToString(CultureInfo.CurrentCulture) ?? "any"} to {option.MaximumValue?.ToString(CultureInfo.CurrentCulture) ?? "any"}",
+				VendorOptionKind.Number => $"a number from {option.MinValue?.ToString(CultureInfo.CurrentCulture) ?? "any"} to {option.MaxValue?.ToString(CultureInfo.CurrentCulture) ?? "any"}",
 				_ => "text",
 			};
 

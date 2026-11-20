@@ -32,7 +32,7 @@ public interface IPrintJob
 	/// <param name="cancellationToken">A token to cancel the request.</param>
 	/// <returns>
 	/// <see langword="true"/> if the print system accepted the cancellation; the job then reports
-	/// <see cref="PrintJobState.Cancelled"/> once it has stopped. <see langword="false"/> if the job had already
+	/// <see cref="PrintJobState.Canceled"/> once it has stopped. <see langword="false"/> if the job had already
 	/// finished, which can happen between reading its status and asking to cancel it.
 	/// </returns>
 	/// <exception cref="NotSupportedException">The print system can't cancel jobs.</exception>

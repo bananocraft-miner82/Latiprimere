@@ -235,7 +235,36 @@ public sealed class CupsPrintSystemIntegrationTests
 		// Assert
 		Assert.True(isCancelled);
 		Assert.Equal(PrintJobState.Pending, waitingStatus.State);
-		Assert.Equal(PrintJobState.Cancelled, finalStatus.State);
+		Assert.Equal(PrintJobState.Canceled, finalStatus.State);
+	}
+
+	[Fact]
+	public async Task GivenJobWaitingOnPausedQueueWhenLookedUpAfterARestartThenFoundOnItsQueueOnly()
+	{
+		// Arrange — the job is submitted through one catalog and looked up through another, as after a restart
+		IPrintJob submitted;
+
+		await using (CatalogFixture before = CupsPrintSystemIntegrationTests.CreateCatalog())
+		{
+			IPrinter paused = await CupsPrintSystemIntegrationTests.GetPrinterAsync(before, CupsPrintSystemIntegrationTests.PausedId);
+			using MemoryStream data = new MemoryStream(CupsPrintSystemIntegrationTests.CreateRawData());
+			submitted = await paused.SubmitAsync(PrintContent.FromRaw(data), PrintOptions.Default, TestContext.Current.CancellationToken);
+		}
+
+		await using CatalogFixture fixture = CupsPrintSystemIntegrationTests.CreateCatalog();
+		IPrinter printer = await CupsPrintSystemIntegrationTests.GetPrinterAsync(fixture, CupsPrintSystemIntegrationTests.PausedId);
+		IPrinter otherQueue = await CupsPrintSystemIntegrationTests.GetPrinterAsync(fixture, CupsPrintSystemIntegrationTests.RawId);
+
+		// Act
+		IPrintJob? found = await printer.GetJobAsync(submitted.Id, TestContext.Current.CancellationToken);
+		IPrintJob? onOtherQueue = await otherQueue.GetJobAsync(submitted.Id, TestContext.Current.CancellationToken);
+
+		// Assert — then cancelled through the job found, so the paused queue doesn't fill up
+		Assert.NotNull(found);
+		Assert.Null(onOtherQueue);
+		Assert.Equal(submitted.Id, found.Id);
+		Assert.Equal(PrintJobState.Pending, (await found.GetStatusAsync(TestContext.Current.CancellationToken)).State);
+		Assert.True(await found.CancelAsync(TestContext.Current.CancellationToken));
 	}
 
 	/// <summary>

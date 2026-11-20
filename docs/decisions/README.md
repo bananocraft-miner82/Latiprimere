@@ -45,6 +45,7 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0037](0037-ipps-and-authentication.md) | IPPS and authentication for direct IPP | Accepted |
 | [0038](0038-remembered-addresses.md) | Remembered printer addresses that survive a restart | Accepted |
 | [0039](0039-api-reference.md) | API reference generated into committed pages | Accepted |
+| [0040](0040-api-review-1-0.md) | Public API for 1.0 | Accepted |
 
 ## Template
 

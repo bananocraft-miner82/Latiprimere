@@ -129,11 +129,11 @@ Prove each technical route works by building thin vertical slices of the real pa
 
 - [x] Adapt CONTRIBUTING.md for Latiprimere
 - [x] Review and agree this plan and resolve the open questions
-- [ ] Spike 0: Solution scaffold, standards enforcement, core contracts, CI (done locally; awaiting review and first CI run)
-- [ ] Spike 1: CUPS over IPP (Linux and macOS) (done on Linux; macOS manual test pending)
-- [ ] Spike 2: Windows spooler, raw jobs and job status (built and unit-tested; read-only spooler and AOT checks pass; end-to-end raw/cancel test deferred)
+- [x] Spike 0: Solution scaffold, standards enforcement, core contracts, CI (reviewed with the go/no-go; CI has run on every change since, green on all three runners from 2026-11-17)
+- [ ] Spike 1: CUPS over IPP (Linux and macOS) (done on Linux, and against the macOS runner's own CUPS in CI; the manual test on a real Mac is P3-8)
+- [x] Spike 2: Windows spooler, raw jobs and job status (built and unit-tested; read-only spooler and AOT checks pass; raw jobs, status and cancel end to end in CI since Phase 1, green on 2026-11-17)
 - [x] Spike 3: Windows PDF via PDFium + GDI (100 pages at 600 DPI in 66 s, 225 MiB peak; see ADR 0009)
-- [ ] Spike 4: Direct IPP to a network printer (works against `ippeveprinter` and the HP ENVY over Wi-Fi, with mDNS discovery and Validate-Job; see ADR 0010. Mac discovery pending)
+- [ ] Spike 4: Direct IPP to a network printer (works against `ippeveprinter` and the HP ENVY over Wi-Fi, with mDNS discovery and Validate-Job, and mDNS discovery in CI on Ubuntu; see ADR 0010. Discovery on a real Mac is P3-8)
 - [x] Spike 5: Capability model (one model from Windows, CUPS and direct IPP; see ADR 0011, and ADR 0012 for the escape hatch)
 - [x] Go / no-go review: **Go** (owner, 2026-11-12; see [go-no-go.md](go-no-go.md))
 
@@ -145,7 +145,7 @@ Phase 0 leaves working slices; Phase 1 completes them.
 - [x] Windows adapter: complete discovery, raw jobs, status, cancel, error mapping. Error mapping done 2026-11-13 ([ADR 0019](decisions/0019-windows-error-mapping.md), accepted); raw jobs, status and cancel run end to end in CI, green on 2026-11-17 (owner)
 - [x] Refuse raw data to drivers that drop it silently, starting with Microsoft Print to PDF, which accepts the job and writes an empty file (owner decision 2026-11-13; [ADR 0019](decisions/0019-windows-error-mapping.md))
 - [x] CUPS adapter: complete discovery, raw and PDF jobs, status, cancel, authentication. Authentication done 2026-11-13: user name and password over TLS, and explained refusals ([ADR 0020](decisions/0020-cups-authentication.md), accepted); raw and PDF jobs, status and cancel run end to end against the test container, in CI too, green on 2026-11-17 (owner)
-- [ ] End-to-end test harness: every package together through the public API, run locally or by hand, not in CI ([test-harness-plan.md](test-harness-plan.md), [ADR 0029](decisions/0029-end-to-end-test-harness.md)). H0 to H3 done 2026-11-17: scenario library, xUnit host, console harness with reports, run scripts, a scripted IPP printer, printed-PDF inspection, and 47 scenarios, the docs examples and both samples among them. H4 done 2026-11-17: manual mode for real printers, with attribute capture ([docs/manual-tests](manual-tests/README.md)); every manual check passed on the HP ENVY 5640. H5 built the same day: packaged and Native AOT modes pass locally; the mDNS trial runs in CI, where it may fail without failing the build (`continue-on-error`); whether it has passed there isn't recorded yet
+- [x] End-to-end test harness: every package together through the public API, run locally or by hand, not in CI ([test-harness-plan.md](test-harness-plan.md), [ADR 0029](decisions/0029-end-to-end-test-harness.md)). H0 to H3 done 2026-11-17: scenario library, xUnit host, console harness with reports, run scripts, a scripted IPP printer, printed-PDF inspection, and 47 scenarios, the docs examples and both samples among them. H4 done 2026-11-17: manual mode for real printers, with attribute capture ([docs/manual-tests](manual-tests/README.md)); every manual check passed on the HP ENVY 5640. H5 built the same day: packaged and Native AOT modes pass locally; the mDNS trial passed in every CI run from 2026-11-17 to 2026-11-19, and is now a normal CI job (ADR 0029, "Outcome of the mDNS trial")
 - [x] Integration tests against virtual printers in CI (Windows, Ubuntu, macOS runners). Written 2026-11-13 for Ubuntu (the CUPS container: CUPS queues and direct IPP) and Windows (the spooler test printers and Microsoft Print to PDF); pass locally against the container. First Ubuntu CI run (2026-11-13): the raw-bytes checks failed because the capture backend's files were readable by `lp` only; fixed. macOS added 2026-11-13: the runner's own CUPS gets the Raw, Paused and Virtual-IPP queues and `ippeveprinter` (tools/macos-test-printers). Green on all three runners on 2026-11-17 (owner), after the fix for the CI build failure
 - [x] Connect timeout for IPP requests: 10 s by default, set through `IppNetworkOptions.ConnectTimeout` and `CupsOptions.ConnectTimeout` (done 2026-11-13). Without it, the default `HttpClient` waited about 21 s on Windows for an address with nothing behind it
 - [x] Connect over IPv4 and IPv6 together (Happy Eyeballs, RFC 8305; done 2026-11-13). .NET tried a name's addresses one at a time, so `localhost` on Windows spent about 2 s on IPv6 before reaching a server that listens on IPv4 only; now 250 ms
@@ -168,12 +168,12 @@ Phase 0 leaves working slices; Phase 1 completes them.
 
 Broken into work packages P3-1 to P3-9, with what exists and the decisions taken, in [phase-3-plan.md](phase-3-plan.md) (accepted 2026-11-18).
 
-- [ ] Direct IPP adapter with mDNS discovery (started in Spike 4)
+- [x] Direct IPP adapter with mDNS discovery (started in Spike 4; hardened through Phases 1 to 3 with Happy Eyeballs, busy retries, remembered addresses, raster printing and IPPS; mDNS discovery checked in CI. Discovery on a real Mac is P3-8)
 - [x] Validate-Job before submitting to network printers. Done 2026-11-18 (P3-1, [ADR 0033](decisions/0033-validate-job.md)): on by default for printers that list it, `IppNetworkOptions.ValidateJobs` to turn it off; Windows queues routed to IPP check too. Still to do: a check on the real HP, which was off
 - [ ] Print PDFs to printers that don't accept PDF, by rendering with PDFium to Apple raster (`image/urf`), PCLm or PWG raster. The HP ENVY 5640 is one: over IPP it takes PCL, JPEG, PCLm, Apple raster and octet-stream, but not PDF. Encoders done 2026-11-18 (P3-2, [ADR 0034](decisions/0034-raster-encoders.md)): PWG raster and Apple raster, grey, colour and 1-bit black, with back-side transforms. Printing with them over direct IPP built 2026-11-18 (P3-3, [ADR 0035](decisions/0035-printing-pdfs-as-raster.md)); Windows WSD queues route to such printers too, matched by UUID over mDNS (P3-4, [ADR 0036](decisions/0036-wsd-queues-over-ipp.md)); the checks on the HP's paper remain
 - [ ] IPPS (TLS) and authentication. Built 2026-11-18 (P3-5, [ADR 0037](decisions/0037-ipps-and-authentication.md)): pinned certificates by SHA-256 fingerprint or a callback, credentials sent only over IPPS, and IPPS preferred for discovered printers once trust is configured. Checked over real TLS on the scripted printer; the HP over `ipps://` waits for the manual check
 - [x] Optionally persist the remembered addresses of name IDs, so a printer that stops answering mDNS while asleep is still found after a restart (the HP ENVY did this on 2026-11-12). Done 2026-11-18 (P3-6, [ADR 0038](decisions/0038-remembered-addresses.md)): `IppNetworkOptions.AddressStorePath`
-- [ ] Documentation site and samples (console, ASP.NET Core, worker service)
+- [x] Documentation site and samples (console, ASP.NET Core, worker service). Done 2026-11-19 (P3-7), with the API reference ([ADR 0039](decisions/0039-api-reference.md)), and reviewed again against the 1.0 API (P3-9)
 - [ ] macOS verification on real hardware
 - [ ] `1.0.0` release
 
@@ -186,16 +186,22 @@ Broken into work packages P3-1 to P3-9, with what exists and the decisions taken
 
 ## Risks
 
+Brought up to date 2026-11-19 (P3-9).
+
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Windows PDF path is slower or lower quality than expected | Low | High | Spike 3 passed (ADR 0009); measure real printer drivers in Phase 2; a render-resolution cap is available |
-| macOS behaviour differs from Linux CUPS (sandboxing, socket paths) | Medium | Low | Mac available for manual testing; macOS CI runner |
-| Name confusion with the commercial "Cross Print" cloud-printing product (crossprint.io) | Low | Medium | Renamed to Latiprimere before the first release ([ADR 0016](decisions/0016-rename-to-latiprimere.md)); search the trademark registers and reserve the `Latiprimere.` NuGet ID prefix before the first publish |
-| A `Latiprimere` package ID is claimed by someone else before we publish | Low | Medium | Publish a placeholder preview early in Phase 1 and apply for the prefix reservation |
-| PrintingTools matures and covers the same ground | Medium | Medium | Differentiate on headless/IPP/AOT; consider contributing instead |
-| Printer-specific bugs swamp the issue tracker | High | Medium | Officially support IPP-conformant behaviour only; issue template asks for IPP attribute dumps |
-| SharpIppNext gaps or abandonment | Low | Medium | Keep it behind an internal interface so it can be replaced |
-| PDFium native packaging across RIDs | Medium | Medium | Isolate in an optional package; reuse maintained PDFium binaries |
+| Windows PDF path is slower or lower quality than expected | Low | High | Spike 3 passed (ADR 0009); printed on the HP ENVY 5640 through its own driver, every manual check passing (2026-11-17); `WindowsOptions.MaxRenderDpi` caps the resolution |
+| macOS behaviour differs from Linux CUPS (sandboxing, socket paths) | Low | Low | The macOS runner's own CUPS runs the integration tests in CI, green since 2026-11-17; the checks on a real Mac are P3-8 |
+| Another library or service is confused with Latiprimere | Low | Medium | Renamed from CrossPrint before the first release ([ADR 0016](decisions/0016-rename-to-latiprimere.md)) |
+| Someone else publishes `Latiprimere.*` packages | Low | Medium | The six package IDs are ours since 0.1.0-preview. The `Latiprimere.` prefix isn't reserved yet (the packages aren't shown as verified on nuget.org, 2026-11-19): request it as [releasing.md](releasing.md) says |
+| PrintingTools matures and covers the same ground | Medium | Medium | Differentiate on headless use, direct IPP, raster printing and Native AOT; consider contributing instead |
+| Printer-specific bugs swamp the issue tracker | High | Medium | Officially support IPP-conformant behaviour only; the harness's manual mode captures a printer's IPP attributes for a report ([docs/manual-tests](manual-tests/README.md)) |
+| Only one real printer has been tried | High | Medium | `ippeveprinter` and the scripted printer stand in for IPP Everywhere printers in CI; the HP ENVY 5640 covers PDF over its Windows driver, raster and IPPS. Reports from users with other printers, through manual mode, will widen it |
+| SharpIppNext gaps or abandonment | Low | Medium | Kept behind `IIppClient`; attributes it doesn't model are read from its raw attribute list |
+| Tmds.MDns is pre-1.0 | Low | Low | Small and dependency-free, behind `IIppPrinterDiscovery`; mDNS discovery runs in CI since 2026-11-17 ([ADR 0029](decisions/0029-end-to-end-test-harness.md)) |
+| PDFium native packaging across RIDs | Low | Medium | Isolated in `Latiprimere.Rendering.Pdfium`; shipped since 0.1.0-preview, and published with Native AOT on all three runners in CI |
+| The Windows spooler doesn't record how a job ended | Certain | Medium | Reported as `Completed` with a note, or `Canceled`; PDF jobs to queues routed over IPP report the printer's own outcome ([ADR 0027](decisions/0027-direct-ipp-for-windows-queues.md), [ADR 0036](decisions/0036-wsd-queues-over-ipp.md)) |
+| A design mistake in the API is found after 1.0 | Medium | Medium | The 1.0 review ([ADR 0040](decisions/0040-api-review-1-0.md)); after it, additions only, by the rules in CONTRIBUTING.md, with breaking changes waiting for the next .NET major ([ADR 0030](decisions/0030-release-numbering.md)) |
 
 ## Open questions for review
 

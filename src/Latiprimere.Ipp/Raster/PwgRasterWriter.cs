@@ -86,8 +86,8 @@ internal sealed class PwgRasterWriter : RasterWriter
 		PwgRasterWriter.WriteUInt(span, PwgRasterWriter.ResolutionOffset, (uint)header.Dpi);
 		PwgRasterWriter.WriteUInt(span, PwgRasterWriter.ResolutionOffset + 4, (uint)header.Dpi);
 		PwgRasterWriter.WriteUInt(span, PwgRasterWriter.NumCopiesOffset, 1);
-		PwgRasterWriter.WriteUInt(span, PwgRasterWriter.PageSizeOffset, PwgRasterWriter.ToPoints(header.Media.WidthMillimetres));
-		PwgRasterWriter.WriteUInt(span, PwgRasterWriter.PageSizeOffset + 4, PwgRasterWriter.ToPoints(header.Media.HeightMillimetres));
+		PwgRasterWriter.WriteUInt(span, PwgRasterWriter.PageSizeOffset, PwgRasterWriter.ToPoints(header.Media.WidthMillimeters));
+		PwgRasterWriter.WriteUInt(span, PwgRasterWriter.PageSizeOffset + 4, PwgRasterWriter.ToPoints(header.Media.HeightMillimeters));
 		PwgRasterWriter.WriteUInt(span, PwgRasterWriter.TumbleOffset, header.Duplex && header.Tumble ? 1u : 0u);
 		PwgRasterWriter.WriteUInt(span, PwgRasterWriter.WidthOffset, (uint)header.Width);
 		PwgRasterWriter.WriteUInt(span, PwgRasterWriter.HeightOffset, (uint)header.Height);

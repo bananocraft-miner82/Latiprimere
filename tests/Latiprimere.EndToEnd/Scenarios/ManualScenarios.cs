@@ -221,7 +221,7 @@ public static class ManualScenarios
 
 		if (paper is not null)
 		{
-			await context.AskPersonAsync($"the page is on {paper.DisplayName}", $"Is it printed on {paper.DisplayName} paper ({paper.WidthMillimetres:0} x {paper.HeightMillimetres:0} mm)?");
+			await context.AskPersonAsync($"the page is on {paper.DisplayName}", $"Is it printed on {paper.DisplayName} paper ({paper.WidthMillimeters:0} x {paper.HeightMillimeters:0} mm)?");
 		}
 
 		if (hasMonochrome)

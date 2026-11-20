@@ -52,7 +52,7 @@ public static class LifecycleScenarios
 		bool isCancelled = await job.CancelAsync(context.CancellationToken);
 		context.Check("cancelling it is accepted", isCancelled);
 		IReadOnlyList<PrintJobStatus> changes = await JobFollower.FollowAsync(context, job);
-		context.CheckEqual("the job ends cancelled", PrintJobState.Cancelled, changes[^1].State);
+		context.CheckEqual("the job ends cancelled", PrintJobState.Canceled, changes[^1].State);
 
 		bool isCancelledAgain = await job.CancelAsync(context.CancellationToken);
 		context.Check("cancelling it again reports it had already finished", !isCancelledAgain);

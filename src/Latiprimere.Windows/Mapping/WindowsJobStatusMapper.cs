@@ -47,7 +47,7 @@ internal static class WindowsJobStatusMapper
 			return new PrintJobStatus
 			{
 				JobId        = jobId,
-				State        = isCancelRequested ? PrintJobState.Cancelled : PrintJobState.Completed,
+				State        = isCancelRequested ? PrintJobState.Canceled : PrintJobState.Completed,
 				StateMessage = isCancelRequested ? null : DisplayStrings.JobLeftQueue,
 				Timestamp    = timestamp
 			};
@@ -72,7 +72,7 @@ internal static class WindowsJobStatusMapper
 	{
 		return status switch
 		{
-			_ when (status & WindowsJobStatusMapper.CancelledFlags) != 0  => PrintJobState.Cancelled,
+			_ when (status & WindowsJobStatusMapper.CancelledFlags) != 0  => PrintJobState.Canceled,
 			_ when (status & WindowsJobStatusMapper.CompletedFlags) != 0  => PrintJobState.Completed,
 			_ when (status & JobStatusFlags.Paused) != 0                  => PrintJobState.Held,
 			_ when (status & WindowsJobStatusMapper.StoppedFlags) != 0    => PrintJobState.Stopped,
