@@ -79,8 +79,10 @@ public sealed class PclmRoundTripTests
 
 		Assert.Equal(strips.Count, stripIndex);
 
-		// PDFium smooths images it scales, so its pixels are off by up to 2.6 on average; strips 32 lines out of place
-		// would be off by 5 to 19
+		// PDFium smooths images it scales, so its pixels aren't exact, and by how much differs between its builds: 2.6
+		// levels on average here on Windows, 3.1 on macOS. So the strips' places are checked against a measure of
+		// their own: the rendering must be far closer to the lines where they belong than to the same lines 32 rows
+		// out of place, which here were 5 to 19 levels off
 		using IRasterDocument rendered = new PdfiumRasterizer().Open(new MemoryStream(encoded));
 		Assert.Equal(expected.Pages.Count, rendered.PageCount);
 
@@ -94,7 +96,9 @@ public sealed class PclmRoundTripTests
 			byte[] pixels = new byte[band.ByteCount];
 			rendered.RenderBand(pageIndex, band, pixels);
 
-			Assert.InRange(PclmRoundTripTests.MeanDifference(page, pixels, band.Stride, colorSpace), 0, 3);
+			double inPlace = PclmRoundTripTests.MeanDifference(page, pixels, band.Stride, colorSpace, rowOffset: 0);
+			double outOfPlace = PclmRoundTripTests.MeanDifference(page, pixels, band.Stride, colorSpace, rowOffset: 32);
+			Assert.True(inPlace * 2 < outOfPlace, $"in place {inPlace:0.00}, 32 rows out {outOfPlace:0.00}");
 		}
 	}
 
@@ -169,8 +173,10 @@ public sealed class PclmRoundTripTests
 	/// <param name="pixels">PDFium's rendering of the PCLm page: blue, green, red and alpha.</param>
 	/// <param name="stride">The bytes in each rendered row.</param>
 	/// <param name="colorSpace">The colour space both were encoded in.</param>
+	/// <param name="rowOffset">How many rows down the rendering is compared from, wrapping at the page's foot: 0 for
+	/// where each line belongs.</param>
 	/// <returns>The mean difference of each sample, from 0 to 255.</returns>
-	private static double MeanDifference(RasterPage page, byte[] pixels, int stride, RasterColorSpace colorSpace)
+	private static double MeanDifference(RasterPage page, byte[] pixels, int stride, RasterColorSpace colorSpace, int rowOffset)
 	{
 		long differences = 0;
 
@@ -180,7 +186,7 @@ public sealed class PclmRoundTripTests
 
 			for (int x = 0; x < page.Width; x++)
 			{
-				int source = (y * stride) + (x * RasterBand.BytesPerPixel);
+				int source = (((y + rowOffset) % page.Height) * stride) + (x * RasterBand.BytesPerPixel);
 				(int r, int g, int b) = (pixels[source + 2], pixels[source + 1], pixels[source]);
 
 				// DeviceGray renders as equal red, green and blue
