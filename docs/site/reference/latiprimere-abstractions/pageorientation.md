@@ -14,6 +14,8 @@ public enum PageOrientation
 
 Enumerates the orientations in which pages can be printed.
 
+Later versions may add orientations, as IPP also has reverse portrait and reverse landscape. Treat one you don't know as [PageOrientation.PrinterDefault](/docs/reference/latiprimere-abstractions/pageorientation/#values), as print systems do.
+
 ## Values
 
 - **`PrinterDefault`** (`0`): Use the printer's default setting, or the orientation in the document itself.

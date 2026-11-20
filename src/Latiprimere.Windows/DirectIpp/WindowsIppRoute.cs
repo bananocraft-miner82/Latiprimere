@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Latiprimere.Ipp;
+using Latiprimere.Ipp.Connections;
 using Latiprimere.Ipp.Discovery;
 using Latiprimere.Windows.Resources;
 using Latiprimere.Windows.Spooler;
@@ -23,8 +24,8 @@ internal sealed class WindowsIppRoute : IDisposable
 	private readonly Dictionary<string, Uri> configuredUris; // From WindowsOptions.IppPrinterUris, by queue name
 	private readonly IIppPrinterDiscovery? discovery;        // Finds printers by UUID; null turns matching off
 	private readonly ILogger logger;                         // Where to log a failed search
-	private readonly ConcurrentDictionary<string, Uri> matchedUris =
-		new ConcurrentDictionary<string, Uri>(StringComparer.Ordinal); // Printers found by UUID, by UUID
+	private readonly ConcurrentDictionary<string, DiscoveredIppPrinter> matched =
+		new ConcurrentDictionary<string, DiscoveredIppPrinter>(StringComparer.Ordinal); // Printers found by UUID, by UUID
 	private readonly ConcurrentDictionary<string, DateTimeOffset> unmatchedUntil =
 		new ConcurrentDictionary<string, DateTimeOffset>(StringComparer.Ordinal); // UUIDs not found, until when
 
@@ -76,6 +77,18 @@ internal sealed class WindowsIppRoute : IDisposable
 	/// Gets the IPP client and settings routed jobs use.
 	/// </summary>
 	public IppPrintContext Context { get; }
+
+	/// <summary>
+	/// Gets how the client protects requests: the certificates it trusts and the credentials it sends, and over what
+	/// (ADR 0042). Plain connections without credentials unless set.
+	/// </summary>
+	public IppConnectionSecurity Security { get; init; } = IppConnectionSecurity.None;
+
+	/// <summary>
+	/// Gets a value indicating whether a WSD queue's printer that announces an IPPS address is reached there first, as
+	/// when certificates beyond the system's are trusted (decision D4 of the Phase 3 plan).
+	/// </summary>
+	public bool PrefersIpps { get; init; }
 
 	/// <summary>
 	/// Finds the IPP URI of a queue: configured for its name, or its port's name when that is the printer's URL.
@@ -145,9 +158,17 @@ internal sealed class WindowsIppRoute : IDisposable
 			return null;
 		}
 
-		Uri? matched = await this.FindByUuidAsync(uuid, cancellationToken).ConfigureAwait(false);
+		DiscoveredIppPrinter? found = await this.FindByUuidAsync(uuid, cancellationToken).ConfigureAwait(false);
 
-		return matched is null ? null : new WindowsIppTarget { PrinterUri = matched, Uuid = uuid };
+		if (found is null)
+		{
+			return null;
+		}
+
+		// Over IPPS first when trusted; plain IPP if its encrypted connection can't be opened (ADR 0037)
+		return this.PrefersIpps && found.SecureUri is not null
+			? new WindowsIppTarget { PrinterUri = found.SecureUri, FallbackUri = found.PrinterUri, Uuid = uuid }
+			: new WindowsIppTarget { PrinterUri = found.PrinterUri, Uuid = uuid };
 	}
 
 	/// <summary>
@@ -183,7 +204,7 @@ internal sealed class WindowsIppRoute : IDisposable
 	{
 		ArgumentNullException.ThrowIfNull(uuid);
 
-		this.matchedUris.TryRemove(uuid, out _);
+		this.matched.TryRemove(uuid, out _);
 	}
 
 	/// <summary>
@@ -232,10 +253,10 @@ internal sealed class WindowsIppRoute : IDisposable
 	/// </summary>
 	/// <param name="uuid">The normalised UUID.</param>
 	/// <param name="cancellationToken">A token to cancel the search.</param>
-	/// <returns>Its URI, or <see langword="null"/> if it wasn't found, now or recently.</returns>
-	private async Task<Uri?> FindByUuidAsync(string uuid, CancellationToken cancellationToken)
+	/// <returns>The printer, or <see langword="null"/> if it wasn't found, now or recently.</returns>
+	private async Task<DiscoveredIppPrinter?> FindByUuidAsync(string uuid, CancellationToken cancellationToken)
 	{
-		if (this.matchedUris.TryGetValue(uuid, out Uri? known))
+		if (this.matched.TryGetValue(uuid, out DiscoveredIppPrinter? known))
 		{
 			return known;
 		}
@@ -268,8 +289,8 @@ internal sealed class WindowsIppRoute : IDisposable
 		}
 
 		this.unmatchedUntil.TryRemove(uuid, out _);
-		this.matchedUris[uuid] = found.PrinterUri;
+		this.matched[uuid] = found;
 
-		return found.PrinterUri;
+		return found;
 	}
 }

@@ -52,11 +52,29 @@ public static class ManualPrinting
 					{
 						options.PrinterUris.Add(ippUri);
 					}
+
+					// The person checked these against the printer's web page (ADR 0037)
+					foreach (string fingerprint in context.Targets.ManualCertificateFingerprints)
+					{
+						options.TrustedCertificateFingerprints.Add(fingerprint);
+					}
 				});
 
 				if (OperatingSystem.IsWindows())
 				{
-					services.AddLatiprimerePdfium().AddLatiprimereWindows(configureWindows);
+					services.AddLatiprimerePdfium().AddLatiprimereWindows
+					(
+						options =>
+						{
+							// For a queue sent to its printer over IPPS (ADR 0042)
+							foreach (string fingerprint in context.Targets.ManualCertificateFingerprints)
+							{
+								options.IppTrustedCertificateFingerprints.Add(fingerprint);
+							}
+
+							configureWindows?.Invoke(options);
+						}
+					);
 				}
 			}
 		);

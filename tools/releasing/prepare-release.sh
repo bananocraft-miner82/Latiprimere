@@ -7,7 +7,8 @@
 #   - has packing compare the packages with the previous release, if there was one
 #     (PackageValidationBaselineVersion in src/Directory.Build.props). main already does, after the previous release's
 #     post-release commit (post-release.sh); this sets it for a first release, or if that commit wasn't made;
-#   - updates the version in README.md's status line;
+#   - updates the version in README.md's status line, first checking the line says "preview" for a preview and
+#     "stable" for a stable version, and stopping if not;
 #   - turns the "## Unreleased" heading of CHANGELOG.md into "## <version> - <today>".
 #
 # Usage: sh tools/releasing/prepare-release.sh <version>, for example 11.0.42, from the repository root.
@@ -122,6 +123,11 @@ set_property()
 	endings=$(line_endings "$file")
 	read_file "$file" | sed "s|<$name>[^<]*</$name>|<$name>$value</$name>|" | write_file "$file" "$endings"
 }
+
+# The README's status must match the release, checked before anything changes: a stable release needs the wording
+# switch-to-stable.sh writes, and a preview mustn't be published while the README says stable, as when
+# RELEASE_PREVIEW was left true after the switch (docs/releasing.md, "The first stable release")
+sh "$(dirname "$0")/check-readme-status.sh" "$VERSION"
 
 set_property Directory.Build.props VersionPrefix "$VERSION_PREFIX"
 set_property Directory.Build.props VersionSuffix "$VERSION_SUFFIX"

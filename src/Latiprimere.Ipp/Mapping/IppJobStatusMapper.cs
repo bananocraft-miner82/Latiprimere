@@ -15,13 +15,22 @@ internal static class IppJobStatusMapper
 	/// <param name="jobId">The Latiprimere job identifier.</param>
 	/// <param name="timestamp">The time the status was read.</param>
 	/// <returns>The job status.</returns>
+	/// <remarks>
+	/// The printer's own <c>job-state-message</c> is kept when it gives one. Otherwise the message says what the most
+	/// telling of its <c>job-state-reasons</c> means, as CUPS, which cancels a job its printer refuses, gives no
+	/// message for it.
+	/// </remarks>
 	internal static PrintJobStatus ToPrintJobStatus(JobDescriptionAttributes? attributes, string jobId, DateTimeOffset timestamp)
 	{
+		IReadOnlyList<string> reasons = IppJobStateReasons.Read(attributes);
+		string? message = IppValueReader.ReadString(attributes?.JobStateMessage);
+
 		return new PrintJobStatus
 		{
 			JobId          = jobId,
 			State          = IppJobStatusMapper.ToPrintJobState(IppValueReader.ReadValue(attributes?.JobState)),
-			StateMessage   = IppValueReader.ReadString(attributes?.JobStateMessage),
+			StateMessage   = string.IsNullOrWhiteSpace(message) ? IppJobStateReasons.Explain(reasons) : message,
+			StateReasons   = reasons,
 			PagesCompleted = IppValueReader.ReadValue(attributes?.JobImpressionsCompleted),
 			Timestamp      = timestamp
 		};

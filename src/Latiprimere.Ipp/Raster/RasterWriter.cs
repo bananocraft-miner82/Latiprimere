@@ -32,12 +32,19 @@ internal abstract class RasterWriter
 	/// <summary>
 	/// Creates the writer for a format.
 	/// </summary>
-	/// <param name="format">The format.</param>
+	/// <param name="settings">The settings, with the format, and for PCLm its strips' height and compression.</param>
 	/// <param name="output">Where the document goes.</param>
 	/// <returns>The writer.</returns>
-	internal static RasterWriter Create(RasterFormat format, Stream output)
+	internal static RasterWriter Create(RasterSettings settings, Stream output)
 	{
-		return format == RasterFormat.AppleRaster ? new AppleRasterWriter(output) : new PwgRasterWriter(output);
+		ArgumentNullException.ThrowIfNull(settings);
+
+		return settings.Format switch
+		{
+			RasterFormat.AppleRaster => new AppleRasterWriter(output),
+			RasterFormat.Pclm        => new PclmWriter(output, settings.PclmStripHeight, settings.PclmCompression),
+			_                        => new PwgRasterWriter(output),
+		};
 	}
 
 	/// <summary>
@@ -64,7 +71,7 @@ internal abstract class RasterWriter
 	/// </summary>
 	/// <param name="line">The line, in the page's colour space.</param>
 	/// <param name="repeat">How many consecutive lines are this one, 1 to 256.</param>
-	internal void WriteLine(ReadOnlySpan<byte> line, int repeat)
+	internal virtual void WriteLine(ReadOnlySpan<byte> line, int repeat)
 	{
 		ArgumentOutOfRangeException.ThrowIfNotEqual(line.Length, this.bytesPerLine);
 
@@ -79,7 +86,7 @@ internal abstract class RasterWriter
 	/// <summary>
 	/// Writes what's still buffered, and flushes the stream.
 	/// </summary>
-	internal void Flush()
+	internal virtual void Flush()
 	{
 		this.FlushBuffer();
 		this.output.Flush();

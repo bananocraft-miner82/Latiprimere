@@ -86,6 +86,12 @@ internal static class CapabilitiesCommand
 			capabilities.InputTrays.Select(tray => CliMessages.FormatTrayValue(tray.Name, tray.Id))
 		);
 
+		CapabilitiesCommand.WriteLine
+		(
+			CliMessages.CapabilityFormats,
+			capabilities.DocumentFormats.Select(format => format.ToString())
+		);
+
 		CapabilitiesCommand.WriteVendorOptions(capabilities.VendorOptions);
 
 		return ExitCodes.Success;

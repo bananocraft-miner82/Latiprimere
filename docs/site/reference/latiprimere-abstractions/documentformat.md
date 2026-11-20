@@ -14,7 +14,12 @@ public enum DocumentFormat
 
 Enumerates the document formats that can be submitted to a printer.
 
+Later versions may add formats, each with its own [PrintContent](/docs/reference/latiprimere-abstractions/printcontent/) factory. A print system that doesn't take one throws [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) from [IPrinter.SubmitAsync](/docs/reference/latiprimere-abstractions/iprinter/#submitasync), so code that switches over these values should expect others.
+
 ## Values
 
 - **`Pdf`** (`0`): A PDF document. The print system converts it for the printer where necessary.
 - **`Raw`** (`1`): Raw printer-language data, such as ZPL, ESC/POS or PCL, sent to the printer unchanged.
+- **`Jpeg`** (`2`): A JPEG image, printed on one page as [PrintOptions.Scaling](/docs/reference/latiprimere-abstractions/printoptions/#scaling) says. The print system converts it for the printer where necessary.
+- **`Png`** (`3`): A PNG image, printed on one page as [PrintOptions.Scaling](/docs/reference/latiprimere-abstractions/printoptions/#scaling) says, with any transparency over white. The print system converts it for the printer where necessary.
+- **`Text`** (`4`): Plain text, laid out on pages in a fixed-width font. The print system lays it out, or converts it for the printer.

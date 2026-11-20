@@ -31,9 +31,28 @@ Without dependency injection, pass the same settings to `IppNetworkPrintSystemFa
 
 ## Printers that don't take PDF
 
-Many network printers, most inkjets among them, don't take PDF over IPP. Instead they take page images: PWG raster, which every IPP Everywhere printer takes, or Apple raster, which every AirPrint printer takes. With `AddLatiprimerePdfium()` from Latiprimere.Rendering.Pdfium registered, Latiprimere renders the PDF itself and sends its pages in whichever of the two the printer takes, preferring PWG raster. A printer that takes PDF is always sent the PDF.
+Many network printers, most inkjets among them, don't take PDF over IPP. Instead they take page images: PWG raster, which every IPP Everywhere printer takes; Apple raster, which every AirPrint printer takes; or PCLm, which Mopria printers take. With `AddLatiprimerePdfium()` from Latiprimere.Rendering.Pdfium registered, Latiprimere renders the PDF itself and sends its pages in one of these the printer takes. A printer that takes PDF is always sent the PDF.
 
 Without PDFium, a PDF to such a printer is refused with `NotSupportedException`, saying to add it, before anything is sent. Raw printer data is never rendered.
+
+`RasterFormats` sets which raster formats may be used, in the order they're tried: by default PWG raster, then Apple raster, then PCLm. A printer that takes more than one gets the first. To try PCLm first, or leave a format out:
+
+```csharp
+services.AddLatiprimereIpp(options =>
+{
+	options.RasterFormats.Clear();
+	options.RasterFormats.Add(IppRasterFormat.Pclm);
+	options.RasterFormats.Add(IppRasterFormat.AppleRaster);
+});
+```
+
+With the list empty, PDFs are never rendered: a PDF to a printer that can't take PDF is refused with `NotSupportedException`, naming the raster formats it takes that were left out.
+
+Images go the same way. A JPEG to a printer that takes JPEG, as IPP Everywhere and AirPrint printers are expected to, is sent as it is, with `Scaling` as IPP's `print-scaling`. A PNG, or a JPEG to a printer that doesn't take JPEG, is placed on a page of the job's paper, or the printer's default, as a PDF, which is sent as it is or rendered as raster like any PDF. A printer that takes neither PDF nor a raster format Latiprimere can render for it is refused with `NotSupportedException` before anything is sent.
+
+Text is always laid out by Latiprimere as a PDF on the job's paper, even for a printer that lists `text/plain`, so it looks the same on every printer. It is limited to the Windows-1252 characters Courier shows; text with others is refused with `NotSupportedException` before anything is sent.
+
+PCLm is a PDF holding each page as image strips. Strips are as tall as the printer prefers, and compressed with Flate or run-length encoding, whichever it prefers of the two. Latiprimere doesn't write PCLm's JPEG strips, which would blur text.
 
 The job is printed the way the printer itself would print a PDF:
 
@@ -65,6 +84,22 @@ options.AddressStorePath = Path.Combine(AppContext.BaseDirectory, "printers.json
 - **Used only while it's the same printer:** a remembered address is used only while the printer there still reports the UUID it announced, and the search follows if it doesn't answer.
 - **Never an error:** a missing or damaged file means starting with nothing remembered, and is logged. So does a file a later version of Latiprimere wrote in a newer format, which is then left as it is.
 - **Keep it where only your application can write:** its addresses count as printers found on the network.
+
+### Anyone on the network can announce a printer
+
+Discovery takes printers at their word. Multicast DNS has no way to check who's speaking, so any device on the same network can announce a printer under any name, including a name your real printer uses, or answer a search for it first. A job for a printer found that way goes to whoever announced it, and they can read the document.
+
+Latiprimere guards what it can:
+
+- **A remembered address is used only while the printer there reports the UUID it announced,** which keeps a job from going to another printer that took over the address. A device that pretends to be the printer can report any UUID it likes, so this doesn't stop it.
+- **A printer's IPPS address is used only if it was announced by the same host as its IPP one,** and not with another UUID.
+- **A shared password goes to a printer found on the network only once its certificate is pinned:** see [who gets the shared password](/docs/print-systems/secure-printers/#who-gets-the-shared-password).
+
+None of that stops a device that announces a printer from receiving the jobs sent to it by name. When that matters, as for payslips or medical records:
+
+- **Configure the printer by its `ipps://` address in `PrinterUris`, pin its certificate, and print to it by that address,** as `ipp:ipps://…`. A pinned certificate is the one thing another device can't present. Looked up by name instead, a printer whose IPPS certificate isn't trusted is reached over plain IPP, so pinning protects only the address.
+- **Turn discovery off** with `EnableDiscovery = false` once your printers are configured, so they aren't listed alongside whatever else announces itself. Looking up an `ipp:dnssd:` ID still searches the network, so keep those IDs out of printer IDs you store.
+- **Keep untrusted devices off the network your printers are on,** as for any service found by multicast DNS.
 
 ## Printers by address
 
@@ -110,6 +145,7 @@ To avoid refusals altogether, choose settings from the printer's capabilities: s
 | Setting             | Default        | What it does                                                         |
 | ------------------- | -------------- | -------------------------------------------------------------------- |
 | `ConnectTimeout`    | 10 seconds     | How long to wait for a connection to open. It doesn't limit how long the printer takes to answer. |
+| `UploadStallTimeout` | 5 minutes     | How long a printer may go without taking any more of a job, or without answering once it has been sent it all, before the job fails. A printer that keeps reading, however slowly, is never cut short. `Timeout.InfiniteTimeSpan` waits as long as it takes. |
 | `UserName`          | The OS user    | The user name sent with jobs, which some printers show or log.        |
 | `ValidateJobs`      | `true`         | Whether to ask the printer to check a job's settings before sending the document. |
 | `MaxRenderDpi`      | None           | The highest resolution a PDF is rendered at for a printer that can't take PDF. |

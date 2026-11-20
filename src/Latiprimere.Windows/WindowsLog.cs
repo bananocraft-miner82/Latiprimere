@@ -61,4 +61,46 @@ internal static partial class WindowsLog
 	/// <param name="exception">Why.</param>
 	[LoggerMessage(Level = LogLevel.Information, Message = "The PDF can't be sent as raster to the IPP printer of '{PrinterName}', so the job goes through the queue.")]
 	internal static partial void RasterNotPossible(ILogger logger, string printerName, Exception exception);
+
+	/// <summary>
+	/// Logs that a queue's IPP printer presented a certificate that isn't trusted, so its jobs go through the queue.
+	/// </summary>
+	/// <param name="logger">The logger.</param>
+	/// <param name="printerName">The queue's name.</param>
+	/// <param name="printerUri">The printer's IPPS address.</param>
+	/// <param name="fingerprint">The certificate's SHA-256 fingerprint, to pin.</param>
+	/// <param name="exception">The refusal.</param>
+	[LoggerMessage(Level = LogLevel.Warning, Message = "The IPP printer of '{PrinterName}' at {PrinterUri} presented a certificate that isn't trusted, with SHA-256 fingerprint {Fingerprint}, so the job goes through the queue. If that is the fingerprint the printer's own web page shows, add it to WindowsOptions.IppTrustedCertificateFingerprints to send its PDF jobs over IPPS.")]
+	internal static partial void IppCertificateNotTrusted(ILogger logger, string printerName, Uri printerUri, string fingerprint, Exception exception);
+
+	/// <summary>
+	/// Logs that a queue's IPP printer couldn't be asked about a job, so it goes through the queue.
+	/// </summary>
+	/// <param name="logger">The logger.</param>
+	/// <param name="printerName">The queue's name.</param>
+	/// <param name="printerUri">The printer's address.</param>
+	/// <param name="exception">Why.</param>
+	[LoggerMessage(Level = LogLevel.Information, Message = "The IPP printer of '{PrinterName}' at {PrinterUri} couldn't be reached or refused to say what it takes, so the job goes through the queue.")]
+	internal static partial void IppPrinterUnavailable(ILogger logger, string printerName, Uri printerUri, Exception exception);
+
+	/// <summary>
+	/// Logs that a queue's IPP printer asks for authentication it won't be given, so its jobs go through the queue.
+	/// </summary>
+	/// <param name="logger">The logger.</param>
+	/// <param name="printerName">The queue's name.</param>
+	/// <param name="printerUri">The printer's address.</param>
+	/// <param name="authentication">Its <c>uri-authentication-supported</c> keyword for that address.</param>
+	[LoggerMessage(Level = LogLevel.Information, Message = "The IPP printer of '{PrinterName}' at {PrinterUri} asks for '{Authentication}' authentication, and is sent no password there: WindowsOptions.IppCredentials and IppPrinterCredentials are sent only over IPPS, with HTTP Basic. Its jobs go through the queue.")]
+	internal static partial void IppPrinterNeedsAuthentication(ILogger logger, string printerName, Uri printerUri, string authentication);
+
+	/// <summary>
+	/// Logs that a queue's IPP printer couldn't be reached at its IPPS address, so its plain IPP address is used.
+	/// </summary>
+	/// <param name="logger">The logger.</param>
+	/// <param name="printerName">The queue's name.</param>
+	/// <param name="secureUri">The IPPS address tried first.</param>
+	/// <param name="printerUri">The plain IPP address used instead.</param>
+	/// <param name="exception">Why.</param>
+	[LoggerMessage(Level = LogLevel.Information, Message = "The encrypted connection to the IPP printer of '{PrinterName}' at {SecureUri} couldn't be opened, because its certificate isn't trusted or nothing answered there, so {PrinterUri} is used instead.")]
+	internal static partial void IppSecureAddressUnusable(ILogger logger, string printerName, Uri secureUri, Uri printerUri, Exception exception);
 }

@@ -33,6 +33,99 @@ public sealed class PrintContentTests
 		Assert.Same(stream, content.Content);
 	}
 
+	[Theory]
+	[InlineData(DocumentFormat.Jpeg)]
+	[InlineData(DocumentFormat.Png)]
+	public void GivenReadableStreamWhenFromAnImageThenFormatIsThatImagesAndStreamIsKept(DocumentFormat format)
+	{
+		// Arrange (provided by InlineData above)
+		using MemoryStream stream = new MemoryStream();
+
+		// Act
+		PrintContent content = format == DocumentFormat.Jpeg ? PrintContent.FromJpeg(stream) : PrintContent.FromPng(stream);
+
+		// Assert
+		Assert.Equal(format, content.Format);
+		Assert.Same(stream, content.Content);
+	}
+
+	[Fact]
+	public void GivenUnreadableStreamWhenFromAnImageThenThrowsArgumentException()
+	{
+		// Arrange
+		using WriteOnlyStream stream = new WriteOnlyStream();
+
+		// Act
+		Func<PrintContent> fromJpeg = () => PrintContent.FromJpeg(stream);
+		Func<PrintContent> fromPng = () => PrintContent.FromPng(stream);
+
+		// Assert
+		Assert.Equal("content", Assert.Throws<ArgumentException>(fromJpeg).ParamName);
+		Assert.Equal("content", Assert.Throws<ArgumentException>(fromPng).ParamName);
+	}
+
+	[Fact]
+	public void GivenAStringWhenFromTextThenFormatIsTextAndTheStreamHoldsItInUtf8WithoutAByteOrderMark()
+	{
+		// Arrange
+		string text = "café €5";
+
+		// Act
+		PrintContent content = PrintContent.FromText(text);
+
+		// Assert
+		using MemoryStream read = new MemoryStream();
+		content.Content.CopyTo(read);
+		Assert.Equal(DocumentFormat.Text, content.Format);
+		Assert.Equal(System.Text.Encoding.UTF8.GetBytes(text), read.ToArray());
+		Assert.Equal("utf-8", content.TextEncoding?.WebName);
+	}
+
+	[Fact]
+	public void GivenAStreamAndEncodingWhenFromTextThenBothAreKept()
+	{
+		// Arrange
+		using MemoryStream stream = new MemoryStream();
+
+		// Act
+		PrintContent content = PrintContent.FromText(stream, System.Text.Encoding.Latin1);
+
+		// Assert
+		Assert.Equal(DocumentFormat.Text, content.Format);
+		Assert.Same(stream, content.Content);
+		Assert.Same(System.Text.Encoding.Latin1, content.TextEncoding);
+	}
+
+	[Fact]
+	public void GivenOtherFormatsWhenCreatedThenTheyHaveNoTextEncoding()
+	{
+		// Arrange
+		using MemoryStream stream = new MemoryStream();
+
+		// Act
+		PrintContent pdf = PrintContent.FromPdf(stream);
+		PrintContent raw = PrintContent.FromRaw(stream);
+
+		// Assert
+		Assert.Null(pdf.TextEncoding);
+		Assert.Null(raw.TextEncoding);
+	}
+
+	[Fact]
+	public void GivenNullTextOrEncodingWhenFromTextThenThrowsArgumentNullException()
+	{
+		// Arrange
+		using MemoryStream stream = new MemoryStream();
+
+		// Act
+		Func<PrintContent> withoutText = () => PrintContent.FromText(null!); // Deliberately null to test the guard
+		Func<PrintContent> withoutEncoding = () => PrintContent.FromText(stream, null!); // Likewise
+
+		// Assert
+		Assert.Throws<ArgumentNullException>(withoutText);
+		Assert.Equal("encoding", Assert.Throws<ArgumentNullException>(withoutEncoding).ParamName);
+	}
+
 	[Fact]
 	public void GivenNullStreamWhenFromPdfThenThrowsArgumentNullException()
 	{

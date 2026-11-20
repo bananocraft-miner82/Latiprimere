@@ -17,6 +17,8 @@ public sealed class PrinterAttributesBuilder
 	private IppPrinterState? state = IppPrinterState.Idle;          // printer-state
 	private string[]? documentFormats = null;                      // document-format-supported
 	private string? uuid = null;                                   // printer-uuid
+	private Uri[]? uris = null;                                    // printer-uri-supported
+	private string[]? authentications = null;                      // uri-authentication-supported
 
 	/// <summary>Sets <c>printer-uuid</c>; omitted unless set.</summary>
 	/// <param name="uuid">The UUID, usually as a <c>urn:uuid:</c> URN.</param>
@@ -24,6 +26,20 @@ public sealed class PrinterAttributesBuilder
 	public PrinterAttributesBuilder WithUuid(string uuid)
 	{
 		this.uuid = uuid;
+
+		return this;
+	}
+
+	/// <summary>
+	/// Sets <c>printer-uri-supported</c> and the <c>uri-authentication-supported</c> beside it; omitted unless set.
+	/// </summary>
+	/// <param name="entries">Each address with the authentication it asks for, such as
+	/// <c>("ipp://printer.local/ipp/print", "none")</c>.</param>
+	/// <returns>This builder, for chaining.</returns>
+	public PrinterAttributesBuilder WithUriAuthentication(params (string Uri, string Authentication)[] entries)
+	{
+		this.uris = entries.Select(entry => new Uri(entry.Uri)).ToArray();
+		this.authentications = entries.Select(entry => entry.Authentication).ToArray();
 
 		return this;
 	}
@@ -88,7 +104,14 @@ public sealed class PrinterAttributesBuilder
 				(
 					this.documentFormats.Select(format => new IppDocumentFormat(format)).ToArray()
 				),
-			PrinterUUID = this.uuid is null ? (IppValue<string>?)null : new IppValue<string>(this.uuid)
+			PrinterUUID = this.uuid is null ? (IppValue<string>?)null : new IppValue<string>(this.uuid),
+			PrinterUriSupported = this.uris is null ? (IppValue<Uri[]>?)null : new IppValue<Uri[]>(this.uris),
+			UriAuthenticationSupported = this.authentications is null
+				? (IppValue<UriAuthentication[]>?)null
+				: new IppValue<UriAuthentication[]>
+				(
+					this.authentications.Select(keyword => new UriAuthentication(keyword)).ToArray()
+				)
 		};
 	}
 

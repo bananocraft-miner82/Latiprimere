@@ -40,6 +40,12 @@ internal static class ConsoleOutput
 		{
 			ConsoleOutput.WriteError(CliMessages.NativeErrorCode, exception.NativeErrorCode);
 		}
+
+		// The library's message names IppNetworkOptions; here, the certificate is trusted through the environment
+		if (exception is PrintCertificateException { CertificateFingerprint: { } fingerprint })
+		{
+			ConsoleOutput.WriteError(CliMessages.TrustCertificateHint, Program.IppFingerprintsVariable, fingerprint);
+		}
 	}
 
 	/// <summary>

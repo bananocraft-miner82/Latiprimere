@@ -63,4 +63,17 @@ public sealed class WindowsOptionsTests
 		Assert.Equal(nameof(WindowsOptions.MaxRenderDpi), exception.ParamName);
 		Assert.Equal(300, options.MaxRenderDpi);
 	}
+
+	[Fact]
+	public void GivenNewOptionsWhenReadThenIppRasterFormatsArePwgThenAppleThenPclm()
+	{
+		// Arrange
+		WindowsOptions options = new WindowsOptions();
+
+		// Act
+		IList<Latiprimere.Ipp.IppRasterFormat> formats = options.IppRasterFormats;
+
+		// Assert
+		Assert.Equal([Latiprimere.Ipp.IppRasterFormat.PwgRaster, Latiprimere.Ipp.IppRasterFormat.AppleRaster, Latiprimere.Ipp.IppRasterFormat.Pclm], formats);
+	}
 }

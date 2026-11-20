@@ -110,6 +110,15 @@ jobs:
             exit 1
           fi
 
+      # The release scripts run only when a release is made, and switch-to-stable.sh only once, at 1.0, so they're
+      # checked on every push: ShellCheck, which the Ubuntu runner has, then the stable switch and the README status
+      # check run on scratch copies with LF and CRLF line endings (tools/releasing/test-release-scripts.sh)
+      - name: Check the release scripts
+        if: runner.os == 'Linux'
+        run: |
+          shellcheck tools/releasing/*.sh
+          sh tools/releasing/test-release-scripts.sh
+
       # Native AOT needs the platform's linker: the runners have Visual Studio's C++ tools and Xcode, and Linux needs
       # clang and zlib
       - name: Install Native AOT prerequisites
@@ -117,9 +126,10 @@ jobs:
         run: sudo apt-get install -y --no-install-recommends clang zlib1g-dev
 
       # Publishes the CLI sample and the end-to-end harness with Native AOT for each target, fails on any trimming or
-      # AOT warning, and runs four of the native harness's scenarios against this runner's test printers: listing,
-      # options through CUPS and straight to ippeveprinter, and Microsoft Print to PDF (tools/aot-check/check-aot.sh;
-      # ADR 0029). A scenario whose printers the runner doesn't have is skipped.
+      # AOT warning, and runs some of the native harness's scenarios against this runner's test printers: listing,
+      # options through CUPS and straight to ippeveprinter, Microsoft Print to PDF, and the scripted printer for raster,
+      # vendor options, remembered addresses, a stalled upload, job reasons and a Windows queue over IPPS
+      # (tools/aot-check/check-aot.sh lists them; ADR 0029). A scenario whose printers the runner doesn't have is skipped.
       - name: Check Native AOT
         shell: bash
         run: |

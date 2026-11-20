@@ -73,7 +73,9 @@ In the same tests, the paper size and monochrome came out as chosen.
 
 ### PDFs need PDFium
 
-The Windows spooler doesn't print PDFs itself. `Latiprimere.Rendering.Pdfium` renders each page with PDFium, and Latiprimere draws the pages through the printer's driver. Register it with `AddLatiprimerePdfium()`, or pass `new PdfiumRasterizer()` to `WindowsPrintSystemFactory.Create`. Raw printer data needs no rasteriser.
+CUPS takes JPEG and PNG images as they are, with `Scaling` as IPP's `print-scaling`, and converts them for the printer, as it does PDFs. It lays out text itself too, sent as UTF-8 `text/plain`, with any character its fonts have.
+
+The Windows spooler doesn't print PDFs or images itself. `Latiprimere.Rendering.Pdfium` renders each page with PDFium, and Latiprimere draws the pages through the printer's driver. Register it with `AddLatiprimerePdfium()`, or pass `new PdfiumRasterizer()` to `WindowsPrintSystemFactory.Create`. Raw printer data needs no rasteriser. An image is placed on a page of the job's paper, or the driver's default, as a PDF, and text laid out on such pages in Courier, and both are printed the same way, in their pages' orientation. A text-only driver is refused them, as it is a PDF: send it text as raw data instead.
 
 Because pages are drawn as images, a PDF saved with Microsoft Print to PDF holds images of the pages, not the original text.
 
@@ -100,7 +102,7 @@ This is also a handy way to test printing code without using paper. Only the Win
 
 ### PDFs straight to the printer over IPP
 
-A PDF drawn through a driver reaches the printer as a picture of each page, and the spooler often says a job has finished as soon as it has left the computer. Most network printers' queues stand in front of a printer that also speaks IPP. With `PrintPdfOverIpp` on, a PDF job for such a queue goes straight to that printer instead, as it is or, for a printer that can't take PDF, rendered as PWG or Apple raster. It prints faster, with sharp text, and the job reports how it really ended.
+A PDF drawn through a driver reaches the printer as a picture of each page, and the spooler often says a job has finished as soon as it has left the computer. Most network printers' queues stand in front of a printer that also speaks IPP. With `PrintPdfOverIpp` on, a PDF job for such a queue goes straight to that printer instead, as it is or, for a printer that can't take PDF, rendered as PWG raster, Apple raster or PCLm, tried in the order `IppRasterFormats` lists them. It prints faster, with sharp text, and the job reports how it really ended.
 
 ```csharp
 ServiceCollection services = new ServiceCollection();
@@ -120,19 +122,43 @@ Latiprimere finds a queue's printer in one of three ways:
 
 - **Configured:** the queue's name is in `IppPrinterUris`. Needed for queues on Standard TCP/IP ports, as their port doesn't give the IPP address and Latiprimere doesn't guess it.
 - **Added by URL:** the queue was added with the printer's address, so its port is named after it.
-- **WSD:** the queue is on a WSD port, which Windows sets up for printers it finds itself. Its port records the printer's UUID, and Latiprimere looks on the network, over mDNS, for a printer announcing that UUID, then checks the printer reports the same UUID when asked. The first PDF job listens for up to two seconds; a printer not found isn't looked for again for five minutes.
+- **WSD:** the queue is on a WSD port, which Windows sets up for printers it finds itself. Its port records the printer's UUID, and Latiprimere looks on the network, over mDNS, for a printer announcing that UUID, then checks the printer reports the same UUID when asked. The first PDF job listens for up to two seconds; a printer not found isn't looked for again for five minutes. Any device on the network can announce a UUID, so for documents that must reach the real printer, configure its `ipps://` address in `IppPrinterUris` and pin its certificate (see [Anyone on the network can announce a printer](/docs/print-systems/network-printers/#anyone-on-the-network-can-announce-a-printer)), or leave `PrintPdfOverIpp` off.
 
 A job goes through the queue's driver as before when any of these is so:
 
 - the queue's printer can't be found, or is on a print server;
-- the printer takes neither PDF nor a raster format, or there's no PDF rasteriser for a printer that only takes raster;
+- the printer takes neither PDF nor a raster format in `IppRasterFormats`, or there's no PDF rasteriser for a printer that only takes raster;
 - the job sets `OutputFile`, an `InputTray` or a `windows:` vendor option, which need the driver;
-- the printer can't be reached when the job is sent: the queue holds the job until the printer is back, and the next job looks for the printer again;
+- the printer can't be reached when the job is sent, or its `ipps://` certificate isn't trusted: the queue holds the job until the printer is back, and the next job looks for the printer again;
+- the printer says it asks for a password it won't be sent, or for authentication other than a user name and password: see below;
 - the pages can't be planned as raster for the printer, such as when it reports no paper size.
 
 Those last two need a document stream that can seek, such as a file, to start again through the queue: from one that can't, the exception is thrown instead.
 
-Jobs sent over IPP bypass the Windows queue: they don't appear in its queue window, and its pause, permissions, pooling and accounting don't apply to them. Their job IDs are the printer's, after `ipp:`, such as `ipp:42`, which `GetJobAsync` uses to ask the printer rather than the queue; `ipp:` vendor options are sent with them, and `MaxRenderDpi` limits the resolution of any raster. An `ipps://` address is trusted only if the computer trusts its certificate: pinned certificates and passwords are for [network printers](/docs/print-systems/secure-printers/) printed to directly.
+Jobs sent over IPP bypass the Windows queue: they don't appear in its queue window, and its pause, permissions, pooling and accounting don't apply to them. Their job IDs are the printer's, after `ipp:`, such as `ipp:42`, which `GetJobAsync` uses to ask the printer rather than the queue; `ipp:` vendor options are sent with them, and `MaxRenderDpi` limits the resolution of any raster.
+
+#### Printers over IPPS, with a password
+
+An `ipps://` address in `IppPrinterUris`, or a WSD queue's printer that announces one, is reached over an encrypted connection. Printers nearly always present a certificate they made themselves, which no computer trusts, so pin it, and give the printer its password if it asks for one, as for [network printers](/docs/print-systems/secure-printers/) printed to directly:
+
+```csharp
+services.AddLatiprimereWindows(options =>
+{
+	options.PrintPdfOverIpp = true;
+	options.IppPrinterUris["Finance"] = new Uri("ipps://192.168.20.30:443/ipp/print");
+
+	// The fingerprint the printer's web page shows
+	options.IppTrustedCertificateFingerprints.Add(fingerprint);
+
+	// Sent to this printer only, and only over IPPS, never in clear text
+	options.IppPrinterCredentials[new Uri("ipps://192.168.20.30:443/ipp/print")] = new NetworkCredential("finance", password);
+});
+```
+
+- **Until its certificate is trusted,** the queue's jobs go through its driver, and the fingerprint is logged as a warning, naming `IppTrustedCertificateFingerprints`. Check it against the printer's web page before adding it. `IppServerCertificateValidationCallback` is there for any other rule.
+- **Passwords** in `IppCredentials`, for every printer, or `IppPrinterCredentials`, for one, go only over IPPS, as HTTP Basic authentication, never in clear text. With `IppCredentials` set, a WSD queue's printer must have its certificate pinned before it gets the password, as anyone on the network could announce a printer with the queue's UUID.
+- **Once a certificate is pinned** or the callback is set, a WSD queue's printer that announces an IPPS address as well is reached there first, and over plain IPP if its certificate isn't trusted.
+- **A printer says what it asks for** at each of its addresses. One that asks for a password it won't be sent, as at a plain `ipp://` address, or for authentication other than a user name and password, has its jobs printed through the driver instead, without being sent any, and that's logged.
 
 ### Printers on print servers
 

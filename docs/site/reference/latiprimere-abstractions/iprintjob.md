@@ -76,3 +76,29 @@ The job's current status.
 **Exceptions**
 
 - [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system failed to report the job's status.
+
+### WatchStatusAsync
+
+```csharp
+IAsyncEnumerable<PrintJobStatus> WatchStatusAsync(TimeSpan pollInterval, CancellationToken cancellationToken = default)
+```
+
+Follows the job until it reaches a final state, reporting each change of its status as it happens.
+
+The Windows spooler signals each change to its queue, so a job there is read when one comes, rather than every `pollInterval`, and at least every 30 seconds in case a change goes unsignalled. CUPS and network printers are read every `pollInterval`.
+
+Arguments are checked when enumeration starts. A job whose state the print system doesn't report is [PrintJobState.Unknown](/docs/reference/latiprimere-abstractions/printjobstate/#values), which isn't final, so following it goes on until `cancellationToken` is cancelled: pass one with a timeout when that matters. The default implementation reads [IPrintJob.GetStatusAsync](/docs/reference/latiprimere-abstractions/iprintjob/#getstatusasync) every `pollInterval`.
+
+**Parameters**
+
+- `pollInterval`: How long to wait between reads of the status when the print system can't say when it changes, so it is polled (see the remarks).
+- `cancellationToken`: A token to stop following the job. This doesn't cancel the job itself.
+
+**Returns**
+
+Each distinct status the job reports, ending with its final status (completed, canceled or aborted). A status is reported again only when its state, message, reasons or page count change, never twice the same.
+
+**Exceptions**
+
+- [ArgumentOutOfRangeException](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception): `pollInterval` is zero or negative, which would ask the print system for the status again and again without pause.
+- [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system failed to report the job's status.

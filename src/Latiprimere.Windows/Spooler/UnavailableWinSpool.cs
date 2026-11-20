@@ -90,8 +90,15 @@ internal sealed class UnavailableWinSpool : IWinSpool
 		return null;
 	}
 
+	/// <inheritdoc/>
+	/// <remarks>Always <see langword="null"/>: there is no spooler to signal changes.</remarks>
+	public IWindowsChangeNotification? OpenChangeNotification(string printerName, WindowsChanges changes)
+	{
+		return null;
+	}
+
 	/// <summary>
-	/// Creates the exception thrown by every member.
+	/// Creates the exception thrown by every member but this and <see cref="GetWsdPrinterUuid"/>.
 	/// </summary>
 	/// <returns>The exception.</returns>
 	private static PlatformNotSupportedException CreateException()

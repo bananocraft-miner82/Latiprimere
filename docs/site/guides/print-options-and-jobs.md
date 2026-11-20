@@ -17,6 +17,7 @@ sidebar:
 | `Orientation` | `Portrait` or `Landscape`                                  | `PrinterDefault`               |
 | `MediaSize`   | One of the printer's paper sizes                           | `null`: the printer's default  |
 | `ColorMode`   | `Color` or `Monochrome`                                    | `PrinterDefault`               |
+| `Scaling`     | `Fit`, `Fill` or `None`, for images                        | `PrinterDefault`               |
 | `InputTray`   | One of the printer's trays                                 | `null`: the printer's default  |
 | `OutputFile`  | A file to print to instead of the printer (Windows only)   | `null`: print normally         |
 | `VendorOptions` | Anything else the printer offers, by key: see below      | Empty                          |
@@ -26,6 +27,20 @@ For two-sided printing, `LongEdge` turns pages like a book, and `ShortEdge` flip
 :::note[Orientation and PDFs on CUPS]
 CUPS may not turn a PDF's pages for `Landscape`: in testing with CUPS 2.4, a portrait PDF stayed portrait. To print landscape through CUPS, make the PDF's pages landscape. On Windows, `Landscape` turns the page and scales the content to fit across it. Network printers are sent the setting as IPP's `orientation-requested`, and what a printer does with it for a PDF is up to the printer. See [CUPS servers and the Windows spooler](/docs/print-systems/cups-and-windows/#pdfs-keep-their-own-orientation).
 :::
+
+`Scaling` sizes an image on the paper. `Fit` fills the paper within 5 mm margins. `Fill` covers it, cutting off what overhangs. `None` prints the image at its own size, from the resolution it gives, or 96 dpi if it gives none. `PrinterDefault` shrinks an image larger than the paper and leaves a smaller one at its own size. An image is turned as its EXIF orientation says, and printed landscape when it is wider than tall, unless you set `Orientation`. A PNG's transparent parts print as the paper's white.
+
+```csharp
+using FileStream photo = File.OpenRead("photo.jpg");
+
+IPrintJob job = await printer.SubmitAsync(PrintContent.FromJpeg(photo), new PrintOptions { Scaling = ScalingMode.Fit });
+```
+
+Text, from `PrintContent.FromText`, is set in Courier at 10 points within half-inch margins, on portrait pages unless you set `Orientation` to `Landscape`. Long lines wrap at a space, tabs stop every 8 columns, and a form feed starts a new page. CUPS lays text out its own way.
+
+```csharp
+IPrintJob job = await printer.SubmitAsync(PrintContent.FromText("Order 1042\nTotal\t€42.50"), PrintOptions.Default);
+```
 
 Setting `Copies` below 1 throws `ArgumentOutOfRangeException`. A printer that doesn't support a setting may ignore it or reject the job, depending on the print system: [Reading printer capabilities](/docs/guides/printer-capabilities/) shows how to check first.
 
@@ -79,7 +94,7 @@ static async Task PrintWithOptionsAsync(IPrinter printer, string pdfPath)
 
 ## Job states
 
-`WatchStatusAsync` checks the job's status every half second and reports it each time its state, message or page count changes. It ends after the first final state.
+`WatchStatusAsync` reports the job's status each time its state, message, reasons or page count changes, never twice the same. It ends after the first final state. The Windows spooler signals each change, so a Windows job is reported as it changes; CUPS and network printers are asked every half second, or at the interval you give.
 
 | State        | Meaning                                                          | Final |
 | ------------ | ---------------------------------------------------------------- | ----- |
@@ -94,7 +109,8 @@ static async Task PrintWithOptionsAsync(IPrinter printer, string pdfPath)
 
 Each `PrintJobStatus` also has:
 
-- **`StateMessage`:** the print system's own explanation, such as "Media empty", when it gives one;
+- **`StateMessage`:** the print system's own explanation, such as "Media empty", when it gives one. For a network printer or a CUPS queue that gives none, Latiprimere explains its reason instead, when it knows it: "The job was cancelled at the printer.", or "The printer can't print the job with the options chosen.";
+- **`StateReasons`:** why the job is in its state, as IPP `job-state-reasons` keywords such as `job-canceled-at-device`, `aborted-by-system` or `printer-stopped`, for code to act on. Network printers and CUPS give them; the Windows spooler doesn't, except for jobs it sends to a queue's IPP printer, so the list is empty there;
 - **`PagesCompleted`:** pages printed so far, or `null` if the print system doesn't count them;
 - **`IsTerminal`:** whether the state is final.
 

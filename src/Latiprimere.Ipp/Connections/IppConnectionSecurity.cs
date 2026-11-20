@@ -54,6 +54,52 @@ internal sealed record IppConnectionSecurity
 	}
 
 	/// <summary>
+	/// Creates the security direct IPP uses for printers (ADR 0037): certificates checked by the trust, credentials
+	/// for all printers or for particular ones, sent only over TLS. Used for printers printed to directly, and for
+	/// Windows queues sent to their IPP printers.
+	/// </summary>
+	/// <param name="credentials">The credentials for every printer, or <see langword="null"/>.</param>
+	/// <param name="printerCredentials">Credentials for particular printers, by printer URI, already checked with
+	/// <see cref="IsPrinterCredentialsUri"/> and <see cref="BasicAuthentication.ValidateCredentials"/>.</param>
+	/// <param name="trust">The check of printers' certificates.</param>
+	/// <returns>The security.</returns>
+	public static IppConnectionSecurity CreateForPrinters
+	(
+		NetworkCredential?                                credentials,
+		IEnumerable<KeyValuePair<Uri, NetworkCredential>> printerCredentials,
+		IppCertificateTrust                               trust
+	)
+	{
+		ArgumentNullException.ThrowIfNull(printerCredentials);
+		ArgumentNullException.ThrowIfNull(trust);
+
+		Dictionary<string, NetworkCredential> byHostPort = new Dictionary<string, NetworkCredential>(StringComparer.Ordinal);
+
+		foreach (KeyValuePair<Uri, NetworkCredential> printer in printerCredentials)
+		{
+			byHostPort[IppConnectionSecurity.ToHostPort(printer.Key)] = printer.Value;
+		}
+
+		return new IppConnectionSecurity
+		{
+			Credentials                         = credentials,
+			PrinterCredentials                  = byHostPort,
+			SendsCredentialsOnlyOverTls         = true,
+			ServerCertificateValidationCallback = trust.Validate
+		};
+	}
+
+	/// <summary>
+	/// Checks a key of a printer credentials dictionary is an absolute <c>ipp</c> or <c>ipps</c> URI.
+	/// </summary>
+	/// <param name="uri">The key.</param>
+	/// <returns>Whether it is.</returns>
+	public static bool IsPrinterCredentialsUri(Uri? uri)
+	{
+		return uri is { IsAbsoluteUri: true, Scheme: "ipp" or "ipps" };
+	}
+
+	/// <summary>
 	/// Makes the key of <see cref="PrinterCredentials"/> for a URI: its host, without IPv6 brackets, and port, in
 	/// lower case. An <c>ipp</c> or <c>ipps</c> URI without a port has IPP's 631.
 	/// </summary>

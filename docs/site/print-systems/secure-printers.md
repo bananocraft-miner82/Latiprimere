@@ -74,6 +74,7 @@ A certificate the computer already trusts, such as one your organisation's certi
 - **A printer's own credentials win** over `Credentials`. They're matched by the host and port in the URI, so give them the address the printer is reached at.
 - **A user name** must be set, and can't contain a colon, which HTTP Basic uses to separate it from the password. A bad one throws `ArgumentException` when `AddLatiprimereIpp` is called. The domain of a `NetworkCredential` isn't used.
 - **A password that's refused** throws a `PrintAuthenticationException` saying the printer refused it.
+- **A printer that asks for a password** it isn't sent is refused with a `PrintAuthenticationException`. If the printer lists an `ipps://` address of its own, the message gives it, at the host you reached it by; if it asks for authentication Latiprimere can't give, such as a client certificate, the message says so.
 
 ### Who gets the shared password
 
@@ -85,13 +86,15 @@ If you pin several printers but have a password for only one, give it in `Printe
 
 Once a certificate is pinned or the callback is set, a printer found on the network that announces both an IPP and an IPPS address is reached over IPPS. If its certificate isn't trusted, or nothing answers at its IPPS address, it's reached over plain IPP instead, without any password, and that's logged at Information. With neither set, printers found on the network are reached over plain IPP, as when IPPS wasn't supported. An IPPS address is only taken from an announcement by the same host as the printer's IPP one.
 
+That fallback means a pinned certificate protects a printer only at the address you configured: a device that announces the printer's name gets its jobs over plain IPP, by name. For documents that must reach the real printer, print to its `ipps://` address. See [Anyone on the network can announce a printer](/docs/print-systems/network-printers/#anyone-on-the-network-can-announce-a-printer).
+
 ### Hosts are compared as written
 
 A printer found on the network is reached at the IPv4 address it announces, such as `192.168.20.15`, not at a name such as `hp-envy.local`. Configure it in `PrinterUris` and `PrinterCredentials` with that same address. One configured by name isn't matched when it's looked up by its `ipp:dnssd:` ID, so it doesn't get its own credentials, and with `Credentials` set its certificate must be pinned. To use a name, look the printer up by the URI you configured instead.
 
 ## Not covered here
 
-- **Windows queues** whose PDFs go straight to their printer over IPP trust an `ipps://` address only if the computer trusts its certificate, and send no password. See [PDFs straight to the printer over IPP](/docs/print-systems/cups-and-windows/#pdfs-straight-to-the-printer-over-ipp).
+- **Windows queues** whose PDFs go straight to their printer over IPP take the same settings in `WindowsOptions`: `IppTrustedCertificateFingerprints`, `IppServerCertificateValidationCallback`, `IppCredentials` and `IppPrinterCredentials`. See [Printers over IPPS, with a password](/docs/print-systems/cups-and-windows/#printers-over-ipps-with-a-password).
 - **Trust on first use,** pinning whatever certificate a printer presents the first time, isn't offered: it would trust whatever answered first.
 
 The code on this page is in [SecurePrinters.cs](https://github.com/bananocraft-miner82/Latiprimere/blob/main/samples/Latiprimere.Examples/SecurePrinters.cs).

@@ -173,6 +173,107 @@ public sealed class SharpIppClientAdapterTests
 		Assert.Contains("did not answer in time", exception.Message, StringComparison.Ordinal);
 	}
 
+	[Theory]
+	[InlineData(null, "Printer cannot print with supplied options.", "Printer cannot print with supplied options.")]
+	[InlineData("Paper jam", "Printer cannot print with supplied options.", "Paper jam")]
+	[InlineData(null, null, null)]
+	public async Task GivenJobAttributesWhenGetJobAttributesThenCupsPrinterStateMessageStandsInForAMissingStateMessage
+	(
+		string? stateMessage,
+		string? printerStateMessage,
+		string? expected
+	)
+	{
+		// Arrange — CUPS cancels a job its printer refuses with no job-state-message, saying why in its
+		// job-printer-state-message; a printer's own job-state-message wins (provided by InlineData above)
+		byte[] answer = SharpIppClientAdapterTests.CreateJobAttributesResponse(stateMessage, printerStateMessage);
+		StubHttpMessageHandler stub = new StubHttpMessageHandler(HttpStatusCode.OK, "application/ipp", answer);
+		using SharpIppClientAdapter client = new SharpIppClientAdapter(new HttpClient(stub, disposeHandler: true));
+
+		GetJobAttributesRequest request = new GetJobAttributesRequest
+		{
+			OperationAttributes = new GetJobAttributesOperationAttributes
+			{
+				PrinterUri          = new IppValue<Uri>(SharpIppClientAdapterTests.PrinterUri),
+				JobId               = new IppValue<int>(2),
+				RequestingUserName  = new StringWithLanguage("ann"),
+				RequestedAttributes = new IppValue<string[]>(IppRequestedAttributes.JobStatusAttributes)
+			}
+		};
+
+		// Act
+		GetJobAttributesResponse response = await client.GetJobAttributesAsync(request, TestContext.Current.CancellationToken);
+
+		// Assert — the rest is read as SharpIppNext reads it, and job-printer-state-message is asked for
+		Assert.Equal(expected, response.JobAttributes?.JobStateMessage?.Value);
+		Assert.Equal(JobState.Canceled, response.JobAttributes?.JobState?.Value);
+		byte[] body = Assert.IsType<byte[]>(stub.LastRequestBody);
+		Assert.True(SharpIppClientAdapterTests.Contains(body, Encoding.ASCII.GetBytes("job-printer-state-message")));
+	}
+
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public async Task GivenPrinterThatStopsReadingWhenPrintJobSentThenThrowsPrintExceptionAboutTheUpload(bool isSeekable)
+	{
+		// Arrange — over real TCP, a printer that accepts the connection and then reads nothing, so the upload stops
+		// once the network's buffers are full. SharpIppNext writes a seekable document in one write, which Windows
+		// reports finished as soon as it has queued it, and a forward-only one in pieces (isSeekable provided by
+		// InlineData above)
+		using TcpListener printer = new TcpListener(IPAddress.Loopback, 0);
+		printer.Start();
+
+		using CancellationTokenSource guard = SharpIppClientAdapterTests.CreateGuard();
+		Task<TcpClient> accepted = printer.AcceptTcpClientAsync(guard.Token).AsTask();
+
+		using SharpIppClientAdapter client = SharpIppClientAdapterTests.CreateStallGuardedClient(TimeSpan.FromSeconds(1));
+		byte[] content = new byte[64 * 1024 * 1024];
+		using Stream document = isSeekable ? new MemoryStream(content) : new Latiprimere.Testing.Fakes.ForwardOnlyStream(content);
+		PrintJobRequest request = SharpIppClientAdapterTests.CreatePrintJobRequest(printer, document);
+
+		// Act
+		Func<Task> send = () => client.PrintJobAsync(request, IppVendorAttributes.None, guard.Token);
+
+		// Assert — told it stopped taking the document, and not as a failure to connect, which a Windows queue would
+		// answer by printing through the spooler as well
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(send);
+		Assert.Contains("stopped taking the document", exception.Message, StringComparison.Ordinal);
+		Assert.Contains("1 seconds", exception.Message, StringComparison.Ordinal);
+		IppTransferStalledException stall = Assert.IsType<IppTransferStalledException>(exception.InnerException);
+		Assert.False(stall.IsAwaitingResponse);
+		Assert.False(IppConnectionErrors.IsConnectFailure(exception));
+		Assert.False(guard.IsCancellationRequested);
+
+		using TcpClient connection = await accepted;
+	}
+
+	[Fact]
+	public async Task GivenPrinterThatNeverAnswersWhenPrintJobSentThenThrowsPrintExceptionAboutTheAnswer()
+	{
+		// Arrange — over real TCP, a printer that reads the whole request and never answers
+		using TcpListener printer = new TcpListener(IPAddress.Loopback, 0);
+		printer.Start();
+
+		using CancellationTokenSource guard = SharpIppClientAdapterTests.CreateGuard();
+		Task reading = SharpIppClientAdapterTests.ReadWithoutAnsweringAsync(printer, guard.Token);
+
+		using SharpIppClientAdapter client = SharpIppClientAdapterTests.CreateStallGuardedClient(TimeSpan.FromSeconds(1));
+		using Stream document = new MemoryStream(new byte[1024]);
+		PrintJobRequest request = SharpIppClientAdapterTests.CreatePrintJobRequest(printer, document);
+
+		// Act
+		Func<Task> send = () => client.PrintJobAsync(request, IppVendorAttributes.None, guard.Token);
+
+		// Assert
+		PrintException exception = await Assert.ThrowsAsync<PrintException>(send);
+		Assert.Contains("did not answer within 1 seconds", exception.Message, StringComparison.Ordinal);
+		IppTransferStalledException stall = Assert.IsType<IppTransferStalledException>(exception.InnerException);
+		Assert.True(stall.IsAwaitingResponse);
+		Assert.False(guard.IsCancellationRequested);
+
+		await reading;
+	}
+
 	[Fact]
 	public async Task GivenColourTrayAndSizeWhenPrintJobSentThenEncodesThemAsPrintersExpect()
 	{
@@ -682,6 +783,43 @@ public sealed class SharpIppClientAdapterTests
 	}
 
 	/// <summary>
+	/// Creates a Get-Job-Attributes response for a cancelled job, as CUPS answers one.
+	/// </summary>
+	/// <param name="stateMessage">Its <c>job-state-message</c>, or <see langword="null"/> for none.</param>
+	/// <param name="printerStateMessage">Its <c>job-printer-state-message</c>, or <see langword="null"/> for none.</param>
+	/// <returns>The encoded response.</returns>
+	private static byte[] CreateJobAttributesResponse(string? stateMessage, string? printerStateMessage)
+	{
+		using MemoryStream stream = new MemoryStream();
+		using BinaryWriter writer = new BinaryWriter(stream);
+
+		// Version 1.1, successful-ok, request ID 1
+		writer.Write(new byte[] { 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 });
+		writer.Write((byte)0x01);
+		SharpIppClientAdapterTests.WriteAttribute(writer, 0x47, "attributes-charset", "utf-8");
+		SharpIppClientAdapterTests.WriteAttribute(writer, 0x48, "attributes-natural-language", "en");
+		writer.Write((byte)0x02);
+		SharpIppClientAdapterTests.WriteAttribute(writer, 0x21, "job-id", [0x00, 0x00, 0x00, 0x02]);
+		SharpIppClientAdapterTests.WriteAttribute(writer, 0x23, "job-state", [0x00, 0x00, 0x00, 0x07]);
+		SharpIppClientAdapterTests.WriteAttribute(writer, 0x44, "job-state-reasons", "processing-to-stop-point");
+
+		if (stateMessage is not null)
+		{
+			SharpIppClientAdapterTests.WriteAttribute(writer, 0x41, "job-state-message", stateMessage);
+		}
+
+		if (printerStateMessage is not null)
+		{
+			SharpIppClientAdapterTests.WriteAttribute(writer, 0x41, "job-printer-state-message", printerStateMessage);
+		}
+
+		writer.Write((byte)0x03);
+		writer.Flush();
+
+		return stream.ToArray();
+	}
+
+	/// <summary>
 	/// Encodes a collection member as RFC 8010 does: a <c>memberAttrName</c> (tag 0x4A, no name, the member's name as
 	/// its value), then the member's value with no name.
 	/// </summary>
@@ -830,6 +968,76 @@ public sealed class SharpIppClientAdapterTests
 	{
 		writer.Write((byte)((value >> 8) & 0xFF));
 		writer.Write((byte)(value & 0xFF));
+	}
+
+	/// <summary>
+	/// Creates an adapter over real TCP whose uploads have the given stall timeout.
+	/// </summary>
+	/// <param name="uploadStallTimeout">The stall timeout.</param>
+	/// <returns>The adapter. The caller disposes it.</returns>
+	private static SharpIppClientAdapter CreateStallGuardedClient(TimeSpan uploadStallTimeout)
+	{
+		HttpClient httpClient = IppHttpClientFactory.CreateForTcp(TimeSpan.FromSeconds(10), IppConnectionSecurity.None, uploadStallTimeout);
+
+		return new SharpIppClientAdapter(httpClient);
+	}
+
+	/// <summary>
+	/// Creates a Print-Job request for a printer listening on the loopback address.
+	/// </summary>
+	/// <param name="printer">The printer's listener.</param>
+	/// <param name="document">The document.</param>
+	/// <returns>The request.</returns>
+	private static PrintJobRequest CreatePrintJobRequest(TcpListener printer, Stream document)
+	{
+		int port = ((IPEndPoint)printer.LocalEndpoint).Port;
+
+		return new PrintJobRequest
+		{
+			Document            = document,
+			OperationAttributes = new PrintJobOperationAttributes
+			{
+				PrinterUri         = new IppValue<Uri>(new Uri($"ipp://127.0.0.1:{port}/ipp/print")),
+				RequestingUserName = new StringWithLanguage("ann")
+			}
+		};
+	}
+
+	/// <summary>
+	/// Accepts one connection and reads everything sent on it, never answering, until the client gives up.
+	/// </summary>
+	/// <param name="printer">The printer's listener.</param>
+	/// <param name="cancellationToken">A token that ends the reading.</param>
+	/// <returns>A task that completes when the client closes the connection.</returns>
+	private static async Task ReadWithoutAnsweringAsync(TcpListener printer, CancellationToken cancellationToken)
+	{
+		using TcpClient connection = await printer.AcceptTcpClientAsync(cancellationToken);
+		NetworkStream stream = connection.GetStream();
+		byte[] buffer = new byte[16 * 1024];
+
+		try
+		{
+			while (await stream.ReadAsync(buffer, cancellationToken) > 0)
+			{
+				// Read and drop it, as a printer that has taken the job but won't say so
+			}
+		}
+		catch (IOException)
+		{
+			// The client reset the connection when it gave up
+		}
+	}
+
+	/// <summary>
+	/// Creates a token that ends a test with a cancellation, rather than letting it hang, if a stall is missed.
+	/// </summary>
+	/// <returns>The token's source.</returns>
+	private static CancellationTokenSource CreateGuard()
+	{
+		CancellationTokenSource guard = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+		guard.CancelAfter(TimeSpan.FromSeconds(30));
+
+		return guard;
 	}
 
 	/// <summary>

@@ -4,6 +4,20 @@ namespace Latiprimere.Abstractions.Tests;
 
 public sealed class PrintJobStatusTests
 {
+	[Fact]
+	public void GivenStatusWithoutReasonsWhenStateReasonsReadThenIsEmpty()
+	{
+		// Arrange — as print systems that give no reasons, such as the Windows spooler, create it
+		PrintJobStatus status = PrintJobStatusTests.CreateStatus(PrintJobState.Processing);
+
+		// Act
+		IReadOnlyList<string> reasons = status.StateReasons;
+
+		// Assert
+		Assert.NotNull(reasons);
+		Assert.Empty(reasons);
+	}
+
 	[Theory]
 	[InlineData(PrintJobState.Completed)]
 	[InlineData(PrintJobState.Canceled)]

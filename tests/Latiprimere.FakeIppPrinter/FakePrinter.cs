@@ -34,6 +34,8 @@ public sealed class FakePrinter : IAsyncDisposable
 	private readonly List<RecordedRequest> requests = new List<RecordedRequest>(); // Every request, in order
 	private readonly Lock stateLock = new Lock();                             // Guards responder and requests
 	private bool isDisposed;                                                  // Whether it has been stopped
+	private readonly CancellationTokenSource stopping = new CancellationTokenSource(); // Releases stalled requests on stop
+	private int stalledPrintJobs;                                             // Backs StalledPrintJobs
 
 	/// <summary>
 	/// Initialises a new instance of the <see cref="FakePrinter"/> class, ready to start.
@@ -118,6 +120,18 @@ public sealed class FakePrinter : IAsyncDisposable
 	public FakePrinterBehaviour Behaviour { get; } = new FakePrinterBehaviour();
 
 	/// <summary>
+	/// Gets how many Print-Job requests the printer stopped reading, as <see cref="FakePrinterBehaviour.StallPrintJobUpload"/>
+	/// says to.
+	/// </summary>
+	public int StalledPrintJobs
+	{
+		get
+		{
+			return Volatile.Read(ref this.stalledPrintJobs);
+		}
+	}
+
+	/// <summary>
 	/// Gets the printer's attributes; change them at any time.
 	/// </summary>
 	public FakePrinterProfile Profile { get; }
@@ -187,8 +201,13 @@ public sealed class FakePrinter : IAsyncDisposable
 		}
 
 		this.isDisposed = true;
+
+		// A stalled request has stopped reading, so Kestrel wouldn't see its client hang up, and stopping would wait
+		// for it until the shutdown timeout
+		await this.stopping.CancelAsync();
 		await this.app.StopAsync(CancellationToken.None);
 		await this.app.DisposeAsync();
+		this.stopping.Dispose();
 		this.certificate?.Dispose();
 	}
 
@@ -224,8 +243,14 @@ public sealed class FakePrinter : IAsyncDisposable
 			return;
 		}
 
-		// The whole request first, so the client has sent everything before any answer, even a refusal
 		using MemoryStream body = new MemoryStream();
+
+		if (this.Behaviour.StallPrintJobUpload && await this.StallIfPrintJobAsync(context.Request.Body, body, cancellationToken))
+		{
+			return;
+		}
+
+		// The whole request first, so the client has sent everything before any answer, even a refusal
 		await context.Request.Body.CopyToAsync(body, cancellationToken);
 		body.Position = 0;
 		IIppRequestMessage? request = await this.TryReadRequestAsync(body, cancellationToken);
@@ -245,7 +270,7 @@ public sealed class FakePrinter : IAsyncDisposable
 			await Task.Delay(this.Behaviour.ResponseDelay, cancellationToken);
 		}
 
-		if (!this.IsAuthorized(context.Request))
+		if (!this.IsAuthorized(context.Request, request.IppOperation))
 		{
 			this.Record(request, document, hasAuthorization, StatusCodes.Status401Unauthorized, statusCode: null);
 			context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -276,6 +301,42 @@ public sealed class FakePrinter : IAsyncDisposable
 		context.Response.ContentType = "application/ipp";
 		context.Response.ContentLength = output.Length;
 		await context.Response.Body.WriteAsync(output.GetBuffer().AsMemory(0, (int)output.Length), cancellationToken);
+	}
+
+	/// <summary>
+	/// Reads a request's IPP header and, for Print-Job, stops reading until the client gives up.
+	/// </summary>
+	/// <param name="requestBody">The HTTP request's body.</param>
+	/// <param name="body">Where the header goes, for a request read on as usual.</param>
+	/// <param name="cancellationToken">Cancelled when the client closes the connection.</param>
+	/// <returns><see langword="true"/> if it was a Print-Job and the client has given up; <see langword="false"/> to
+	/// read the rest of the request as usual.</returns>
+	private async Task<bool> StallIfPrintJobAsync(Stream requestBody, MemoryStream body, CancellationToken cancellationToken)
+	{
+		// Version (2 bytes), operation (2) and request ID (4)
+		byte[] header = new byte[8];
+		await requestBody.ReadExactlyAsync(header, cancellationToken);
+
+		if (header[2] != 0 || header[3] != (byte)IppOperation.PrintJob)
+		{
+			body.Write(header);
+
+			return false;
+		}
+
+		Interlocked.Increment(ref this.stalledPrintJobs);
+		using CancellationTokenSource wait = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.stopping.Token);
+
+		try
+		{
+			await Task.Delay(Timeout.InfiniteTimeSpan, wait.Token);
+		}
+		catch (OperationCanceledException)
+		{
+			// The client closed the connection, or the printer was stopped
+		}
+
+		return true;
 	}
 
 	/// <summary>
@@ -317,15 +378,17 @@ public sealed class FakePrinter : IAsyncDisposable
 	}
 
 	/// <summary>
-	/// Checks the request's Basic credentials, when the printer requires them.
+	/// Checks the request's Basic credentials, when the printer requires them for its operation.
 	/// </summary>
 	/// <param name="request">The HTTP request.</param>
+	/// <param name="operation">The IPP operation it asks for.</param>
 	/// <returns><see langword="true"/> if no credentials are required, or the right ones were sent.</returns>
-	private bool IsAuthorized(HttpRequest request)
+	private bool IsAuthorized(HttpRequest request, IppOperation operation)
 	{
 		NetworkCredential? required = this.options.RequiredCredentials;
+		bool isJob = operation is IppOperation.PrintJob or IppOperation.ValidateJob;
 
-		if (required is null)
+		if (required is null || (this.options.RequiresCredentialsForJobsOnly && !isJob))
 		{
 			return true;
 		}

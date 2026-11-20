@@ -43,6 +43,12 @@ The end-to-end harness checks a printer you name, which may be real, and prints 
 
 A scenario is skipped when the printer doesn't report what it would check, such as trays. Run some only by naming them: `manual --printer <id> manual.test-page manual.tray`.
 
+**A printer over IPPS** (`ipp:ipps://…`) presents its own certificate, which isn't trusted until it's pinned. Run the checks once without it: they fail, giving the certificate's SHA-256 fingerprint. Check that against the printer's own web page, then pin it with `--fingerprint`, which you can repeat. It's trusted for direct IPP, for a Windows queue sent to its printer over IPPS, and for saving the printer's attributes:
+
+```bash
+dotnet run --project tests/Latiprimere.TestHarness -f net11.0 -- manual --printer "ipp:ipps://192.0.2.10:443/ipp/print" --fingerprint 3A:7F:…
+```
+
 Expected differences:
 
 - **CUPS queues** keep a PDF's own orientation, so `manual.landscape` prints portrait there.

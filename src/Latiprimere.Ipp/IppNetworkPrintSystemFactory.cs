@@ -84,7 +84,9 @@ public static class IppNetworkPrintSystemFactory
 		IppCertificateTrust trust = IppNetworkPrintSystemFactory.CreateCertificateTrust(options);
 		IppConnectionSecurity security = IppNetworkPrintSystemFactory.CreateConnectionSecurity(options, trust);
 
-		SharpIppClientAdapter client = new SharpIppClientAdapter(IppHttpClientFactory.CreateForTcp(options.ConnectTimeout, security))
+		HttpClient httpClient = IppHttpClientFactory.CreateForTcp(options.ConnectTimeout, security, options.UploadStallTimeout);
+
+		SharpIppClientAdapter client = new SharpIppClientAdapter(httpClient)
 		{
 			Security         = security,
 			CertificateTrust = trust
@@ -100,6 +102,7 @@ public static class IppNetworkPrintSystemFactory
 			ValidateJobs       = options.ValidateJobs,
 			PdfRasterizer      = pdfRasterizer,
 			MaxRenderDpi       = options.MaxRenderDpi,
+			RasterFormats      = IppNetworkPrintSystemFactory.ToRasterFormats(options.RasterFormats),
 			Logger             = IppLog.CreateLogger(loggerFactory)
 		};
 
@@ -142,27 +145,18 @@ public static class IppNetworkPrintSystemFactory
 			IppNetworkPrintSystemFactory.ValidateCredentials(options.Credentials);
 		}
 
-		Dictionary<string, NetworkCredential> printerCredentials = new Dictionary<string, NetworkCredential>(StringComparer.Ordinal);
-
 		foreach (KeyValuePair<Uri, NetworkCredential> printer in options.PrinterCredentials)
 		{
-			if (printer.Key is null || !printer.Key.IsAbsoluteUri || printer.Key.Scheme is not ("ipp" or "ipps"))
+			if (!IppConnectionSecurity.IsPrinterCredentialsUri(printer.Key))
 			{
 				throw new ArgumentException(ExceptionMessages.FormatIppPrinterCredentialsUriInvalid(printer.Key), nameof(options));
 			}
 
 			ArgumentNullException.ThrowIfNull(printer.Value, nameof(options));
 			IppNetworkPrintSystemFactory.ValidateCredentials(printer.Value);
-			printerCredentials[IppConnectionSecurity.ToHostPort(printer.Key)] = printer.Value;
 		}
 
-		return new IppConnectionSecurity
-		{
-			Credentials                         = options.Credentials,
-			PrinterCredentials                  = printerCredentials,
-			SendsCredentialsOnlyOverTls         = true,
-			ServerCertificateValidationCallback = trust.Validate
-		};
+		return IppConnectionSecurity.CreateForPrinters(options.Credentials, options.PrinterCredentials, trust);
 	}
 
 	/// <summary>
@@ -179,16 +173,36 @@ public static class IppNetworkPrintSystemFactory
 	{
 		ArgumentNullException.ThrowIfNull(options);
 
-		// Relative URIs are left to CreateConnectionSecurity, which refuses them
-		IEnumerable<string>? systemTrustHosts = options.Credentials is null
-			? null
-			: options.PrinterUris
-				.Concat(options.PrinterCredentials.Keys)
-				.Where(uri => uri is { IsAbsoluteUri: true })
-				.Select(uri => uri.IdnHost)
-				.ToList();
+		return IppCertificateTrust.CreateForPrinters
+		(
+			options.TrustedCertificateFingerprints,
+			options.ServerCertificateValidationCallback,
+			options.Credentials,
+			options.PrinterUris.Concat(options.PrinterCredentials.Keys)
+		);
+	}
 
-		return new IppCertificateTrust(options.TrustedCertificateFingerprints, options.ServerCertificateValidationCallback, systemTrustHosts);
+	/// <summary>
+	/// Turns the raster formats an application chose into the order they're tried in, without repeats; a value that
+	/// isn't one of them is left out.
+	/// </summary>
+	/// <param name="formats">The formats, in order.</param>
+	/// <returns>The order.</returns>
+	internal static IReadOnlyList<Raster.RasterFormat> ToRasterFormats(IEnumerable<IppRasterFormat> formats)
+	{
+		ArgumentNullException.ThrowIfNull(formats);
+
+		return formats
+			.Select(format => format switch
+			{
+				IppRasterFormat.PwgRaster   => (Raster.RasterFormat?)Raster.RasterFormat.PwgRaster,
+				IppRasterFormat.AppleRaster => Raster.RasterFormat.AppleRaster,
+				IppRasterFormat.Pclm        => Raster.RasterFormat.Pclm,
+				_                           => null,
+			})
+			.OfType<Raster.RasterFormat>()
+			.Distinct()
+			.ToArray();
 	}
 
 	/// <summary>
