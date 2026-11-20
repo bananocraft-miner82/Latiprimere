@@ -36,7 +36,7 @@ jobs:
     steps:
       # All history and tags, to find the latest release
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -68,7 +68,7 @@ jobs:
       # All history and tags, so the scripts can number the release after the latest one and refuse a version
       # already tagged
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -131,13 +131,13 @@ jobs:
     steps:
       # Only for dotnet nuget push, so any current SDK does; there's no checkout, so no global.json
       - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
       # The packages build.yml made and tested on this run
       - name: Download packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: packages
           path: artifacts/packages
@@ -184,7 +184,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.sha }}
 
