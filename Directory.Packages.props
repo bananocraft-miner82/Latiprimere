@@ -11,9 +11,9 @@
 
 	<!-- Library dependencies -->
 	<ItemGroup>
-		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14" />
-		<PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
-		<PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
+		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.15" />
+		<PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.15" />
+		<PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.15" />
 		<PackageVersion Include="SharpIppNext" Version="5.0.3" />
 		<PackageVersion Include="Tmds.MDns" Version="0.10.1" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.ResxSourceGenerator" Version="3.11.0-beta1.26226.5" />
