@@ -62,6 +62,16 @@ public sealed record PrinterCapabilities
 	public IReadOnlyList<InputTray> InputTrays { get; init; } = Array.Empty<InputTray>();
 
 	/// <summary>
+	/// Gets the document formats the printer can be sent, whether it takes them itself or Latiprimere converts them.
+	/// </summary>
+	/// <remarks>
+	/// A format whose conversion needs a PDF rasteriser, such as a PDF to the Windows spooler, is listed only when
+	/// one is registered. A format that isn't listed is refused by <see cref="IPrinter.SubmitAsync"/> with
+	/// <see cref="NotSupportedException"/>.
+	/// </remarks>
+	public IReadOnlyList<DocumentFormat> DocumentFormats { get; init; } = Array.Empty<DocumentFormat>();
+
+	/// <summary>
 	/// Gets the printer's other settings, such as print quality, finishing or a driver's own settings, with the keys
 	/// and values to set them through <see cref="PrintOptions.VendorOptions"/>.
 	/// </summary>

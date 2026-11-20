@@ -20,6 +20,26 @@ public sealed class IppConnectionErrorsTests
 		Assert.True(isConnectFailure);
 	}
 
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void GivenStalledUploadWhenIsConnectFailureThenReturnsFalse(bool isAwaitingResponse)
+	{
+		// Arrange — some of the document may have reached the printer, so a Windows queue's job mustn't go through
+		// the spooler as well (isAwaitingResponse provided by InlineData above)
+		PrintException exception = new PrintException
+		(
+			"Stopped taking the document.",
+			new Latiprimere.Ipp.Connections.IppTransferStalledException(isAwaitingResponse, TimeSpan.FromMinutes(5), new TaskCanceledException())
+		);
+
+		// Act
+		bool isConnectFailure = IppConnectionErrors.IsConnectFailure(exception);
+
+		// Assert
+		Assert.False(isConnectFailure);
+	}
+
 	[Fact]
 	public void GivenConnectTimeoutWhenIsConnectFailureThenReturnsTrue()
 	{

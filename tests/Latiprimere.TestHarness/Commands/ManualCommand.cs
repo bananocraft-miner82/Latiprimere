@@ -18,22 +18,25 @@ internal static class ManualCommand
 	/// </summary>
 	public static readonly string[] Usage =
 	[
-		"  manual --printer <id> [filter ...]",
+		"  manual --printer <id> [--fingerprint <sha256> ...] [filter ...]",
 		"                       Guided checks on a printer you name, which may be real: reads it first, then prints",
 		"                       each test job only after you say yes, and asks what came out. Filters choose the",
-		"                       scenarios, as for run; by default every manual.* scenario"
+		"                       scenarios, as for run; by default every manual.* scenario. --fingerprint pins the",
+		"                       certificate of a printer reached over ipps://, as checked on its own web page"
 	];
 
 	/// <summary>
 	/// Runs the manual checks.
 	/// </summary>
-	/// <param name="arguments"><c>--printer &lt;id&gt;</c>, then any filters.</param>
+	/// <param name="arguments"><c>--printer &lt;id&gt;</c>, any <c>--fingerprint &lt;sha256&gt;</c>, then any
+	/// filters.</param>
 	/// <param name="cancellationToken">Stops the run.</param>
 	/// <returns>The exit code.</returns>
 	/// <exception cref="ArgumentException">No printer was named, or a filter matches no scenario.</exception>
 	public static async Task<int> RunAsync(string[] arguments, CancellationToken cancellationToken)
 	{
 		string? printerId = null;
+		List<string> fingerprints = new List<string>();
 		List<string> filters = new List<string>();
 
 		for (int index = 0; index < arguments.Length; index++)
@@ -41,6 +44,11 @@ internal static class ManualCommand
 			if (arguments[index] == "--printer" && index + 1 < arguments.Length)
 			{
 				printerId = arguments[++index];
+			}
+			else if (arguments[index] == "--fingerprint" && index + 1 < arguments.Length)
+			{
+				// A printer's own certificate, pinned as an application would (ADR 0037)
+				fingerprints.Add(arguments[++index]);
 			}
 			else
 			{
@@ -70,7 +78,8 @@ internal static class ManualCommand
 			return ExitCodes.Success;
 		}
 
-		HarnessTargets targets = await HarnessTargets.DetectAsync(hasPerson: true, printerId, cancellationToken);
+		HarnessTargets detected = await HarnessTargets.DetectAsync(hasPerson: true, printerId, cancellationToken);
+		HarnessTargets targets = detected.WithManualCertificateFingerprints(fingerprints);
 
 		return await RunCommand.RunScenariosAsync(scenarios, targets, "manual", person, cancellationToken);
 	}

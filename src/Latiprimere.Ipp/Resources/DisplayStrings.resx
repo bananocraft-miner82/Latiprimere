@@ -20,4 +20,76 @@
 		<value>The printer or queue no longer exists, so how the job ended isn't known.</value>
 		<comment>State message for a job whose printer or CUPS queue now answers not-found too, as when a queue is deleted with its jobs.</comment>
 	</data>
+	<data name="JobReasonUnsupportedOptions" xml:space="preserve">
+		<value>The printer can't print the job with the options chosen.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: unsupported-attributes-or-values or conflicting-attributes. CUPS cancels a job this way when its printer refuses an option, such as two-sided printing on a one-sided printer.</comment>
+	</data>
+	<data name="JobReasonUnsupportedFormat" xml:space="preserve">
+		<value>The printer doesn't take the document's format.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: unsupported-document-format</comment>
+	</data>
+	<data name="JobReasonDocumentUnreadable" xml:space="preserve">
+		<value>The printer couldn't read the document.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: document-format-error or document-unprintable-error</comment>
+	</data>
+	<data name="JobReasonCompression" xml:space="preserve">
+		<value>The printer couldn't decompress the document.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: unsupported-compression or compression-error</comment>
+	</data>
+	<data name="JobReasonDocumentProtected" xml:space="preserve">
+		<value>The document is protected by a password or permissions, and the printer couldn't print it.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: document-password-error, document-permission-error or document-security-error</comment>
+	</data>
+	<data name="JobReasonDocumentIncomplete" xml:space="preserve">
+		<value>The document didn't reach the printer whole.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: document-access-error or submission-interrupted</comment>
+	</data>
+	<data name="JobReasonAccounting" xml:space="preserve">
+		<value>The printer's accounting didn't allow the job.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: account-authorization-failed, account-closed, account-info-needed or account-limit-reached</comment>
+	</data>
+	<data name="JobReasonCanceledAfterTimeout" xml:space="preserve">
+		<value>The job was cancelled after waiting too long.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: job-canceled-after-timeout</comment>
+	</data>
+	<data name="JobReasonCanceledAtDevice" xml:space="preserve">
+		<value>The job was cancelled at the printer.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: job-canceled-at-device</comment>
+	</data>
+	<data name="JobReasonCanceledByOperator" xml:space="preserve">
+		<value>The job was cancelled by the printer's operator.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: job-canceled-by-operator</comment>
+	</data>
+	<data name="JobReasonCanceledByUser" xml:space="preserve">
+		<value>The job was cancelled by the user who sent it.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: job-canceled-by-user</comment>
+	</data>
+	<data name="JobReasonAbortedBySystem" xml:space="preserve">
+		<value>The print system stopped the job.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: aborted-by-system</comment>
+	</data>
+	<data name="JobReasonCompletedWithErrors" xml:space="preserve">
+		<value>The job finished, with errors.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: job-completed-with-errors</comment>
+	</data>
+	<data name="JobReasonCompletedWithWarnings" xml:space="preserve">
+		<value>The job finished, with warnings.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: job-completed-with-warnings</comment>
+	</data>
+	<data name="JobReasonHeldAtPrinter" xml:space="preserve">
+		<value>The job is held until someone releases it at the printer.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: job-held-for-authorization, job-held-for-button-press, job-held-for-release or job-password-wait</comment>
+	</data>
+	<data name="JobReasonHeldForReview" xml:space="preserve">
+		<value>The job is held for review.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: job-held-for-review</comment>
+	</data>
+	<data name="JobReasonHeldUntil" xml:space="preserve">
+		<value>The job is held until the time it was given.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: job-hold-until-specified</comment>
+	</data>
+	<data name="JobReasonPrinterStopped" xml:space="preserve">
+		<value>The job is waiting: the printer is stopped.</value>
+		<comment>State message for a job whose printer gives no job-state-message, from its job-state-reasons: printer-stopped or printer-stopped-partly</comment>
+	</data>
 </root>

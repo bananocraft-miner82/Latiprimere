@@ -236,7 +236,7 @@ internal sealed class FakePrintJob : IPrintJob
 }
 ```
 
-`WatchStatusAsync` is an extension method that calls `GetStatusAsync`, so it works on the fake job as it does on a real one. Make sure every script ends in a final state, `Completed`, `Canceled` or `Aborted`: a job that never finishes keeps a test waiting until it times out.
+`IPrintJob.WatchStatusAsync` has a default implementation that calls `GetStatusAsync` at the interval given, so it works on the fake job as it does on a real one, through `IPrintJob`: call it on a variable of that type, or cast the fake to it. Make sure every script ends in a final state, `Completed`, `Canceled` or `Aborted`: a job that never finishes keeps a test waiting until it times out.
 
 ## The tests
 

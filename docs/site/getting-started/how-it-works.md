@@ -56,9 +56,11 @@ An `IPrinter` sends documents to one printer. Its `Info` holds the description r
 
 ## What happens to a document
 
-Latiprimere prints two kinds of document:
+Latiprimere prints four kinds of document:
 
-- **PDF**, made with `PrintContent.FromPdf`. CUPS takes the PDF as it is and converts it for the printer. A network printer that accepts PDF gets it as it is too; one that doesn't is sent its pages as images, PWG or Apple raster, rendered by `Latiprimere.Rendering.Pdfium`, or refused with `NotSupportedException` before anything is sent if that isn't registered. The Windows spooler can't print PDFs, so `Latiprimere.Rendering.Pdfium` draws each page and the printer's driver prints the pages.
+- **PDF**, made with `PrintContent.FromPdf`. CUPS takes the PDF as it is and converts it for the printer. A network printer that accepts PDF gets it as it is too; one that doesn't is sent its pages as images, in PWG raster, Apple raster or PCLm, rendered by `Latiprimere.Rendering.Pdfium`, or refused with `NotSupportedException` before anything is sent if that isn't registered. The Windows spooler can't print PDFs, so `Latiprimere.Rendering.Pdfium` draws each page and the printer's driver prints the pages.
+- **Images**, made with `PrintContent.FromJpeg` or `PrintContent.FromPng`, each printed on one page. CUPS takes them as they are and converts them. A network printer that takes JPEG gets a JPEG as it is; otherwise the image is placed on a page as a PDF, which goes as any PDF does. On Windows the image becomes a PDF, which `Latiprimere.Rendering.Pdfium` draws through the driver.
+- **Plain text**, made with `PrintContent.FromText`. CUPS lays it out itself. Elsewhere Latiprimere lays it out as a PDF, in Courier at 10 points within half-inch margins, which goes as any PDF does; that shows the Windows-1252 characters, which cover Western European languages, and text with others is refused with `NotSupportedException` naming the character.
 - **Raw printer data**, made with `PrintContent.FromRaw`: ZPL for label printers, ESC/POS for receipt printers, or PCL. It goes to the printer untouched, so it must be in the printer's own language. See [Labels and receipts](/docs/guides/labels-and-receipts/).
 
 You own the stream and dispose it once the job is sent. Latiprimere reads it from its current position to the end. Prefer a stream that can seek, such as a file or memory stream: a busy network printer turns a job away, and only a stream that can seek can be sent again.
@@ -91,7 +93,7 @@ Pending ──▶ Processing ──▶ Completed
 | `Aborted`    | Ended by the print system because of an error                            | Yes   |
 | `Unknown`    | The print system didn't say, or said something Latiprimere doesn't know  |       |
 
-Print systems don't announce changes, so Latiprimere asks. `GetStatusAsync` asks once. `WatchStatusAsync` asks every half second, or at the interval you give, reports each change, and ends at a final state (`IsTerminal` is `true`).
+`GetStatusAsync` reads a job's status once. `WatchStatusAsync` reports each change, and ends at a final state (`IsTerminal` is `true`). On Windows the spooler signals each change, so it is reported as it happens. CUPS and network printers don't announce changes, so Latiprimere asks every half second, or at the interval you give. Printers can be followed the same way: `IPrinter.GetStatusAsync` reads a printer's state, message and reasons, such as `media-empty-error`, and `IPrinter.WatchStatusAsync` reports each change until you cancel it.
 
 A few things to know:
 

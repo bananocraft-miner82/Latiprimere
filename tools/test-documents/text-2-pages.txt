@@ -1,0 +1,43 @@
+Latiprimere text test: two pages, split by a form feed
+
+Item	Qty	Price
+Café crème	2	€3.40
+Croissant	3	€1.20
+Smørrebrød	1	€7.90
+Bratwürst	2	€4.50
+
+A long line follows, so it wraps at a space: the quick brown fox jumps over the lazy dog the quick brown fox jumps over the lazy dog the quick brown fox jumps over the lazy dog
+
+Line  1 of the first page.
+Line  2 of the first page.
+Line  3 of the first page.
+Line  4 of the first page.
+Line  5 of the first page.
+Line  6 of the first page.
+Line  7 of the first page.
+Line  8 of the first page.
+Line  9 of the first page.
+Line 10 of the first page.
+Line 11 of the first page.
+Line 12 of the first page.
+Line 13 of the first page.
+Line 14 of the first page.
+Line 15 of the first page.
+Line 16 of the first page.
+Line 17 of the first page.
+Line 18 of the first page.
+Line 19 of the first page.
+Line 20 of the first page.
+Line 21 of the first page.
+Line 22 of the first page.
+Line 23 of the first page.
+Line 24 of the first page.
+Line 25 of the first page.
+Line 26 of the first page.
+Line 27 of the first page.
+Line 28 of the first page.
+Line 29 of the first page.
+Line 30 of the first page.
+Second page, after the form feed.
+
+« Guillemets », ‘single’ and “double” quotes, and an en dash – all Windows-1252.

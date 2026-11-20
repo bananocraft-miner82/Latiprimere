@@ -44,6 +44,61 @@ public sealed class IppJobStatusMapperTests
 	}
 
 	[Fact]
+	public void GivenCancelledJobWithReasonsButNoMessageWhenToPrintJobStatusThenExplainsTheReason()
+	{
+		// Arrange — as CUPS reports a job its printer refused
+		JobDescriptionAttributes attributes = new JobDescriptionAttributes
+		{
+			JobState        = new IppValue<JobState>(JobState.Canceled),
+			JobStateReasons = new IppValue<JobStateReason[]>([new JobStateReason("job-canceled-at-device")])
+		};
+
+		// Act
+		PrintJobStatus status = IppJobStatusMapper.ToPrintJobStatus(attributes, "7", DateTimeOffset.UtcNow);
+
+		// Assert
+		Assert.Equal(PrintJobState.Canceled, status.State);
+		Assert.Equal(["job-canceled-at-device"], status.StateReasons);
+		Assert.Equal("The job was cancelled at the printer.", status.StateMessage);
+	}
+
+	[Theory]
+	[InlineData("Paper jam in tray 2")]
+	[InlineData("   ")]
+	public void GivenReasonsAndAMessageWhenToPrintJobStatusThenKeepsThePrintersOwnMessage(string message)
+	{
+		// Arrange — a message, or one that is only spaces and says nothing (provided by InlineData above)
+		JobDescriptionAttributes attributes = new JobDescriptionAttributes
+		{
+			JobState        = new IppValue<JobState>(JobState.Aborted),
+			JobStateReasons = new IppValue<JobStateReason[]>([new JobStateReason("aborted-by-system")]),
+			JobStateMessage = new StringWithLanguage(message)
+		};
+
+		// Act
+		PrintJobStatus status = IppJobStatusMapper.ToPrintJobStatus(attributes, "7", DateTimeOffset.UtcNow);
+
+		// Assert
+		string expected = string.IsNullOrWhiteSpace(message) ? "The print system stopped the job." : message;
+		Assert.Equal(expected, status.StateMessage);
+		Assert.Equal(["aborted-by-system"], status.StateReasons);
+	}
+
+	[Fact]
+	public void GivenNoReasonsWhenToPrintJobStatusThenHasNoneAndNoMessage()
+	{
+		// Arrange
+		JobDescriptionAttributes attributes = new JobDescriptionAttributes { JobState = new IppValue<JobState>(JobState.Completed) };
+
+		// Act
+		PrintJobStatus status = IppJobStatusMapper.ToPrintJobStatus(attributes, "7", DateTimeOffset.UtcNow);
+
+		// Assert
+		Assert.Empty(status.StateReasons);
+		Assert.Null(status.StateMessage);
+	}
+
+	[Fact]
 	public void GivenJobAttributesWhenToPrintJobStatusThenMapsStateMessageAndPages()
 	{
 		// Arrange

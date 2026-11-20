@@ -24,6 +24,14 @@ public sealed class FakePrinterBehaviour
 	public bool DropConnectionOnPrintJob { get; set; }
 
 	/// <summary>
+	/// Gets or sets a value indicating whether the printer stops reading a Print-Job request once it has read the IPP
+	/// header, keeping the connection open without answering, as a printer that jams or hangs partway through a job
+	/// does. The client's writes stop finishing once the network's buffers are full. Such requests aren't recorded;
+	/// <see cref="FakePrinter.StalledPrintJobs"/> counts them.
+	/// </summary>
+	public bool StallPrintJobUpload { get; set; }
+
+	/// <summary>
 	/// Gets or sets a value indicating whether the printer is stopped. Jobs it accepts wait until it starts again.
 	/// </summary>
 	public bool IsStopped { get; set; }

@@ -333,6 +333,14 @@ internal sealed unsafe class WinSpoolApi : IWinSpool
 	}
 
 	/// <inheritdoc/>
+	public IWindowsChangeNotification? OpenChangeNotification(string printerName, WindowsChanges changes)
+	{
+		ArgumentNullException.ThrowIfNull(printerName);
+
+		return WinSpoolChangeNotification.TryOpen(printerName, changes);
+	}
+
+	/// <inheritdoc/>
 	/// <remarks>
 	/// The WSD Port Monitor keeps each port under <c>HKLM\SYSTEM\CurrentControlSet\Control\Print\Monitors\WSD
 	/// Port\Ports\&lt;port&gt;</c>, with the printer's UUID as the string value <c>Printer UUID</c>. Reading it needs

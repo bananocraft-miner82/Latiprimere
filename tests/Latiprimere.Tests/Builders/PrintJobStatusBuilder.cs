@@ -10,6 +10,7 @@ internal sealed class PrintJobStatusBuilder
 	private PrintJobState state = PrintJobState.Pending; // Job state
 	private string? stateMessage = null;                 // Detail about the state
 	private int? pagesCompleted = null;                  // Pages printed so far
+	private string[] stateReasons = [];                  // Why the job is in its state
 
 	/// <summary>
 	/// Sets the state of the status being built.
@@ -31,6 +32,18 @@ internal sealed class PrintJobStatusBuilder
 	public PrintJobStatusBuilder WithStateMessage(string stateMessage)
 	{
 		this.stateMessage = stateMessage;
+
+		return this;
+	}
+
+	/// <summary>
+	/// Sets the state reasons of the status being built.
+	/// </summary>
+	/// <param name="stateReasons">The job-state-reasons keywords.</param>
+	/// <returns>This builder, for chaining.</returns>
+	public PrintJobStatusBuilder WithStateReasons(params string[] stateReasons)
+	{
+		this.stateReasons = stateReasons;
 
 		return this;
 	}
@@ -58,6 +71,7 @@ internal sealed class PrintJobStatusBuilder
 			JobId          = this.jobId,
 			State          = this.state,
 			StateMessage   = this.stateMessage,
+			StateReasons   = this.stateReasons,
 			PagesCompleted = this.pagesCompleted,
 			Timestamp      = DateTimeOffset.UtcNow
 		};

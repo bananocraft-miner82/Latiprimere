@@ -58,6 +58,16 @@ public MediaSize? DefaultMediaSize { get; init; }
 
 Gets the paper size used when a job doesn't choose one, or `null` if not reported.
 
+### DocumentFormats
+
+```csharp
+public IReadOnlyList<DocumentFormat> DocumentFormats { get; init; }
+```
+
+Gets the document formats the printer can be sent, whether it takes them itself or Latiprimere converts them.
+
+A format whose conversion needs a PDF rasteriser, such as a PDF to the Windows spooler, is listed only when one is registered. A format that isn't listed is refused by [IPrinter.SubmitAsync](/docs/reference/latiprimere-abstractions/iprinter/#submitasync) with [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception).
+
 ### DuplexModes
 
 ```csharp

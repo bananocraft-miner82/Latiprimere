@@ -1,3 +1,4 @@
+using System.Net;
 using System.Runtime.Versioning;
 using Latiprimere.Windows.Gdi;
 using Latiprimere.Windows.Spooler;
@@ -255,6 +256,89 @@ public sealed class WindowsPrintSystemTests
 
 		// Assert
 		Assert.Throws<ArgumentException>(create);
+	}
+
+	[Fact]
+	[SupportedOSPlatform("windows")] // Skipped elsewhere
+	public void GivenPdfOverIppWithPinnedCertificateWhenCreateOnWindowsThenRoutePrefersIppsAndKeepsTheCredentials()
+	{
+		// Arrange
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The route is only created on Windows.");
+		WindowsOptions options = new WindowsOptions { PrintPdfOverIpp = true, IppCredentials = new NetworkCredential("ann", "secret") };
+		options.IppTrustedCertificateFingerprints.Add(new string('A', 64));
+		options.IppPrinterCredentials[new Uri("ipps://10.0.0.9/ipp/print")] = new NetworkCredential("bob", "other");
+
+		// Act
+		using IPrintSystem printSystem = WindowsPrintSystemFactory.Create(pdfRasterizer: null, options);
+
+		// Assert — the shared password goes only over IPPS; the printer's own overrides it
+		Latiprimere.Windows.DirectIpp.WindowsIppRoute? route = Assert.IsType<WindowsPrintSystem>(printSystem).IppRoute;
+		Assert.NotNull(route);
+		Assert.True(route.PrefersIpps);
+		Assert.Null(route.Security.FindCredentialsToSend(new Uri("ipp://10.0.0.5/ipp/print")));
+		Assert.Equal("ann", route.Security.FindCredentialsToSend(new Uri("ipps://10.0.0.5/ipp/print"))?.UserName);
+		Assert.Equal("bob", route.Security.FindCredentialsToSend(new Uri("ipps://10.0.0.9:631/ipp/print"))?.UserName);
+	}
+
+	[Fact]
+	[SupportedOSPlatform("windows")] // Skipped elsewhere
+	public void GivenPdfOverIppWithOnlySystemTrustWhenCreateOnWindowsThenRouteDoesNotPreferIpps()
+	{
+		// Arrange
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The route is only created on Windows.");
+		WindowsOptions options = new WindowsOptions { PrintPdfOverIpp = true };
+
+		// Act
+		using IPrintSystem printSystem = WindowsPrintSystemFactory.Create(pdfRasterizer: null, options);
+
+		// Assert
+		Latiprimere.Windows.DirectIpp.WindowsIppRoute? route = Assert.IsType<WindowsPrintSystem>(printSystem).IppRoute;
+		Assert.False(route?.PrefersIpps);
+		Assert.False(route?.Security.HasCredentials);
+	}
+
+	[Theory]
+	[InlineData("fingerprint")]
+	[InlineData("no-user")]
+	[InlineData("colon")]
+	[InlineData("printer-uri")]
+	public void GivenPdfOverIppWithSecuritySettingIppCantUseWhenCreateThenThrowsArgumentExceptionNamingWindowsOptions(string mistake)
+	{
+		// Arrange — a fingerprint too short, credentials without a user name or with a colon in it, or a printer's
+		// credentials keyed by a URI that isn't ipp or ipps (provided by InlineData above)
+		Assert.SkipUnless(OperatingSystem.IsWindows(), "The route is only created on Windows.");
+		WindowsOptions options = new WindowsOptions { PrintPdfOverIpp = true };
+
+		switch (mistake)
+		{
+			case "fingerprint":
+				options.IppTrustedCertificateFingerprints.Add("3A:7F");
+				break;
+
+			case "no-user":
+				options.IppCredentials = new NetworkCredential(string.Empty, "secret");
+				break;
+
+			case "colon":
+				options.IppCredentials = new NetworkCredential("ann:admin", "secret");
+				break;
+
+			default:
+				options.IppPrinterCredentials[new Uri("https://10.0.0.9/ipp/print")] = new NetworkCredential("bob", "other");
+				break;
+		}
+
+		// Act
+		Func<IPrintSystem> create = () => WindowsPrintSystemFactory.Create(pdfRasterizer: null, options);
+
+		// Assert — the same check dependency injection makes when the options are registered
+		ArgumentException exception = Assert.Throws<ArgumentException>(create);
+		Assert.Throws<ArgumentException>(() => WindowsPrintSystemFactory.ValidateOptions(options));
+
+		if (mistake != "fingerprint")
+		{
+			Assert.Contains("WindowsOptions", exception.Message, StringComparison.Ordinal);
+		}
 	}
 
 	/// <summary>

@@ -1,3 +1,7 @@
+using System.Net;
+using System.Net.Security;
+using Latiprimere.Ipp;
+
 namespace Latiprimere.Windows;
 
 /// <summary>
@@ -42,9 +46,9 @@ public sealed class WindowsOptions
 	/// its port is named after the printer's address; or it is on a WSD port, and a printer on the network announces
 	/// itself over mDNS with the UUID the port records, and reports that UUID when asked;</description></item>
 	/// <item><description>the queue isn't on a print server;</description></item>
-	/// <item><description>the printer says it accepts PDF, or, with a PDF rasteriser, PWG raster or Apple raster, which
-	/// is asked at its first PDF job. A PDF it can't take is rendered and sent in one of those, at the printer's
-	/// resolution limited by <see cref="MaxRenderDpi"/>;</description></item>
+	/// <item><description>the printer says it accepts PDF, or, with a PDF rasteriser, a raster format in
+	/// <see cref="IppRasterFormats"/>, which is asked at its first PDF job. A PDF it can't take is rendered and sent in
+	/// the first of those it takes, at the printer's resolution limited by <see cref="MaxRenderDpi"/>;</description></item>
 	/// <item><description>the job doesn't set <see cref="PrintOptions.OutputFile"/>, an
 	/// <see cref="PrintOptions.InputTray"/>, or a <c>windows:</c> vendor option.</description></item>
 	/// </list>
@@ -67,6 +71,78 @@ public sealed class WindowsOptions
 	/// <c>https</c> URI, such as <c>ipp://192.168.1.20/ipp/print</c>; the print system refuses others when created.
 	/// </remarks>
 	public IDictionary<string, Uri> IppPrinterUris { get; } = new Dictionary<string, Uri>(StringComparer.OrdinalIgnoreCase);
+
+	/// <summary>
+	/// Gets the SHA-256 fingerprints of printer certificates to trust when <see cref="PrintPdfOverIpp"/> sends a job
+	/// over IPPS (<c>ipps://</c>), in hexadecimal, with or without colons between the bytes, such as <c>3A:7F:…</c>.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Printers nearly always present a certificate they made themselves, which no computer trusts, so until its
+	/// certificate is trusted a queue whose printer is reached over IPPS prints through the Windows queue instead. The
+	/// fingerprint is logged when that happens; check it against the one the printer's web page shows before adding
+	/// it. They work as <c>IppNetworkOptions.TrustedCertificateFingerprints</c> do for printing to network printers
+	/// directly.
+	/// </para>
+	/// <para>
+	/// Once a certificate is pinned, or <see cref="IppServerCertificateValidationCallback"/> is set, a WSD queue's
+	/// printer that announces an IPPS address as well is reached over IPPS, and over plain IPP only if its certificate
+	/// isn't trusted.
+	/// </para>
+	/// </remarks>
+	public IList<string> IppTrustedCertificateFingerprints { get; } = new List<string>();
+
+	/// <summary>
+	/// Gets or sets the check, for <see cref="PrintPdfOverIpp"/>, of a printer's certificate that neither the system
+	/// trusts nor <see cref="IppTrustedCertificateFingerprints"/> pins; or <see langword="null"/>, the default, to
+	/// refuse it.
+	/// </summary>
+	/// <remarks>
+	/// Return <see langword="true"/> only for a certificate you have checked, for example by its fingerprint: anyone
+	/// able to intercept the connection could otherwise read the documents and any password.
+	/// </remarks>
+	public RemoteCertificateValidationCallback? IppServerCertificateValidationCallback { get; set; }
+
+	/// <summary>
+	/// Gets or sets the user name and password <see cref="PrintPdfOverIpp"/> sends to every printer over IPPS, or
+	/// <see langword="null"/>, the default, to send none. <see cref="IppPrinterCredentials"/> overrides it for
+	/// particular printers.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// They are sent with every request, as HTTP Basic authentication, and only over IPPS, never in clear text. The
+	/// <see cref="NetworkCredential.Domain"/> is not used. A queue whose printer asks for a password it won't be sent,
+	/// as one reached over plain IPP does, prints through the Windows queue instead.
+	/// </para>
+	/// <para>
+	/// While they are set, a certificate the system trusts is enough only for printers in <see cref="IppPrinterUris"/>
+	/// or <see cref="IppPrinterCredentials"/>: anyone on the network can announce a printer with a WSD queue's UUID at
+	/// a host whose certificate a public authority issued, so a printer found that way must have its certificate
+	/// pinned in <see cref="IppTrustedCertificateFingerprints"/> or accepted by
+	/// <see cref="IppServerCertificateValidationCallback"/>. To keep a password to one printer, use
+	/// <see cref="IppPrinterCredentials"/>.
+	/// </para>
+	/// </remarks>
+	public NetworkCredential? IppCredentials { get; set; }
+
+	/// <summary>
+	/// Gets the user names and passwords of particular printers for <see cref="PrintPdfOverIpp"/>, by printer URI,
+	/// such as <c>ipps://192.168.1.20/ipp/print</c>. They are matched by host and port, and sent only over IPPS, as
+	/// <see cref="IppCredentials"/> are.
+	/// </summary>
+	public IDictionary<Uri, NetworkCredential> IppPrinterCredentials { get; } = new Dictionary<Uri, NetworkCredential>();
+
+	/// <summary>
+	/// Gets the raster formats <see cref="PrintPdfOverIpp"/> may render a PDF into for a printer that can't take PDF,
+	/// in the order they're tried: by default PWG raster, then Apple raster, then PCLm, as
+	/// <c>IppNetworkOptions.RasterFormats</c> has them. Empty, such a printer's PDF jobs print through its driver.
+	/// </summary>
+	public IList<IppRasterFormat> IppRasterFormats { get; } = new List<IppRasterFormat>
+	{
+		IppRasterFormat.PwgRaster,
+		IppRasterFormat.AppleRaster,
+		IppRasterFormat.Pclm
+	};
 
 	/// <summary>
 	/// Gets or sets the highest resolution, in dots per inch, at which PDF pages are rendered before they are sent to

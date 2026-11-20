@@ -18,6 +18,7 @@
 	<ItemGroup>
 		<None Include="Data\*.txt" />
 		<None Include="Data\*.ipp" CopyToOutputDirectory="PreserveNewest" />
+		<None Include="Data\*.jpg" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
 </Project>

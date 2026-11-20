@@ -16,6 +16,7 @@ internal sealed class IppPrintContextBuilder
 	private Latiprimere.Rendering.IPdfRasterizer? pdfRasterizer;             // Renders PDFs for raster jobs
 	private int? maxRenderDpi;                                               // The raster resolution limit
 	private TimeProvider timeProvider = TimeProvider.System;                 // The clock retries are timed by
+	private IReadOnlyList<Raster.RasterFormat> rasterFormats = Raster.RasterJobPlanner.DefaultFormatOrder; // Tried in order
 
 	/// <summary>Sets how long to resend jobs turned away as busy, with millisecond waits between attempts.</summary>
 	/// <param name="busyRetryDuration">How long to keep resending.</param>
@@ -112,6 +113,18 @@ internal sealed class IppPrintContextBuilder
 	}
 
 	/// <summary>
+	/// Sets the raster formats a PDF may be rendered into, in the order they're tried.
+	/// </summary>
+	/// <param name="rasterFormats">The formats.</param>
+	/// <returns>This builder.</returns>
+	public IppPrintContextBuilder WithRasterFormats(params Raster.RasterFormat[] rasterFormats)
+	{
+		this.rasterFormats = rasterFormats;
+
+		return this;
+	}
+
+	/// <summary>
 	/// Builds the context, with "tester" as the requesting user, and waits of a few milliseconds between resends of
 	/// busy jobs so tests stay fast.
 	/// </summary>
@@ -130,6 +143,7 @@ internal sealed class IppPrintContextBuilder
 			ValidateJobs         = this.validateJobs,
 			PdfRasterizer        = this.pdfRasterizer,
 			MaxRenderDpi         = this.maxRenderDpi,
+			RasterFormats        = this.rasterFormats,
 			Logger               = this.logger,
 			TimeProvider         = this.timeProvider
 		};

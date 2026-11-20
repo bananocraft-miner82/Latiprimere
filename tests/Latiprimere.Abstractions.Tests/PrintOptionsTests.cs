@@ -18,6 +18,7 @@ public sealed class PrintOptionsTests
 		Assert.Equal(DuplexMode.PrinterDefault, options.Duplex);
 		Assert.Equal(PageOrientation.PrinterDefault, options.Orientation);
 		Assert.Equal(ColorMode.PrinterDefault, options.ColorMode);
+		Assert.Equal(ScalingMode.PrinterDefault, options.Scaling);
 		Assert.Null(options.MediaSize);
 		Assert.Null(options.InputTray);
 		Assert.Empty(options.VendorOptions);

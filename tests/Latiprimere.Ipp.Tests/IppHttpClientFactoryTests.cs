@@ -49,6 +49,39 @@ public sealed class IppHttpClientFactoryTests
 		Assert.Throws<ArgumentOutOfRangeException>(createClient);
 	}
 
+	[Theory]
+	[InlineData(0)]
+	[InlineData(-2)]
+	public void GivenUploadStallTimeoutNotPositiveWhenCreateForTcpThenThrowsArgumentOutOfRangeException(int milliseconds)
+	{
+		// Arrange — zero, or negative other than infinite (provided by InlineData above)
+		TimeSpan uploadStallTimeout = TimeSpan.FromMilliseconds(milliseconds);
+
+		// Act
+		Func<HttpClient> createClient = () => IppHttpClientFactory.CreateForTcp
+		(
+			TimeSpan.FromSeconds(5),
+			Latiprimere.Ipp.Connections.IppConnectionSecurity.None,
+			uploadStallTimeout
+		);
+
+		// Assert
+		Assert.Throws<ArgumentOutOfRangeException>(createClient);
+	}
+
+	[Fact]
+	public void GivenInfiniteUploadStallTimeoutWhenValidateThenAccepts()
+	{
+		// Arrange — infinite leaves the stall guard out
+		TimeSpan uploadStallTimeout = Timeout.InfiniteTimeSpan;
+
+		// Act
+		Exception? exception = Record.Exception(() => IppHttpClientFactory.ValidateUploadStallTimeout(uploadStallTimeout));
+
+		// Assert
+		Assert.Null(exception);
+	}
+
 	[Fact]
 	public void GivenConnectTimeoutBeyondHandlerLimitWhenValidateThenThrowsArgumentOutOfRangeException()
 	{

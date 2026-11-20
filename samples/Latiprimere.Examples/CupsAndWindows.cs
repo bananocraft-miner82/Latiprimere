@@ -77,6 +77,35 @@ internal static class CupsAndWindows
 	}
 
 	/// <summary>
+	/// Registers the Windows spooler so that a queue's PDF jobs go to its printer over IPPS, with the printer's own
+	/// certificate pinned and its own password.
+	/// </summary>
+	/// <param name="fingerprint">The SHA-256 fingerprint of the printer's certificate, from the warning logged while
+	/// it isn't trusted, checked against the one its web page shows.</param>
+	/// <param name="password">The printer's password, from a secret store.</param>
+	/// <returns>The service provider, which the caller disposes.</returns>
+	public static ServiceProvider BuildServiceProviderWithPdfOverIpps(string fingerprint, string password)
+	{
+		ServiceCollection services = new ServiceCollection();
+
+		services.AddLatiprimere();
+		services.AddLatiprimerePdfium();
+		services.AddLatiprimereWindows(options =>
+		{
+			options.PrintPdfOverIpp = true;
+			options.IppPrinterUris["Finance"] = new Uri("ipps://192.168.20.30:443/ipp/print");
+
+			// The fingerprint the printer's web page shows
+			options.IppTrustedCertificateFingerprints.Add(fingerprint);
+
+			// Sent to this printer only, and only over IPPS, never in clear text
+			options.IppPrinterCredentials[new Uri("ipps://192.168.20.30:443/ipp/print")] = new NetworkCredential("finance", password);
+		});
+
+		return services.BuildServiceProvider();
+	}
+
+	/// <summary>
 	/// Prints a document to a file with Microsoft Print to PDF, which works in a service with no user interface.
 	/// </summary>
 	/// <param name="catalog">The printer catalog.</param>

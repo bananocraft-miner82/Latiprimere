@@ -54,6 +54,17 @@ internal static partial class IppLog
 	internal static partial void PrintingAsRaster(ILogger logger, Uri printerUri, string mimeType, RasterColorSpace colorSpace, int dpi, bool gzip);
 
 	/// <summary>
+	/// Logs that an image or text is sent as a PDF Latiprimere laid out, as the printer can't take it itself (ADR 0047,
+	/// ADR 0048).
+	/// </summary>
+	/// <param name="logger">The logger.</param>
+	/// <param name="printerUri">The printer.</param>
+	/// <param name="format">The document's format.</param>
+	/// <param name="landscape">Whether the pages are landscape.</param>
+	[LoggerMessage(Level = LogLevel.Debug, Message = "{PrinterUri} doesn't take {Format} documents as they are, so the document is laid out and sent as a PDF, landscape: {Landscape}.")]
+	internal static partial void PrintingConvertedAsPdf(ILogger logger, Uri printerUri, DocumentFormat format, bool landscape);
+
+	/// <summary>
 	/// Logs that a printer's IPPS address couldn't be used, for an untrusted certificate or because nothing answered
 	/// there, so it is reached over plain IPP (ADR 0037).
 	/// </summary>

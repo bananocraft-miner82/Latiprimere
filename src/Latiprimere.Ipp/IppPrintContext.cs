@@ -48,6 +48,9 @@ internal sealed record IppPrintContext
 	/// limit.</summary>
 	public int? MaxRenderDpi { get; init; }
 
+	/// <summary>Gets the raster formats a PDF may be rendered into, in the order they're tried (ADR 0046).</summary>
+	public IReadOnlyList<Raster.RasterFormat> RasterFormats { get; init; } = Raster.RasterJobPlanner.DefaultFormatOrder;
+
 	/// <summary>Gets where to log what the caller isn't told, such as vendor options that couldn't be read.</summary>
 	public ILogger Logger { get; init; } = NullLogger.Instance;
 

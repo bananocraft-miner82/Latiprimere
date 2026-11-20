@@ -1,7 +1,7 @@
 namespace Latiprimere.Testing.Fixtures;
 
 /// <summary>
-/// Locates the shared test PDFs from tools/test-documents, which this library copies into the Data/ folder of every
+/// Locates the shared test PDFs and images from tools/test-documents, which this library copies into the Data/ folder of every
 /// test project that references it.
 /// </summary>
 public static class TestDocuments
@@ -14,6 +14,21 @@ public static class TestDocuments
 
 	/// <summary>Three pages of plain text, small enough for quick print jobs.</summary>
 	public const string ThreePages = "three-pages.pdf";
+
+	/// <summary>
+	/// A 300 × 200 colour PNG at 96 dpi with a transparent disc: a black bar along the top and a red square in the
+	/// bottom right show its orientation.
+	/// </summary>
+	public const string PhotoPng = "photo-300x200.png";
+
+	/// <summary>The same image as a JPEG, its disc white.</summary>
+	public const string PhotoJpeg = "photo-300x200.jpg";
+
+	/// <summary>
+	/// UTF-8 text in two pages split by a form feed: a tabbed table, accented words, a line long enough to wrap,
+	/// and Windows-1252 punctuation.
+	/// </summary>
+	public const string TwoPagesText = "text-2-pages.txt";
 
 	/// <summary>
 	/// Opens a test document for reading.

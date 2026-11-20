@@ -36,7 +36,7 @@ internal static class RasterDocumentEncoder
 	/// <param name="output">Where the raster document goes.</param>
 	/// <param name="cancellationToken">A token to stop between bands.</param>
 	/// <exception cref="ArgumentException">The settings ask for something the format can't hold, such as 1-bit
-	/// Apple raster.</exception>
+	/// Apple raster or PCLm.</exception>
 	/// <exception cref="OperationCanceledException">The token was cancelled.</exception>
 	internal static void Encode(IRasterDocument document, RasterSettings settings, Stream output, CancellationToken cancellationToken)
 	{
@@ -50,20 +50,34 @@ internal static class RasterDocumentEncoder
 			throw new ArgumentException(ExceptionMessages.AppleRasterNotOneBit, nameof(settings));
 		}
 
-		RasterWriter writer = RasterWriter.Create(settings.Format, output);
-		writer.WriteStart(document.PageCount);
-
-		int mediaWidth = RasterDocumentEncoder.ToPixels(settings.Media.WidthMillimeters, settings.Dpi);
-		int mediaHeight = RasterDocumentEncoder.ToPixels(settings.Media.HeightMillimeters, settings.Dpi);
-		PageBuffers buffers = new PageBuffers(mediaWidth, settings.ColorSpace);
-
-		for (int pageIndex = 0; pageIndex < document.PageCount; pageIndex++)
+		if (settings.Format == RasterFormat.Pclm && settings.ColorSpace == RasterColorSpace.Black1)
 		{
-			cancellationToken.ThrowIfCancellationRequested();
-			RasterDocumentEncoder.EncodePage(document, pageIndex, settings, mediaWidth, mediaHeight, writer, buffers, cancellationToken);
+			throw new ArgumentException(ExceptionMessages.PclmNotOneBit, nameof(settings));
 		}
 
-		writer.Flush();
+		RasterWriter writer = RasterWriter.Create(settings, output);
+
+		try
+		{
+			writer.WriteStart(document.PageCount);
+
+			int mediaWidth = RasterDocumentEncoder.ToPixels(settings.Media.WidthMillimeters, settings.Dpi);
+			int mediaHeight = RasterDocumentEncoder.ToPixels(settings.Media.HeightMillimeters, settings.Dpi);
+			PageBuffers buffers = new PageBuffers(mediaWidth, settings.ColorSpace);
+
+			for (int pageIndex = 0; pageIndex < document.PageCount; pageIndex++)
+			{
+				cancellationToken.ThrowIfCancellationRequested();
+				RasterDocumentEncoder.EncodePage(document, pageIndex, settings, mediaWidth, mediaHeight, writer, buffers, cancellationToken);
+			}
+
+			writer.Flush();
+		}
+		finally
+		{
+			// PCLm's writer holds a PDF writer; the others hold nothing to release
+			(writer as IDisposable)?.Dispose();
+		}
 	}
 
 	/// <summary>

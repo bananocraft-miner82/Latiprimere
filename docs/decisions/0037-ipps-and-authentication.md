@@ -31,8 +31,8 @@ Direct IPP could reach a printer's `ipps://` address, but only through the syste
 - **Configured `ipps://` URIs** in `PrinterUris` use the same trust and credentials.
 - **Not done:**
   - **Trust on first use,** offered by the plan as an opt-in: it needs somewhere to keep the pins, which P3-6's address store can provide.
-  - **`uri-authentication-supported`** isn't read: credentials go to every printer reached over trusted TLS, or to one printer when given in `PrinterCredentials`.
-  - **The Windows route** to IPP printers (ADR 0027) still uses the system's trust only.
+  - **`uri-authentication-supported`** isn't read: credentials go to every printer reached over trusted TLS, or to one printer when given in `PrinterCredentials`. Since read, for clearer refusals and the Windows route ([ADR 0042](0042-ipps-for-windows-queues-and-uri-authentication.md)).
+  - **The Windows route** to IPP printers (ADR 0027) still uses the system's trust only. Since given the same settings in `WindowsOptions` (ADR 0042).
 
 ## Consequences
 

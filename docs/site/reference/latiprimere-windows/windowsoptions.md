@@ -34,6 +34,26 @@ Looking up `\\server\printer` contacts that server, and Windows may sign in to i
 
 Turn this on to look up printers on servers that aren't connected yet, when every identifier the application looks up is trusted. Plain local printer names work either way.
 
+### IppCredentials
+
+```csharp
+public NetworkCredential? IppCredentials { get; set; }
+```
+
+Gets or sets the user name and password [WindowsOptions.PrintPdfOverIpp](/docs/reference/latiprimere-windows/windowsoptions/#printpdfoveripp) sends to every printer over IPPS, or `null`, the default, to send none. [WindowsOptions.IppPrinterCredentials](/docs/reference/latiprimere-windows/windowsoptions/#ippprintercredentials) overrides it for particular printers.
+
+They are sent with every request, as HTTP Basic authentication, and only over IPPS, never in clear text. The [NetworkCredential.Domain](https://learn.microsoft.com/dotnet/api/system.net.networkcredential.domain) is not used. A queue whose printer asks for a password it won't be sent, as one reached over plain IPP does, prints through the Windows queue instead.
+
+While they are set, a certificate the system trusts is enough only for printers in [WindowsOptions.IppPrinterUris](/docs/reference/latiprimere-windows/windowsoptions/#ippprinteruris) or [WindowsOptions.IppPrinterCredentials](/docs/reference/latiprimere-windows/windowsoptions/#ippprintercredentials): anyone on the network can announce a printer with a WSD queue's UUID at a host whose certificate a public authority issued, so a printer found that way must have its certificate pinned in [WindowsOptions.IppTrustedCertificateFingerprints](/docs/reference/latiprimere-windows/windowsoptions/#ipptrustedcertificatefingerprints) or accepted by [WindowsOptions.IppServerCertificateValidationCallback](/docs/reference/latiprimere-windows/windowsoptions/#ippservercertificatevalidationcallback). To keep a password to one printer, use [WindowsOptions.IppPrinterCredentials](/docs/reference/latiprimere-windows/windowsoptions/#ippprintercredentials).
+
+### IppPrinterCredentials
+
+```csharp
+public IDictionary<Uri, NetworkCredential> IppPrinterCredentials { get; }
+```
+
+Gets the user names and passwords of particular printers for [WindowsOptions.PrintPdfOverIpp](/docs/reference/latiprimere-windows/windowsoptions/#printpdfoveripp), by printer URI, such as `ipps://192.168.1.20/ipp/print`. They are matched by host and port, and sent only over IPPS, as [WindowsOptions.IppCredentials](/docs/reference/latiprimere-windows/windowsoptions/#ippcredentials) are.
+
 ### IppPrinterUris
 
 ```csharp
@@ -43,6 +63,36 @@ public IDictionary<string, Uri> IppPrinterUris { get; }
 Gets the IPP URIs of Windows queues, by queue name (not case-sensitive), for [WindowsOptions.PrintPdfOverIpp](/docs/reference/latiprimere-windows/windowsoptions/#printpdfoveripp).
 
 Needed for queues whose port doesn't give the printer's address, such as WSD and Standard TCP/IP ports, as Latiprimere doesn't guess it. Each URI must be an absolute `ipp`, `ipps`, `http` or `https` URI, such as `ipp://192.168.1.20/ipp/print`; the print system refuses others when created.
+
+### IppRasterFormats
+
+```csharp
+public IList<IppRasterFormat> IppRasterFormats { get; }
+```
+
+Gets the raster formats [WindowsOptions.PrintPdfOverIpp](/docs/reference/latiprimere-windows/windowsoptions/#printpdfoveripp) may render a PDF into for a printer that can't take PDF, in the order they're tried: by default PWG raster, then Apple raster, then PCLm, as `IppNetworkOptions.RasterFormats` has them. Empty, such a printer's PDF jobs print through its driver.
+
+### IppServerCertificateValidationCallback
+
+```csharp
+public RemoteCertificateValidationCallback? IppServerCertificateValidationCallback { get; set; }
+```
+
+Gets or sets the check, for [WindowsOptions.PrintPdfOverIpp](/docs/reference/latiprimere-windows/windowsoptions/#printpdfoveripp), of a printer's certificate that neither the system trusts nor [WindowsOptions.IppTrustedCertificateFingerprints](/docs/reference/latiprimere-windows/windowsoptions/#ipptrustedcertificatefingerprints) pins; or `null`, the default, to refuse it.
+
+Return `true` only for a certificate you have checked, for example by its fingerprint: anyone able to intercept the connection could otherwise read the documents and any password.
+
+### IppTrustedCertificateFingerprints
+
+```csharp
+public IList<string> IppTrustedCertificateFingerprints { get; }
+```
+
+Gets the SHA-256 fingerprints of printer certificates to trust when [WindowsOptions.PrintPdfOverIpp](/docs/reference/latiprimere-windows/windowsoptions/#printpdfoveripp) sends a job over IPPS (`ipps://`), in hexadecimal, with or without colons between the bytes, such as `3A:7F:…`.
+
+Printers nearly always present a certificate they made themselves, which no computer trusts, so until its certificate is trusted a queue whose printer is reached over IPPS prints through the Windows queue instead. The fingerprint is logged when that happens; check it against the one the printer's web page shows before adding it. They work as `IppNetworkOptions.TrustedCertificateFingerprints` do for printing to network printers directly.
+
+Once a certificate is pinned, or [WindowsOptions.IppServerCertificateValidationCallback](/docs/reference/latiprimere-windows/windowsoptions/#ippservercertificatevalidationcallback) is set, a WSD queue's printer that announces an IPPS address as well is reached over IPPS, and over plain IPP only if its certificate isn't trusted.
 
 ### MaxRenderDpi
 
@@ -72,7 +122,7 @@ A PDF sent over IPP reaches the printer as it is, instead of as a picture of eac
 
 - the queue's IPP URI is in [WindowsOptions.IppPrinterUris](/docs/reference/latiprimere-windows/windowsoptions/#ippprinteruris); or the queue was added by URL, so its port is named after the printer's address; or it is on a WSD port, and a printer on the network announces itself over mDNS with the UUID the port records, and reports that UUID when asked;
 - the queue isn't on a print server;
-- the printer says it accepts PDF, or, with a PDF rasteriser, PWG raster or Apple raster, which is asked at its first PDF job. A PDF it can't take is rendered and sent in one of those, at the printer's resolution limited by [WindowsOptions.MaxRenderDpi](/docs/reference/latiprimere-windows/windowsoptions/#maxrenderdpi);
+- the printer says it accepts PDF, or, with a PDF rasteriser, a raster format in [WindowsOptions.IppRasterFormats](/docs/reference/latiprimere-windows/windowsoptions/#ipprasterformats), which is asked at its first PDF job. A PDF it can't take is rendered and sent in the first of those it takes, at the printer's resolution limited by [WindowsOptions.MaxRenderDpi](/docs/reference/latiprimere-windows/windowsoptions/#maxrenderdpi);
 - the job doesn't set [PrintOptions.OutputFile](/docs/reference/latiprimere-abstractions/printoptions/#outputfile), an [PrintOptions.InputTray](/docs/reference/latiprimere-abstractions/printoptions/#inputtray), or a `windows:` vendor option.
 
 Such jobs bypass the Windows queue: they don't appear in its queue window, and its pause, permissions, pooling and accounting don't apply to them. Their job IDs are the printer's, and `ipp:` vendor options are sent with them. If the printer can't be reached, the job goes through the Windows queue, which holds it until the printer is back. Finding a WSD queue's printer listens on the network for up to two seconds at its first PDF job; a printer not found isn't searched for again for five minutes.

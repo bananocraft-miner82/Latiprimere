@@ -74,6 +74,18 @@
 		<value>The IPP URI '{1}' for the Windows queue '{0}' must be an absolute ipp, ipps, http or https URI, such as ipp://192.168.1.20/ipp/print.</value>
 		<comment>{0} is the queue name from WindowsOptions.IppPrinterUris, {1} the URI given.</comment>
 	</data>
+	<data name="IppCredentialsWithoutUserName" xml:space="preserve">
+		<value>Credentials in WindowsOptions.IppCredentials or IppPrinterCredentials have no user name. Set its UserName, or leave them unset to send none.</value>
+		<comment>Raised when the Windows print system is created with PrintPdfOverIpp on.</comment>
+	</data>
+	<data name="IppCredentialsUserNameHasColon" xml:space="preserve">
+		<value>A user name in WindowsOptions.IppCredentials or IppPrinterCredentials can't contain ':', which HTTP Basic authentication uses to separate it from the password.</value>
+		<comment>Raised when the Windows print system is created with PrintPdfOverIpp on.</comment>
+	</data>
+	<data name="IppPrinterCredentialsUriInvalid" xml:space="preserve">
+		<value>'{0}' in WindowsOptions.IppPrinterCredentials isn't an absolute ipp or ipps URI.</value>
+		<comment>{0} is the key given.</comment>
+	</data>
 	<data name="VendorOptionNotSupported" xml:space="preserve">
 		<value>The Windows print spooler doesn't support the vendor option '{0}'. It supports {1}.</value>
 		<comment>{0} is the key, such as windows:paper; {1} the supported keys, such as windows:devmode and windows:print-ticket.</comment>
@@ -170,6 +182,9 @@
 	</data>
 	<data name="PdfNeedsRasterizer" xml:space="preserve">
 		<value>Printing PDF documents on Windows needs a PDF rasteriser. Add the Latiprimere.Rendering.Pdfium package and call AddLatiprimerePdfium(), or pass a rasteriser to WindowsPrintSystemFactory.Create().</value>
+	</data>
+	<data name="ImageNeedsRasterizer" xml:space="preserve">
+		<value>Printing images and text on Windows needs a PDF rasteriser, as each is laid out as a PDF. Add the Latiprimere.Rendering.Pdfium package and call AddLatiprimerePdfium(), or pass a rasteriser to WindowsPrintSystemFactory.Create().</value>
 	</data>
 	<data name="WindowsOnly" xml:space="preserve">
 		<value>The Windows print spooler is only available on Windows.</value>

@@ -1,3 +1,4 @@
+using Latiprimere.Ipp.Mapping;
 using Latiprimere.Ipp.Testing.Builders;
 using Latiprimere.Ipp.Testing.Fakes;
 using Latiprimere.Testing.Fakes;
@@ -329,6 +330,90 @@ public sealed class IppPrinterTests
 		// Assert
 		Assert.Equal(expectedRequests, client.AttributeListRequestCount);
 		Assert.Equal(expectedRequests, logger.Entries.Count);
+	}
+
+	[Fact]
+	public async Task GivenPasswordRefusalFromPrinterListingIppsWhenSubmitThenSaysItsEncryptedAddress()
+	{
+		// Arrange — refused at Validate-Job for want of a password, by a printer listing an ipps:// address too
+		FakeIppClient client = new FakeIppClient
+		{
+			ValidateJobFailureToThrow = new PrintAuthenticationException("Needs a user name and password.") { NativeErrorCode = 401 }
+		};
+
+		IppPrinter printer = IppPrinterTests.CreateValidatingPrinter
+		(
+			client,
+			[IppOperation.PrintJob, IppOperation.ValidateJob],
+			requirements: new PrinterUriRequirements
+			{
+				Authentication    = "basic",
+				SecureAlternative = new Uri("ipps://localhost:443/printers/Office")
+			}
+		);
+
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert — the same kind of exception and status, with the address added
+		PrintAuthenticationException exception = await Assert.ThrowsAsync<PrintAuthenticationException>(submit);
+		Assert.StartsWith("Needs a user name and password. ", exception.Message, StringComparison.Ordinal);
+		Assert.Contains("ipps://localhost:443/printers/Office", exception.Message, StringComparison.Ordinal);
+		Assert.Equal(401, exception.NativeErrorCode);
+		Assert.Same(client.ValidateJobFailureToThrow, exception.InnerException);
+	}
+
+	[Fact]
+	public async Task GivenRefusalFromPrinterAskingForDigestWhenSubmitThenSaysLatiprimereCantGiveIt()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient
+		{
+			PrintJobFailureToThrow = new PrintAuthenticationException("Needs a user name and password.") { NativeErrorCode = 401 }
+		};
+
+		IppPrinter printer = IppPrinterTests.CreateValidatingPrinter
+		(
+			client,
+			[IppOperation.PrintJob],
+			requirements: new PrinterUriRequirements { Authentication = "digest" }
+		);
+
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		PrintAuthenticationException exception = await Assert.ThrowsAsync<PrintAuthenticationException>(submit);
+		Assert.Contains("'digest' authentication", exception.Message, StringComparison.Ordinal);
+		Assert.Contains("HTTP Basic only", exception.Message, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task GivenPasswordRefusalWithNothingToAddWhenSubmitThenThrowsItUnchanged()
+	{
+		// Arrange — reached over IPPS already, so there is no other address to give
+		PrintAuthenticationException refusal = new PrintAuthenticationException("Credentials rejected.") { NativeErrorCode = 401 };
+		FakeIppClient client = new FakeIppClient { ValidateJobFailureToThrow = refusal };
+
+		IppPrinter printer = IppPrinterTests.CreateValidatingPrinter
+		(
+			client,
+			[IppOperation.PrintJob, IppOperation.ValidateJob],
+			requirements: new PrinterUriRequirements { Authentication = "basic" }
+		);
+
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		PrintAuthenticationException exception = await Assert.ThrowsAsync<PrintAuthenticationException>(submit);
+		Assert.Same(refusal, exception);
 	}
 
 	[Fact]
@@ -758,14 +843,24 @@ public sealed class IppPrinterTests
 	/// <param name="client">The client.</param>
 	/// <param name="operations">The operations the printer lists.</param>
 	/// <param name="logger">Where to log, or nowhere.</param>
+	/// <param name="requirements">What the printer says it asks for at its address, or <see langword="null"/>.</param>
 	/// <returns>The printer.</returns>
-	private static IppPrinter CreateValidatingPrinter(FakeIppClient client, IppOperation[] operations, RecordingLogger? logger = null)
+	private static IppPrinter CreateValidatingPrinter
+	(
+		FakeIppClient                    client,
+		IppOperation[]                   operations,
+		RecordingLogger?                 logger = null,
+		PrinterUriRequirements?  requirements = null
+	)
 	{
 		IppPrintContextBuilder builder = new IppPrintContextBuilder().WithClient(client).WithValidateJobs(true);
 		IppPrintContext context = (logger is null ? builder : builder.WithLogger(logger)).Build();
 		PrinterInfo info = new PrinterInfo { Id = "ipp:ipp://printer/ipp/print", Name = "Office" };
 
-		return new IppPrinter(context, IppPrinterTests.PrinterUri, info, null, operations);
+		return new IppPrinter(context, IppPrinterTests.PrinterUri, info, null, operations)
+		{
+			UriRequirements = requirements
+		};
 	}
 
 	/// <summary>

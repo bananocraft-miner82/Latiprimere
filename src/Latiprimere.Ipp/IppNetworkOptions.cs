@@ -23,10 +23,17 @@ public sealed class IppNetworkOptions
 	/// </summary>
 	public static readonly TimeSpan DefaultConnectTimeout = IppHttpClientFactory.DefaultConnectTimeout;
 
-	private TimeSpan busyRetryDuration = IppNetworkOptions.DefaultBusyRetryDuration; // Backs BusyRetryDuration
-	private TimeSpan connectTimeout = IppNetworkOptions.DefaultConnectTimeout;       // Backs ConnectTimeout
-	private TimeSpan discoveryDuration = IppNetworkOptions.DefaultDiscoveryDuration; // Backs DiscoveryDuration
-	private int? maxRenderDpi;                                                        // Backs MaxRenderDpi
+	/// <summary>
+	/// The default longest a printer may go without taking any more of a job's document, or without answering once it
+	/// has been sent it all: 5 minutes.
+	/// </summary>
+	public static readonly TimeSpan DefaultUploadStallTimeout = TimeSpan.FromMinutes(5);
+
+	private TimeSpan busyRetryDuration = IppNetworkOptions.DefaultBusyRetryDuration;   // Backs BusyRetryDuration
+	private TimeSpan connectTimeout = IppNetworkOptions.DefaultConnectTimeout;         // Backs ConnectTimeout
+	private TimeSpan discoveryDuration = IppNetworkOptions.DefaultDiscoveryDuration;   // Backs DiscoveryDuration
+	private TimeSpan uploadStallTimeout = IppNetworkOptions.DefaultUploadStallTimeout; // Backs UploadStallTimeout
+	private int? maxRenderDpi;                                                          // Backs MaxRenderDpi
 
 	/// <summary>
 	/// Gets or sets a value indicating whether to find printers on the local network with DNS-SD (Bonjour/mDNS)
@@ -101,6 +108,42 @@ public sealed class IppNetworkOptions
 	}
 
 	/// <summary>
+	/// Gets or sets the longest a printer may go without taking any more of a job's document, or without answering
+	/// once it has been sent it all. Defaults to <see cref="DefaultUploadStallTimeout"/>, 5 minutes;
+	/// <see cref="Timeout.InfiniteTimeSpan"/> waits as long as the printer takes.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// It limits a lack of progress, not the whole upload: a large job to a printer that reads it only as fast as it
+	/// prints takes as long as it needs while the printer keeps reading, and the time spent rendering a PDF sent as
+	/// raster isn't counted. A printer that stops reading partway, such as one that jams, sleeps or loses its network
+	/// connection without closing it, would otherwise hold the submission until the caller's cancellation token, if
+	/// any, cancels it.
+	/// </para>
+	/// <para>
+	/// When it runs out, the submission fails with a <see cref="PrintException"/> saying whether the printer stopped
+	/// taking the document or didn't answer once it was sent it all. The job isn't sent again: the printer may already
+	/// have printed some of it. Allow for a printer that pauses before it starts, to warm up or clean its heads, and
+	/// between pages, as an inkjet printing on both sides does while the ink dries.
+	/// </para>
+	/// </remarks>
+	/// <exception cref="ArgumentOutOfRangeException">The value is not positive, other than
+	/// <see cref="Timeout.InfiniteTimeSpan"/>, or is longer than about 24 days.</exception>
+	public TimeSpan UploadStallTimeout
+	{
+		get
+		{
+			return this.uploadStallTimeout;
+		}
+
+		set
+		{
+			IppHttpClientFactory.ValidateUploadStallTimeout(value);
+			this.uploadStallTimeout = value;
+		}
+	}
+
+	/// <summary>
 	/// Gets or sets how long to keep resending a job that a printer turns away because it is busy with another
 	/// (IPP status <c>server-error-busy</c>). Printers that take one job at a time do this. Defaults to
 	/// <see cref="DefaultBusyRetryDuration"/>; <see cref="TimeSpan.Zero"/> sends each job once.
@@ -149,13 +192,35 @@ public sealed class IppNetworkOptions
 	public bool ValidateJobs { get; set; } = true;
 
 	/// <summary>
+	/// Gets the raster formats a PDF may be rendered into for a printer that can't take PDF, in the order they're
+	/// tried: by default PWG raster, then Apple raster, then PCLm.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The first the printer lists is used. A printer that takes PDF is always sent the PDF. Reorder the list to
+	/// prefer a format, or leave one out so it's never sent, as for a printer that handles one badly. Empty, a printer
+	/// that can't take PDF is refused PDFs with a <see cref="NotSupportedException"/>, as without a rasteriser.
+	/// </para>
+	/// <para>
+	/// PCLm is a PDF of image strips, which Mopria printers take; Latiprimere compresses its strips with Flate or
+	/// run-length encoding, whichever the printer prefers.
+	/// </para>
+	/// </remarks>
+	public IList<IppRasterFormat> RasterFormats { get; } = new List<IppRasterFormat>
+	{
+		IppRasterFormat.PwgRaster,
+		IppRasterFormat.AppleRaster,
+		IppRasterFormat.Pclm
+	};
+
+	/// <summary>
 	/// Gets or sets the highest resolution, in dots per inch, a PDF is rendered at when it is sent as raster to a
 	/// printer that can't take PDF. Defaults to <see langword="null"/>: the printer's default resolution.
 	/// </summary>
 	/// <remarks>
 	/// <para>
-	/// A printer that doesn't take PDF is sent its pages as images, in PWG raster or Apple raster, at one of the
-	/// resolutions it lists, which needs a PDF rasteriser such as Latiprimere.Rendering.Pdfium. Its default is used
+	/// A printer that doesn't take PDF is sent its pages as images, in a format of <see cref="RasterFormats"/>, at one
+	/// of the resolutions it lists, which needs a PDF rasteriser such as Latiprimere.Rendering.Pdfium. Its default is used
 	/// when it has one and it is within this limit; otherwise the highest it lists within the limit and 600 dpi.
 	/// If it lists none that low, its lowest is used. Resolutions above 2400 dpi are never used, whatever this limit.
 	/// </para>
