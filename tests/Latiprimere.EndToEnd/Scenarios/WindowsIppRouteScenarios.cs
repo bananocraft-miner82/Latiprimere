@@ -120,7 +120,7 @@ public static class WindowsIppRouteScenarios
 		// Held in case the job falls back to the driver, which can't share with another process
 		using SharedPrinterLock printerLock = new SharedPrinterLock(TestPrinters.MicrosoftPrintToPdfName);
 
-		PrintOptions options = new PrintOptions { MediaSize = new MediaSize { Name = "iso_a4_210x297mm", DisplayName = "A4", WidthMillimetres = 210, HeightMillimetres = 297 } };
+		PrintOptions options = new PrintOptions { MediaSize = new MediaSize { Name = "iso_a4_210x297mm", DisplayName = "A4", WidthMillimeters = 210, HeightMillimeters = 297 } };
 		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, context.CancellationToken);
 		PrintJobStatus status = await JobFollower.WaitUntilFinishedAsync(context, job);
 		await FakePrinters.SaveRequestsAsync(context, fake);

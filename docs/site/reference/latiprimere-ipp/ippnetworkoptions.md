@@ -164,7 +164,9 @@ Once a certificate is pinned, or [IppNetworkOptions.ServerCertificateValidationC
 public string? UserName { get; set; }
 ```
 
-Gets or sets the user name sent with requests. When `null`, the current operating-system user name is used.
+Gets or sets the user name sent with requests as `requesting-user-name`, which printers list jobs under. When `null`, the current operating-system user name is used.
+
+It isn't a login, and printers don't check it. For a printer that asks for a user name and password, set [IppNetworkOptions.Credentials](/docs/reference/latiprimere-ipp/ippnetworkoptions/#credentials) or [IppNetworkOptions.PrinterCredentials](/docs/reference/latiprimere-ipp/ippnetworkoptions/#printercredentials).
 
 ### ValidateJobs
 

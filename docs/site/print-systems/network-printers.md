@@ -27,7 +27,7 @@ services.AddLatiprimereIpp(options =>
 });
 ```
 
-Without dependency injection, pass the same settings to `IppNetworkPrintSystemFactory.Create(new PdfiumRasterizer(), new IppNetworkOptions { … })`, and dispose the print system when you've finished.
+Without dependency injection, pass the same settings to `IppNetworkPrintSystemFactory.Create(new PdfiumRasterizer(), new IppNetworkOptions { … }, loggerFactory)`, with `null` for a logger factory if you don't log,, and dispose the print system when you've finished.
 
 ## Printers that don't take PDF
 

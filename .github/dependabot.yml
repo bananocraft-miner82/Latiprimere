@@ -1,0 +1,38 @@
+# Pull requests for dependency updates, so a fix in a dependency isn't missed. PDFium matters most: it parses the PDFs
+# applications print, which may come from anyone.
+version: 2
+
+updates:
+  # Directory.Packages.props, where every package's version is set
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One version for the three platforms' binaries
+      pdfium:
+        patterns:
+          - "bblanchon.PDFium.*"
+      microsoft-extensions:
+        patterns:
+          - "Microsoft.Extensions.*"
+      test-and-build-tools:
+        patterns:
+          - "xunit.*"
+          - "StyleCop.Analyzers"
+          - "Microsoft.CodeAnalysis.*"
+    ignore:
+      # The packages support .NET 10 applications, which a major version for .NET 11 would make take it too: an
+      # owner's decision, not an automatic update
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns:
+          - "*"

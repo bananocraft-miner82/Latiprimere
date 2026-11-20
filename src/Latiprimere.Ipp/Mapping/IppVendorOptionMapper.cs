@@ -280,8 +280,8 @@ internal static class IppVendorOptionMapper
 				Key          = key,
 				DisplayName  = displayName,
 				Kind         = VendorOptionKind.Number,
-				MinimumValue = IppVendorOptionMapper.LowestPriority,
-				MaximumValue = IppVendorOptionMapper.HighestPriority,
+				MinValue = IppVendorOptionMapper.LowestPriority,
+				MaxValue = IppVendorOptionMapper.HighestPriority,
 				DefaultValue = defaultValue
 			};
 		}
@@ -295,8 +295,8 @@ internal static class IppVendorOptionMapper
 				Key          = key,
 				DisplayName  = displayName,
 				Kind         = VendorOptionKind.Number,
-				MinimumValue = ranges.Min(range => range.Lower),
-				MaximumValue = ranges.Max(range => range.Upper),
+				MinValue = ranges.Min(range => range.Lower),
+				MaxValue = ranges.Max(range => range.Upper),
 				DefaultValue = defaultValue
 			};
 		}

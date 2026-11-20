@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Latiprimere.Cups.Resources;
 using Latiprimere.Ipp;
@@ -23,12 +24,39 @@ public static class CupsPrintSystemFactory
 	/// <exception cref="ArgumentException">The configured server is not valid; or the credentials have no user name,
 	/// or one containing a colon. An invalid <c>CUPS_SERVER</c> doesn't throw here: each request of the print system
 	/// fails with a <see cref="PrintException"/> that names it.</exception>
+	[SuppressMessage
+	(
+		"ApiDesign",
+		"RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads",
+		Justification = "Shipped before the overload with a logger factory, whose parameters are both required so that Create(null) stays unambiguous."
+	)]
 	public static IPrintSystem Create(CupsOptions? options = null)
 	{
-		return CupsPrintSystemFactory.Create
+		return CupsPrintSystemFactory.Create(options, loggerFactory: null);
+	}
+
+	/// <summary>
+	/// Creates a CUPS print system that logs what it carries on without, such as vendor options it couldn't read.
+	/// </summary>
+	/// <param name="options">How to connect to CUPS, or <see langword="null"/> for the defaults.</param>
+	/// <param name="loggerFactory">
+	/// The application's logger factory, or <see langword="null"/> to log nothing. The print system logs under the
+	/// category <c>Latiprimere.Ipp</c>.
+	/// </param>
+	/// <returns>
+	/// The print system. It holds a connection to the scheduler, so dispose it, for example with
+	/// <c>using</c>, when it is no longer needed. It reports itself as unsupported on platforms without CUPS unless a server is set.
+	/// </returns>
+	/// <exception cref="ArgumentException">The configured server is not valid; or the credentials have no user name,
+	/// or one containing a colon. An invalid <c>CUPS_SERVER</c> doesn't throw here: each request of the print system
+	/// fails with a <see cref="PrintException"/> that names it.</exception>
+	public static IPrintSystem Create(CupsOptions? options, ILoggerFactory? loggerFactory)
+	{
+		return CupsPrintSystemFactory.CreateForEnvironment
 		(
 			options ?? new CupsOptions(),
-			Environment.GetEnvironmentVariable(CupsEndpoint.ServerEnvironmentVariable)
+			Environment.GetEnvironmentVariable(CupsEndpoint.ServerEnvironmentVariable),
+			loggerFactory
 		);
 	}
 
@@ -42,7 +70,7 @@ public static class CupsPrintSystemFactory
 	/// <exception cref="ArgumentException">The configured server is not valid; or the credentials have no user name,
 	/// or one containing a colon.</exception>
 	/// <remarks>Tests pass the environment value in, as setting the variable would affect every test in the process.</remarks>
-	internal static IPrintSystem Create(CupsOptions options, string? environmentServer, ILoggerFactory? loggerFactory = null)
+	internal static IPrintSystem CreateForEnvironment(CupsOptions options, string? environmentServer, ILoggerFactory? loggerFactory = null)
 	{
 		ILogger logger = IppLog.CreateLogger(loggerFactory);
 

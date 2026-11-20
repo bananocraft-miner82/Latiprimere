@@ -28,6 +28,7 @@ The interfaces, records, enums and exceptions every package shares, in the `Lati
 - [PageOrientation](/docs/reference/latiprimere-abstractions/pageorientation/): Enumerates the orientations in which pages can be printed.
 - [PageSize](/docs/reference/latiprimere-abstractions/pagesize/): The size of a document page.
 - [PrintAuthenticationException](/docs/reference/latiprimere-abstractions/printauthenticationexception/): The exception thrown when a print system needs a user name and password for a request, or doesn't accept the ones it was given.
+- [PrintCertificateException](/docs/reference/latiprimere-abstractions/printcertificateexception/): The exception thrown when a printer's certificate isn't trusted, so no encrypted connection to it was made.
 - [PrintContent](/docs/reference/latiprimere-abstractions/printcontent/): Represents a document to be printed: its data and its format.
 - [PrinterCapabilities](/docs/reference/latiprimere-abstractions/printercapabilities/): What a printer can do, as reported by its print system.
 - [PrinterInfo](/docs/reference/latiprimere-abstractions/printerinfo/): Describes a printer known to a print system.

@@ -36,3 +36,23 @@ The print system. On platforms other than Windows it reports itself as unsupport
 **Exceptions**
 
 - [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): A URI in [WindowsOptions.IppPrinterUris](/docs/reference/latiprimere-windows/windowsoptions/#ippprinteruris) isn't an absolute `ipp`, `ipps`, `http` or `https` URI.
+
+```csharp
+public static IPrintSystem Create(IPdfRasterizer? pdfRasterizer, WindowsOptions? options, ILoggerFactory? loggerFactory)
+```
+
+Creates the Windows print system, which logs what it carries on without, such as vendor options it couldn't read.
+
+**Parameters**
+
+- `pdfRasterizer`: The rasteriser used to print PDF documents, such as `PdfiumRasterizer` from Latiprimere.Rendering.Pdfium, or `null` to support raw printer data only.
+- `options`: How to print, or `null` for the defaults.
+- `loggerFactory`: The application's logger factory, or `null` to log nothing. The print system logs under the category `Latiprimere.Windows`, and PDF jobs sent straight to IPP printers under `Latiprimere.Ipp`.
+
+**Returns**
+
+The print system. On platforms other than Windows it reports itself as unsupported, so it can be registered unconditionally in cross-platform applications.
+
+**Exceptions**
+
+- [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): A URI in [WindowsOptions.IppPrinterUris](/docs/reference/latiprimere-windows/windowsoptions/#ippprinteruris) isn't an absolute `ipp`, `ipps`, `http` or `https` URI.

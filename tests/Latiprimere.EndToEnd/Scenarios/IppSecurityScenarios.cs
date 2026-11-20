@@ -124,7 +124,9 @@ public static class IppSecurityScenarios
 
 		context.Require("looking it up throws a PrintException", exception is not null);
 		context.Note($"{exception!.GetType().Name}: {exception.Message}");
-		context.Check("it gives the certificate's fingerprint", exception.Message.Contains(fake.CertificateFingerprint!, StringComparison.Ordinal), exception.Message);
+		context.Check("it is a PrintCertificateException", exception is PrintCertificateException, exception.GetType().Name);
+		context.CheckEqual("it gives the certificate's fingerprint to pin", fake.CertificateFingerprint, (exception as PrintCertificateException)?.CertificateFingerprint);
+		context.Check("and the message gives it too", exception.Message.Contains(fake.CertificateFingerprint!, StringComparison.Ordinal), exception.Message);
 		context.Check("and says where to pin it", exception.Message.Contains("TrustedCertificateFingerprints", StringComparison.Ordinal), exception.Message);
 		context.Check("it isn't mistaken for an authentication problem", exception is not PrintAuthenticationException);
 		context.CheckEqual("no request reached the printer", 0, fake.Requests.Count);

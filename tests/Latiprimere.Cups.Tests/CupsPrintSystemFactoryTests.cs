@@ -173,7 +173,7 @@ public sealed class CupsPrintSystemFactoryTests
 		CupsOptions options = new CupsOptions();
 
 		// Act
-		using IPrintSystem printSystem = CupsPrintSystemFactory.Create(options, CupsPrintSystemFactoryTests.InvalidEnvironmentServer);
+		using IPrintSystem printSystem = CupsPrintSystemFactory.CreateForEnvironment(options, CupsPrintSystemFactoryTests.InvalidEnvironmentServer);
 
 		// Assert — supported, so the catalog asks it and reports why it fails, rather than silently skipping it
 		Assert.True(printSystem.IsSupported);
@@ -186,7 +186,7 @@ public sealed class CupsPrintSystemFactoryTests
 	public async Task GivenInvalidEnvironmentServerWhenPrintSystemUsedThenThrowsPrintExceptionNamingTheVariable(string operation)
 	{
 		// Arrange — operation is the print system call to make (provided by InlineData above)
-		using IPrintSystem printSystem = CupsPrintSystemFactory.Create
+		using IPrintSystem printSystem = CupsPrintSystemFactory.CreateForEnvironment
 		(
 			new CupsOptions(),
 			CupsPrintSystemFactoryTests.InvalidEnvironmentServer

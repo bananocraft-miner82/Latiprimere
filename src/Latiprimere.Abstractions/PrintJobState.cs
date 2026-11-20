@@ -33,7 +33,7 @@ public enum PrintJobState
 	/// <summary>
 	/// The job was cancelled. This state is final.
 	/// </summary>
-	Cancelled = 5,
+	Canceled = 5,
 
 	/// <summary>
 	/// The job was aborted by the print system because of an error. This state is final.

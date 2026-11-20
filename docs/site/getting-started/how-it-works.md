@@ -20,7 +20,7 @@ your code ──▶ IPrinterCatalog ──▶ print systems ──────�
 | `IPrinterCatalog` | Every printer from every print system, in one place. Your code starts here.      |
 | `IPrintSystem`    | One way of reaching printers: the Windows spooler, CUPS or IPP on the network.   |
 | `PrinterInfo`     | A description of a printer: its ID, name and state when it was read.             |
-| `IPrinter`        | A printer you can send documents to and ask about its capabilities.              |
+| `IPrinter`        | A printer you can send documents to, ask about its capabilities, and ask for a job sent earlier. |
 | `PrintContent`    | A document to print: a stream, and whether it's a PDF or raw printer data.       |
 | `PrintOptions`    | How to print it: copies, two-sided, orientation, paper, colour and tray.         |
 | `IPrintJob`       | A job the printer has accepted, which you can follow or cancel.                  |
@@ -77,7 +77,7 @@ You own the stream and dispose it once the job is sent. Latiprimere reads it fro
 Pending ──▶ Processing ──▶ Completed
    │  ▲          │
    ▼  │          ▼
-  Held        Stopped        (any state) ──▶ Cancelled or Aborted
+  Held        Stopped        (any state) ──▶ Canceled or Aborted
 ```
 
 | State        | Meaning                                                                  | Final |
@@ -87,7 +87,7 @@ Pending ──▶ Processing ──▶ Completed
 | `Processing` | Being processed or printed                                               |       |
 | `Stopped`    | Stopped partway, usually because the printer needs attention             |       |
 | `Completed`  | Finished                                                                  | Yes   |
-| `Cancelled`  | Cancelled, by your code or someone at the printer or queue               | Yes   |
+| `Canceled`   | Cancelled, by your code or someone at the printer or queue               | Yes   |
 | `Aborted`    | Ended by the print system because of an error                            | Yes   |
 | `Unknown`    | The print system didn't say, or said something Latiprimere doesn't know  |       |
 
@@ -95,7 +95,7 @@ Print systems don't announce changes, so Latiprimere asks. `GetStatusAsync` asks
 
 A few things to know:
 
-- **`Completed` means the print system has finished with the job.** Print systems forget finished jobs: the Windows spooler as soon as a job has printed, and printers with little memory soon after. Latiprimere reports a job that is no longer listed as `Completed`, or as `Cancelled` if you cancelled it.
+- **`Completed` means the print system has finished with the job.** Print systems forget finished jobs: the Windows spooler as soon as a job has printed, and printers with little memory soon after. Latiprimere reports a job that is no longer listed as `Completed`, or as `Canceled` if you cancelled it. For the same reason, `GetJobAsync` finds a job by its ID only while the print system still lists it.
 - **A job can sit in `Unknown`.** Some printers don't report states, and `Unknown` isn't final, so `WatchStatusAsync` keeps asking. Always follow a job with a timeout.
 - **Stopping following doesn't stop the job.** Cancelling the token you pass to `WatchStatusAsync` only stops your code waiting, and once `SubmitAsync` has returned, its token can't recall the job. To stop the job itself, call `CancelAsync`, which returns `false` if the job had already finished.
 

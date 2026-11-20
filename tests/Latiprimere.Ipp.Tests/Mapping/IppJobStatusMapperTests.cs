@@ -11,7 +11,7 @@ public sealed class IppJobStatusMapperTests
 	[InlineData(JobState.PendingHeld, PrintJobState.Held)]
 	[InlineData(JobState.Processing, PrintJobState.Processing)]
 	[InlineData(JobState.ProcessingStopped, PrintJobState.Stopped)]
-	[InlineData(JobState.Canceled, PrintJobState.Cancelled)]
+	[InlineData(JobState.Canceled, PrintJobState.Canceled)]
 	[InlineData(JobState.Aborted, PrintJobState.Aborted)]
 	[InlineData(JobState.Completed, PrintJobState.Completed)]
 	public void GivenIppJobStateWhenToPrintJobStateThenMapsToMatchingState
@@ -97,7 +97,7 @@ public sealed class IppJobStatusMapperTests
 
 	[Theory]
 	[InlineData(false, PrintJobState.Completed)]
-	[InlineData(true, PrintJobState.Cancelled)]
+	[InlineData(true, PrintJobState.Canceled)]
 	public void GivenJobNoLongerListedWhenStatusCreatedThenReportsItFinishedWithAMessageUnlessCancelled
 	(
 		bool isCancelRequested,
@@ -120,7 +120,7 @@ public sealed class IppJobStatusMapperTests
 
 	[Theory]
 	[InlineData(false, PrintJobState.Aborted)]
-	[InlineData(true, PrintJobState.Cancelled)]
+	[InlineData(true, PrintJobState.Canceled)]
 	public void GivenJobsPrinterGoneWhenStatusCreatedThenReportsItEndedWithAMessageUnlessCancelled
 	(
 		bool isCancelRequested,

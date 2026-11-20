@@ -18,6 +18,6 @@ public enum RasterRotation
 	/// <summary>Turned half way: upside down.</summary>
 	Half = 2,
 
-	/// <summary>Turned a quarter anticlockwise: the page's top goes to the left, as for landscape printing.</summary>
-	Anticlockwise90 = 3,
+	/// <summary>Turned a quarter counterclockwise (anticlockwise): the page's top goes to the left, as for landscape printing.</summary>
+	Counterclockwise90 = 3,
 }

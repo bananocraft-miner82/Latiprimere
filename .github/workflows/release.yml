@@ -11,7 +11,8 @@ name: Release
 #  2. build: build.yml builds, tests and packs that commit on all three runners.
 #  3. publish: pushes those packages to nuget.org, in the "release" environment, which can require an approval.
 #     nuget.org's trusted publishing policy names this workflow file and that environment.
-#  4. finish: tags the release commit v<version>, and opens a pull request that brings it into main.
+#  4. finish: tags the release commit v<version>, adds a commit after it that has main compare its packages with this
+#     release (tools/releasing/post-release.sh), and opens a pull request that brings both into main.
 on:
   push:
     branches: [release]
@@ -35,7 +36,7 @@ jobs:
     steps:
       # All history and tags, to find the latest release
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -67,7 +68,7 @@ jobs:
       # All history and tags, so the scripts can number the release after the latest one and refuse a version
       # already tagged
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -130,13 +131,13 @@ jobs:
     steps:
       # Only for dotnet nuget push, so any current SDK does; there's no checkout, so no global.json
       - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
       # The packages build.yml made and tested on this run
       - name: Download packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: packages
           path: artifacts/packages
@@ -183,7 +184,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.sha }}
 
@@ -193,6 +194,34 @@ jobs:
         run: |
           git tag "v$VERSION" "$SHA"
           git push origin "v$VERSION"
+
+      # The release commit compared the packages with the release before this one, as packing it had to. main compares
+      # them with this one from now on, so a change to something it first shipped fails on main rather than at the next
+      # release; and the suppressions for this release's breaking changes go, as package validation fails on one it
+      # doesn't need (ADR 0040). A second commit on the branch, after the tagged one; skipped once the pull request
+      # is open, as on a re-run.
+      - name: Compare main with this release
+        run: |
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            echo "The pull request for $BRANCH is already open."
+            exit 0
+          fi
+
+          sh tools/releasing/post-release.sh "$VERSION"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Directory.Build.props
+          # A pathspec that matches no file would fail, so only the files the script removed are named
+          git ls-files --deleted -- 'src/*/CompatibilitySuppressions.xml' | xargs -r git rm --quiet --cached --
+
+          if git diff --cached --quiet; then
+            echo "main already compares with $VERSION."
+            exit 0
+          fi
+
+          git commit --message "Compare with $VERSION" --message "Made by the Release workflow (tools/releasing/post-release.sh)."
+          git push --force origin "HEAD:refs/heads/$BRANCH"
 
       # The release commit dated the changelog's notes and marked the public API shipped; main needs both. A re-run
       # finds the pull request already open.
@@ -208,8 +237,9 @@ jobs:
 
           - the version in \`Directory.Build.props\`;
           - the public API marked shipped;
-          - the package validation baseline set to the previous release;
           - the README status line and the changelog's notes dated as $VERSION.
+
+          And, in a second commit, has \`main\` compare its packages with $VERSION, removing the compatibility suppressions it needed.
 
           Merge it before the next release, so its changelog notes start from a clean \`## Unreleased\`.
           EOF

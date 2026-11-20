@@ -25,7 +25,7 @@ public sealed class RasterIntegrationTests
 	/// <summary>The wait between resends of a job turned away as busy.</summary>
 	private static readonly TimeSpan BusyRetryDelay = TimeSpan.FromSeconds(1);
 
-	private static readonly MediaSize A4 = new MediaSize { Name = "iso_a4_210x297mm", DisplayName = "A4", WidthMillimetres = 210, HeightMillimetres = 297 };
+	private static readonly MediaSize A4 = new MediaSize { Name = "iso_a4_210x297mm", DisplayName = "A4", WidthMillimeters = 210, HeightMillimeters = 297 };
 
 	[Theory]
 	[InlineData((int)RasterColorSpace.Gray8, 300)]

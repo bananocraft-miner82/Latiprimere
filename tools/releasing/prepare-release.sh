@@ -5,7 +5,8 @@
 #   - marks the public API as shipped: moves each src/*/PublicAPI.Unshipped.txt into PublicAPI.Shipped.txt, and
 #     drops the shipped lines that *REMOVED* entries name;
 #   - has packing compare the packages with the previous release, if there was one
-#     (PackageValidationBaselineVersion in src/Directory.Build.props);
+#     (PackageValidationBaselineVersion in src/Directory.Build.props). main already does, after the previous release's
+#     post-release commit (post-release.sh); this sets it for a first release, or if that commit wasn't made;
 #   - updates the version in README.md's status line;
 #   - turns the "## Unreleased" heading of CHANGELOG.md into "## <version> - <today>".
 #

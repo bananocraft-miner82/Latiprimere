@@ -17,7 +17,19 @@ fingerprint 3A:7F:…:C8. If that is the fingerprint the printer's own web page 
 IppNetworkOptions.TrustedCertificateFingerprints to trust it.
 ```
 
-That's a `PrintException`, from `GetPrinterAsync` or whichever call first reaches the printer.
+That's a `PrintCertificateException`, from `GetPrinterAsync` or whichever call first reaches the printer. It derives from `PrintException`, and has the fingerprint in `CertificateFingerprint` and the address in `PrinterUri`, so an application can show them and ask whether to trust the printer:
+
+```csharp
+try
+{
+	IPrinter printer = await catalog.GetPrinterAsync(printerId);
+}
+catch (PrintCertificateException exception)
+{
+	// Show it, to be checked against the printer's own web page, before pinning it
+	Console.WriteLine($"{exception.PrinterUri} presented a certificate with fingerprint {exception.CertificateFingerprint}.");
+}
+```
 
 ## Pin the printer's certificate
 
@@ -39,7 +51,7 @@ services.AddLatiprimereIpp(options =>
 {
 	options.PrinterUris.Add(new Uri("ipps://192.168.20.15:443/ipp/print"));
 
-	// From the PrintException, checked against the printer's web page
+	// From the PrintCertificateException, checked against the printer's web page
 	options.TrustedCertificateFingerprints.Add(fingerprint);
 
 	// Sent to this printer only, and only over IPPS, never in clear text

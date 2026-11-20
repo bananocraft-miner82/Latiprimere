@@ -33,7 +33,7 @@ public static class LatiprimereCupsServiceCollectionExtensions
 		// Register once, even if called more than once; the container disposes the print system on shutdown
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IPrintSystem, CupsPrintSystem>
 		(
-			serviceProvider => (CupsPrintSystem)CupsPrintSystemFactory.Create
+			serviceProvider => (CupsPrintSystem)CupsPrintSystemFactory.CreateForEnvironment
 			(
 				options,
 				Environment.GetEnvironmentVariable(CupsEndpoint.ServerEnvironmentVariable),

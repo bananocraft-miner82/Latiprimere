@@ -39,7 +39,7 @@ static async Task ShowVendorOptionsAsync(IPrinter printer)
 		string values = option.Kind switch
 		{
 			VendorOptionKind.Choice => string.Join(", ", option.Choices.Select(choice => $"{choice.Value} ({choice.DisplayName})")),
-			VendorOptionKind.Number => $"a number from {option.MinimumValue?.ToString(CultureInfo.CurrentCulture) ?? "any"} to {option.MaximumValue?.ToString(CultureInfo.CurrentCulture) ?? "any"}",
+			VendorOptionKind.Number => $"a number from {option.MinValue?.ToString(CultureInfo.CurrentCulture) ?? "any"} to {option.MaxValue?.ToString(CultureInfo.CurrentCulture) ?? "any"}",
 			_ => "text",
 		};
 
@@ -73,7 +73,7 @@ Each `VendorOption` has:
 | `Kind`                            | `Choice`, `Number` or `Text`                                                  |
 | `Choices`                         | For a choice: each `Value` to set, with a `DisplayName`                       |
 | `DefaultValue`                    | What the printer uses when a job doesn't say                                  |
-| `MinimumValue`, `MaximumValue`    | For a number: its limits, where the printer gives them                        |
+| `MinValue`, `MaxValue`    | For a number: its limits, where the printer gives them                        |
 | `AllowsSeveralValues`             | Whether several choices can be set at once, separated by commas, as for IPP `finishings` |
 
 Settings the typed options cover, such as paper size, duplex, colour, trays, copies and orientation, aren't listed: use the typed options for them.

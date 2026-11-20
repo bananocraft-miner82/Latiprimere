@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Latiprimere;
 using Latiprimere.Cups;
 using Latiprimere.Ipp;
+using Latiprimere.Rendering.Pdfium;
 using Latiprimere.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -42,18 +43,19 @@ internal static class Logging
 	}
 
 	/// <summary>
-	/// Lists printers without dependency injection, logging what the catalog does.
+	/// Lists printers without dependency injection, logging what the catalog and the print systems do.
 	/// </summary>
 	/// <returns>A task that completes when the printers are listed.</returns>
 	public static async Task ListWithoutDependencyInjectionAsync()
 	{
 		using ILoggerFactory loggerFactory = LoggerFactory.Create(logging => logging.AddConsole().SetMinimumLevel(LogLevel.Debug));
 
-		using IPrintSystem cups = CupsPrintSystemFactory.Create();
-		using IPrintSystem windows = WindowsPrintSystemFactory.Create();
-		using IPrintSystem network = IppNetworkPrintSystemFactory.Create();
+		// Each print system logs through the logger factory it is given
+		using IPrintSystem cups = CupsPrintSystemFactory.Create(options: null, loggerFactory);
+		using IPrintSystem windows = WindowsPrintSystemFactory.Create(new PdfiumRasterizer(), options: null, loggerFactory);
+		using IPrintSystem network = IppNetworkPrintSystemFactory.Create(new PdfiumRasterizer(), options: null, loggerFactory);
 
-		// Only the catalog logs here: the print systems log only when created through dependency injection
+		// And the catalog through its logger
 		PrinterCatalog catalog = new PrinterCatalog([cups, windows, network], loggerFactory.CreateLogger<PrinterCatalog>());
 
 		IReadOnlyList<PrinterInfo> printers = await catalog.GetPrintersAsync();

@@ -117,7 +117,35 @@ public sealed class WindowsPrintSystemIntegrationTests
 		// Assert
 		Assert.True(isCancelled);
 		Assert.False(waitingStatus.IsTerminal);
-		Assert.Equal(PrintJobState.Cancelled, finalStatus.State);
+		Assert.Equal(PrintJobState.Canceled, finalStatus.State);
+	}
+
+	[Fact]
+	public async Task GivenJobWaitingOnPausedPrinterWhenLookedUpAfterARestartThenFound()
+	{
+		// Arrange — the job is submitted through one catalog and looked up through another, as after a restart
+		WindowsPrintSystemIntegrationTests.SkipUnlessTestPrintersInstalled();
+		IPrintJob submitted;
+
+		await using (CatalogFixture before = WindowsPrintSystemIntegrationTests.CreateCatalog())
+		{
+			IPrinter paused = await WindowsPrintSystemIntegrationTests.GetPrinterAsync(before, WindowsPrintSystemIntegrationTests.PausedName);
+			using MemoryStream data = new MemoryStream(WindowsPrintSystemIntegrationTests.CreateRawData());
+			submitted = await paused.SubmitAsync(PrintContent.FromRaw(data), PrintOptions.Default, TestContext.Current.CancellationToken);
+		}
+
+		await using CatalogFixture fixture = WindowsPrintSystemIntegrationTests.CreateCatalog();
+		IPrinter printer = await WindowsPrintSystemIntegrationTests.GetPrinterAsync(fixture, WindowsPrintSystemIntegrationTests.PausedName);
+
+		// Act
+		IPrintJob? found = await printer.GetJobAsync(submitted.Id, TestContext.Current.CancellationToken);
+
+		// Assert — then cancelled through the job found, so the paused printer doesn't fill up
+		Assert.NotNull(found);
+		Assert.Equal(submitted.Id, found.Id);
+		Assert.False((await found.GetStatusAsync(TestContext.Current.CancellationToken)).IsTerminal);
+		Assert.True(await found.CancelAsync(TestContext.Current.CancellationToken));
+		Assert.Null(await printer.GetJobAsync("2147483647", TestContext.Current.CancellationToken));
 	}
 
 	[Fact]
@@ -240,6 +268,11 @@ public sealed class WindowsPrintSystemIntegrationTests
 		Assert.Equal(WindowsPrintSystemIntegrationTests.ToId(PrinterLock.MicrosoftPrintToPdf), job.PrinterId);
 		Assert.Equal(PrintJobState.Completed, status.State);
 		Assert.DoesNotContain("Windows does not record", status.StateMessage ?? string.Empty, StringComparison.Ordinal);
+
+		// And found again by its ID, which tells it from the spooler's jobs, from the printer that still has it
+		Assert.StartsWith("ipp:", job.Id, StringComparison.Ordinal);
+		IPrintJob? found = await printer.GetJobAsync(job.Id, TestContext.Current.CancellationToken);
+		Assert.Equal(job.Id, found?.Id);
 	}
 
 	[Fact]

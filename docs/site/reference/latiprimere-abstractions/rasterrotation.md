@@ -21,4 +21,4 @@ A band's [RasterBand.PageWidth](/docs/reference/latiprimere-abstractions/rasterb
 - **`None`** (`0`): Not turned.
 - **`Clockwise90`** (`1`): Turned a quarter clockwise: the page's top goes to the right.
 - **`Half`** (`2`): Turned half way: upside down.
-- **`Anticlockwise90`** (`3`): Turned a quarter anticlockwise: the page's top goes to the left, as for landscape printing.
+- **`Counterclockwise90`** (`3`): Turned a quarter counterclockwise (anticlockwise): the page's top goes to the left, as for landscape printing.

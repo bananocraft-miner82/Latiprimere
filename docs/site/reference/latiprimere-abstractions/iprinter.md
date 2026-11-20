@@ -26,6 +26,8 @@ PrinterInfo Info { get; }
 
 Gets information about the printer, as read when the printer was looked up.
 
+It isn't updated afterwards: to see the printer's current state, look it up again with [IPrinterCatalog.GetPrinterAsync](/docs/reference/latiprimere-abstractions/iprintercatalog/#getprinterasync).
+
 ## Methods
 
 ### GetCapabilitiesAsync
@@ -46,6 +48,28 @@ The capabilities. Anything the print system doesn't report is left empty.
 
 **Exceptions**
 
+- [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system or printer couldn't be asked.
+
+### GetJobAsync
+
+```csharp
+Task<IPrintJob?> GetJobAsync(string jobId, CancellationToken cancellationToken = default)
+```
+
+Finds a job submitted to this printer earlier, by its [IPrintJob.Id](/docs/reference/latiprimere-abstractions/iprintjob/#id), so it can be followed or cancelled after the application has restarted.
+
+**Parameters**
+
+- `jobId`: The job's identifier, as [IPrintJob.Id](/docs/reference/latiprimere-abstractions/iprintjob/#id) gave it.
+- `cancellationToken`: A token to cancel the request.
+
+**Returns**
+
+The job, or `null` if the print system no longer knows it, or it was never submitted to this printer. Print systems forget finished jobs: printers and CUPS after a while, and Windows as soon as the job has printed, unless the printer is set to keep printed documents. So a job that isn't found has most likely finished, but whether it printed can't be told.
+
+**Exceptions**
+
+- [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `jobId` is `null`.
 - [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system or printer couldn't be asked.
 
 ### SubmitAsync

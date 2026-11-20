@@ -126,8 +126,8 @@ internal static class WindowsCapabilitiesMapper
 		{
 			Name              = name,
 			DisplayName       = paper.Name,
-			WidthMillimetres  = width,
-			HeightMillimetres = height
+			WidthMillimeters  = width,
+			HeightMillimeters = height
 		};
 	}
 

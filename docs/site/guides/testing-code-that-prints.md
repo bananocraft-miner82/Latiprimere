@@ -120,12 +120,13 @@ internal sealed class FakePrinterCatalog : IPrinterCatalog
 
 ### A printer
 
-`FakePrinter` keeps a copy of everything it's sent, so a test can check the document and options. It reads the document straight away, as a real printer does, because your code may close the stream as soon as the job is sent. Set `JobStates` to script what its jobs report, or `Rejection` to make it turn jobs away:
+`FakePrinter` keeps a copy of everything it's sent, so a test can check the document and options, and finds its jobs again by ID. It reads the document straight away, as a real printer does, because your code may close the stream as soon as the job is sent. Set `JobStates` to script what its jobs report, or `Rejection` to make it turn jobs away:
 
 ```csharp
 internal sealed class FakePrinter : IPrinter
 {
 	private readonly List<SubmittedJob> submittedJobs = new List<SubmittedJob>();
+	private readonly List<FakePrintJob> jobs = new List<FakePrintJob>();
 
 	public FakePrinter(string id, string name)
 	{
@@ -159,8 +160,15 @@ internal sealed class FakePrinter : IPrinter
 		this.submittedJobs.Add(new SubmittedJob { Format = content.Format, Options = options, Document = document.ToArray() });
 
 		string jobId = this.submittedJobs.Count.ToString(CultureInfo.InvariantCulture);
+		FakePrintJob job = new FakePrintJob(jobId, this.Info.Id, this.JobStates);
+		this.jobs.Add(job);
 
-		return new FakePrintJob(jobId, this.Info.Id, this.JobStates);
+		return job;
+	}
+
+	public Task<IPrintJob?> GetJobAsync(string jobId, CancellationToken cancellationToken = default)
+	{
+		return Task.FromResult<IPrintJob?>(this.jobs.Find(job => job.Id == jobId));
 	}
 
 	public Task<PrinterCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default)
@@ -215,12 +223,12 @@ internal sealed class FakePrintJob : IPrintJob
 
 	public Task<bool> CancelAsync(CancellationToken cancellationToken = default)
 	{
-		bool hasFinished = this.currentState is PrintJobState.Completed or PrintJobState.Cancelled or PrintJobState.Aborted;
+		bool hasFinished = this.currentState is PrintJobState.Completed or PrintJobState.Canceled or PrintJobState.Aborted;
 
 		if (!hasFinished)
 		{
 			this.upcomingStates.Clear();
-			this.currentState = PrintJobState.Cancelled;
+			this.currentState = PrintJobState.Canceled;
 		}
 
 		return Task.FromResult(!hasFinished);
@@ -228,7 +236,7 @@ internal sealed class FakePrintJob : IPrintJob
 }
 ```
 
-`WatchStatusAsync` is an extension method that calls `GetStatusAsync`, so it works on the fake job as it does on a real one. Make sure every script ends in a final state, `Completed`, `Cancelled` or `Aborted`: a job that never finishes keeps a test waiting until it times out.
+`WatchStatusAsync` is an extension method that calls `GetStatusAsync`, so it works on the fake job as it does on a real one. Make sure every script ends in a final state, `Completed`, `Canceled` or `Aborted`: a job that never finishes keeps a test waiting until it times out.
 
 ## The tests
 

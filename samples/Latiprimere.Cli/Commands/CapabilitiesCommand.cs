@@ -121,8 +121,8 @@ internal static class CapabilitiesCommand
 				) + (option.AllowsSeveralValues ? CliMessages.VendorSeveralValues : string.Empty),
 				VendorOptionKind.Number => CliMessages.FormatVendorNumberValue
 				(
-					option.MinimumValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "…",
-					option.MaximumValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "…"
+					option.MinValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "…",
+					option.MaxValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "…"
 				),
 				_ => CliMessages.VendorTextValue,
 			};

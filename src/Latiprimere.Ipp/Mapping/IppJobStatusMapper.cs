@@ -44,7 +44,7 @@ internal static class IppJobStatusMapper
 		return new PrintJobStatus
 		{
 			JobId        = jobId,
-			State        = isCancelRequested ? PrintJobState.Cancelled : PrintJobState.Completed,
+			State        = isCancelRequested ? PrintJobState.Canceled : PrintJobState.Completed,
 			StateMessage = isCancelRequested ? null : DisplayStrings.JobNoLongerListed,
 			Timestamp    = timestamp
 		};
@@ -66,7 +66,7 @@ internal static class IppJobStatusMapper
 		return new PrintJobStatus
 		{
 			JobId        = jobId,
-			State        = isCancelRequested ? PrintJobState.Cancelled : PrintJobState.Aborted,
+			State        = isCancelRequested ? PrintJobState.Canceled : PrintJobState.Aborted,
 			StateMessage = isCancelRequested ? null : DisplayStrings.JobPrinterGone,
 			Timestamp    = timestamp
 		};
@@ -85,7 +85,7 @@ internal static class IppJobStatusMapper
 			JobState.PendingHeld       => PrintJobState.Held,
 			JobState.Processing        => PrintJobState.Processing,
 			JobState.ProcessingStopped => PrintJobState.Stopped,
-			JobState.Canceled          => PrintJobState.Cancelled,
+			JobState.Canceled          => PrintJobState.Canceled,
 			JobState.Aborted           => PrintJobState.Aborted,
 			JobState.Completed         => PrintJobState.Completed,
 			_                          => PrintJobState.Unknown,

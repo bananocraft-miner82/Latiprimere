@@ -62,8 +62,8 @@ public sealed class IppJobTemplateMapperTests
 			{
 				Name              = "iso_a4_210x297mm",
 				DisplayName       = "A4",
-				WidthMillimetres  = 210,
-				HeightMillimetres = 297
+				WidthMillimeters  = 210,
+				HeightMillimeters = 297
 			}
 
 		};
@@ -97,7 +97,7 @@ public sealed class IppJobTemplateMapperTests
 	[InlineData("iso_a4_210x297mm", 210.0, 297.0, 21000, 29700)]
 	[InlineData("na_letter_8.5x11in", 215.9, 279.4, 21590, 27940)]
 	[InlineData("na_number-10_4.125x9.5in", 104.78, 241.3, 10478, 24130)]
-	public void GivenTrayAndSizeWhenToJobTemplateAttributesThenSendsBothInMediaColInHundredthsOfMillimetres
+	public void GivenTrayAndSizeWhenToJobTemplateAttributesThenSendsBothInMediaColInHundredthsOfMillimeters
 	(
 		string name,
 		double width,
@@ -109,7 +109,7 @@ public sealed class IppJobTemplateMapperTests
 		// Arrange — sizes in millimetres, as the capabilities report them (provided by InlineData above)
 		PrintOptions options = new PrintOptions
 		{
-			MediaSize = new MediaSize { Name = name, DisplayName = name, WidthMillimetres = width, HeightMillimetres = height },
+			MediaSize = new MediaSize { Name = name, DisplayName = name, WidthMillimeters = width, HeightMillimeters = height },
 			InputTray = new InputTray { Id = "tray-2", Name = "Tray 2" }
 		};
 

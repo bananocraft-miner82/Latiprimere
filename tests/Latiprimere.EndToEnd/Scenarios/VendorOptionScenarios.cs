@@ -166,7 +166,7 @@ public static class VendorOptionScenarios
 			.Select(option => option.Kind switch
 			{
 				VendorOptionKind.Choice => $"{option.Key} ({option.DisplayName}): " + string.Join(", ", option.Choices.Select(choice => $"{choice.Value} = {choice.DisplayName}{(choice.Value == option.DefaultValue ? " (default)" : string.Empty)}")),
-				VendorOptionKind.Number => $"{option.Key} ({option.DisplayName}): a number from {option.MinimumValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "…"} to {option.MaximumValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "…"}, default {option.DefaultValue ?? "not reported"}",
+				VendorOptionKind.Number => $"{option.Key} ({option.DisplayName}): a number from {option.MinValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "…"} to {option.MaxValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "…"}, default {option.DefaultValue ?? "not reported"}",
 				_ => $"{option.Key} ({option.DisplayName}): text, default {option.DefaultValue ?? "not reported"}",
 			})
 			.ToList();

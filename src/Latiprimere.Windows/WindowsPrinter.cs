@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Xml;
 using Latiprimere.Ipp;
 using Latiprimere.Ipp.Discovery;
@@ -29,14 +30,19 @@ namespace Latiprimere.Windows;
 /// </remarks>
 internal sealed class WindowsPrinter : IWindowsPrinter
 {
+	/// <summary>
+	/// Goes before the IPP <c>job-id</c> in the ID of a job sent straight to the queue's IPP printer, to tell it from
+	/// the spooler's job IDs, which are numbers too.
+	/// </summary>
+	internal const string IppJobIdPrefix = "ipp:";
+
 	private readonly WindowsPrintContext context; // Spooler, GDI and rasteriser
 	private readonly string printerName;          // The spooler's name for the printer
 	private readonly string? driverName;          // The printer's driver, if the spooler reported it
 	private readonly string? portName;            // The queue's port, which names the printer's URL for some queues
-	private IppPrinter? ippPrinter;               // The queue's IPP printer, once known to accept PDF or raster
-	private string? ippPrinterUuid;               // The UUID it was found by, for a WSD queue; otherwise null
-	private bool ippPrinterRefusesPdf;            // Whether the queue's IPP printer said it takes neither
-	private bool lacksPrintTickets;               // Whether the driver turned out to have no Print Ticket support
+	private volatile WindowsIppMatch? ippMatch;   // The queue's IPP printer, once known to accept PDF or raster
+	private volatile bool ippPrinterRefusesPdf;   // Whether the queue's IPP printer said it takes neither
+	private volatile bool lacksPrintTickets;      // Whether the driver turned out to have no Print Ticket support
 
 	/// <summary>
 	/// Initialises a new instance of the <see cref="WindowsPrinter"/> class.
@@ -135,6 +141,40 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 	}
 
 	/// <inheritdoc/>
+	/// <remarks>
+	/// The spooler removes a job once it has printed, unless the printer's "Keep printed documents" setting is on. A
+	/// job sent straight to the queue's IPP printer, whose ID starts <c>ipp:</c>, is asked of that printer, which needs
+	/// <see cref="WindowsOptions.PrintPdfOverIpp"/> on. A printer that can't be reached, or a WSD queue's printer that
+	/// can't be found, throws a <see cref="PrintException"/>: the job may still be there.
+	/// </remarks>
+	public async Task<IPrintJob?> GetJobAsync(string jobId, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(jobId);
+
+		if (jobId.StartsWith(WindowsPrinter.IppJobIdPrefix, StringComparison.Ordinal))
+		{
+			IppPrinter? printer = await this.FindIppPrinterForJobAsync(jobId, cancellationToken).ConfigureAwait(false);
+
+			return printer is null
+				? null
+				: await printer.GetJobAsync(jobId, cancellationToken).ConfigureAwait(false);
+		}
+
+		if (!int.TryParse(jobId, NumberStyles.None, CultureInfo.InvariantCulture, out int jobNumber) || jobNumber <= 0)
+		{
+			return null;
+		}
+
+		// Spooler calls block, so run them off the caller's thread
+		WindowsJobRecord? job = await Task.Run(() => this.context.Spool.GetJob(this.printerName, jobNumber), cancellationToken)
+										  .ConfigureAwait(false);
+
+		return job is null
+			? null
+			: new WindowsPrintJob(this.context.Spool, this.printerName, this.Info.Id, jobNumber, this.context.TimeProvider);
+	}
+
+	/// <inheritdoc/>
 	public async Task<PrinterCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default)
 	{
 		// DeviceCapabilities and DocumentProperties block, so run them off the caller's thread
@@ -199,9 +239,9 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 	/// <exception cref="PrintException">The printer refused the job, or the connection failed after it opened.</exception>
 	private async Task<IPrintJob?> TrySubmitOverIppAsync(PrintContent content, PrintOptions options, CancellationToken cancellationToken)
 	{
-		IppPrinter? printer = await this.FindIppPrinterAsync(options, cancellationToken).ConfigureAwait(false);
+		WindowsIppMatch? match = await this.FindIppPrinterAsync(options, cancellationToken).ConfigureAwait(false);
 
-		if (printer is null)
+		if (match is null)
 		{
 			return null;
 		}
@@ -211,13 +251,13 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 
 		try
 		{
-			return await printer.SubmitAsync(content, options, cancellationToken).ConfigureAwait(false);
+			return await match.Printer.SubmitAsync(content, options, cancellationToken).ConfigureAwait(false);
 		}
 		catch (PrintException exception) when (IppConnectionErrors.IsConnectFailure(exception))
 		{
 			// Moved or switched off since it was found: the next job asks afresh, searching again by UUID, rather than
 			// waiting for the same address to time out each time
-			this.ForgetIppPrinter();
+			this.ForgetIppPrinter(match);
 
 			if (documentStart is null)
 			{
@@ -245,8 +285,9 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 	/// </summary>
 	/// <param name="options">The job's options; some need the spooler.</param>
 	/// <param name="cancellationToken">A token to cancel the question.</param>
-	/// <returns>The printer, or <see langword="null"/> if this job goes through the spooler.</returns>
-	private async Task<IppPrinter?> FindIppPrinterAsync(PrintOptions options, CancellationToken cancellationToken)
+	/// <returns>The printer and the UUID it was found by, or <see langword="null"/> if this job goes through the
+	/// spooler.</returns>
+	private async Task<WindowsIppMatch?> FindIppPrinterAsync(PrintOptions options, CancellationToken cancellationToken)
 	{
 		WindowsIppRoute? route = this.context.IppRoute;
 
@@ -260,9 +301,11 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 			return null;
 		}
 
-		if (this.ippPrinter is not null)
+		WindowsIppMatch? known = this.ippMatch;
+
+		if (known is not null)
 		{
-			return this.ippPrinter;
+			return known;
 		}
 
 		// An exact URI, or a WSD queue's printer found by the UUID its port records (ADR 0036)
@@ -339,25 +382,70 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 			WindowsLog.IppPrinterMatched(this.context.Logger, this.printerName, printerUri);
 		}
 
-		this.ippPrinter = new IppPrinter(route.Context, printerUri, this.Info, formats, operations);
-		this.ippPrinterUuid = target.Uuid;
+		WindowsIppMatch match = new WindowsIppMatch
+		{
+			Printer = new IppPrinter(route.Context, printerUri, this.Info, formats, operations)
+			{
+				JobIdPrefix = WindowsPrinter.IppJobIdPrefix
+			},
+			Uuid = target.Uuid
+		};
 
-		return this.ippPrinter;
+		this.ippMatch = match;
+
+		return match;
 	}
 
 	/// <summary>
-	/// Forgets the queue's IPP printer, and the route's match for its UUID, so the next PDF job finds it again.
+	/// Finds the queue's IPP printer to ask about a job sent to it earlier, whether or not it takes PDF now.
 	/// </summary>
-	private void ForgetIppPrinter()
+	/// <param name="jobId">The job's ID, for the message if the printer can't be found.</param>
+	/// <param name="cancellationToken">A token to cancel the search.</param>
+	/// <returns>The printer, or <see langword="null"/> if no job of this queue can have gone over IPP: the route is
+	/// off, or the queue has no IPP printer to send to.</returns>
+	/// <exception cref="PrintException">The queue's printer is found by UUID, and the search didn't find it.</exception>
+	private async Task<IppPrinter?> FindIppPrinterForJobAsync(string jobId, CancellationToken cancellationToken)
 	{
-		string? uuid = this.ippPrinterUuid;
+		WindowsIppRoute? route = this.context.IppRoute;
 
-		this.ippPrinter = null;
-		this.ippPrinterUuid = null;
-
-		if (uuid is not null)
+		if (route is null || !route.MayHaveTarget(this.printerName, this.portName, this.context.Spool))
 		{
-			this.context.IppRoute?.ForgetMatch(uuid);
+			return null;
+		}
+
+		WindowsIppMatch? known = this.ippMatch;
+
+		if (known is not null)
+		{
+			return known.Printer;
+		}
+
+		WindowsIppTarget? target = await route
+			.FindTargetAsync(this.printerName, this.portName, this.context.Spool, cancellationToken)
+			.ConfigureAwait(false);
+
+		if (target is null)
+		{
+			throw new PrintException(ExceptionMessages.FormatIppJobPrinterNotFound(jobId, this.printerName));
+		}
+
+		// Only read from, so it isn't kept for PDF jobs, which check first what the printer takes
+		return new IppPrinter(route.Context, target.PrinterUri, this.Info)
+		{
+			JobIdPrefix = WindowsPrinter.IppJobIdPrefix
+		};
+	}
+
+	/// <summary>
+	/// Forgets the queue's IPP printer, and the route's match for its UUID, so the next PDF job finds it again; unless
+	/// another job has found it again already.
+	/// </summary>
+	/// <param name="failed">The match that couldn't be reached.</param>
+	private void ForgetIppPrinter(WindowsIppMatch failed)
+	{
+		if (Interlocked.CompareExchange(ref this.ippMatch, null, failed) == failed && failed.Uuid is not null)
+		{
+			this.context.IppRoute?.ForgetMatch(failed.Uuid);
 		}
 	}
 

@@ -13,8 +13,9 @@ Every Latiprimere exception derives from `PrintException`, so one `catch` handle
 | --------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------ |
 | `PrinterNotFoundException`        | No print system knows the printer ID. `PrinterId` holds the ID.              | Let the user choose another printer.             |
 | `PrintAuthenticationException`    | A CUPS server or network printer needs a user name and password, or refused the ones given; or a network printer asks for one over plain IPP, where it's never sent. | Ask for credentials and create the print system again; for a network printer, use its `ipps://` address. |
+| `PrintCertificateException`       | A network printer's `ipps://` address presented a certificate that isn't trusted. `CertificateFingerprint` and `PrinterUri` say which. | Check the fingerprint against the printer's web page, then pin it. |
 | `PrintSystemUnavailableException` | No registered print system works on this machine, or its service isn't running. | Register the right print system, or start its service. |
-| `PrintException`                  | Anything else the print system reports: a rejected job, a printer that can't be reached, a timeout, a certificate that isn't trusted. | Show the message; `NativeErrorCode` helps diagnose it. |
+| `PrintException`                  | Anything else the print system reports: a rejected job, a printer that can't be reached, a timeout. | Show the message; `NativeErrorCode` helps diagnose it. |
 | `NotSupportedException`           | The printer can't take the document or option, such as raw data on a virtual printer, or a PDF on a text-only printer. | Change what you send.                           |
 | `ArgumentException`               | An option the print system refuses, such as a vendor option the printer doesn't offer, or settings that can't work, such as a malformed certificate fingerprint, when the print system is registered. | Fix the option or setting: the message says which. |
 
@@ -88,7 +89,7 @@ Check that the CUPS scheduler is running: `lpstat -r` should say so. In a contai
 Discovery only sees printers on the same part of the network, and needs multicast DNS (UDP port 5353) to get through firewalls. Add the printer by its address instead: see [Network printers over IPP](/docs/print-systems/network-printers/). A printer that sleeps may not answer the search: `AddressStorePath` remembers where each printer was last seen.
 
 **A network printer's `ipps://` address "presented a certificate that isn't trusted".**
-Printers make their own certificates, which no computer trusts. Check the fingerprint in the message against the printer's web page, then pin it: see [Secure network printers](/docs/print-systems/secure-printers/).
+Printers make their own certificates, which no computer trusts. Check the fingerprint, in the message and in the `PrintCertificateException`'s `CertificateFingerprint`, against the printer's web page, then pin it: see [Secure network printers](/docs/print-systems/secure-printers/).
 
 **Microsoft Print to PDF fails with "The printer driver's request was cancelled".**
 The driver wanted to show a Save dialog, which an app without a user interface can't. Set `PrintOptions.OutputFile`: see [CUPS servers and the Windows spooler](/docs/print-systems/cups-and-windows/).
@@ -98,7 +99,7 @@ The print system isn't reporting the job's state, so it stays `Unknown`. Always 
 
 ## Should you retry?
 
-- **Don't retry** `PrinterNotFoundException`, `PrintAuthenticationException` or `NotSupportedException`: the same request fails the same way.
+- **Don't retry** `PrinterNotFoundException`, `PrintAuthenticationException`, `PrintCertificateException` or `NotSupportedException`: the same request fails the same way.
 - **A `PrintException`** for a printer or server that couldn't be reached may succeed later, once the printer is back.
 - **Busy network printers** are retried for you, for two minutes by default.
 

@@ -21,6 +21,6 @@ Enumerates the states a print job can be in. Modelled on the IPP job states.
 - **`Held`** (`2`): The job is held and will not be processed until it is released.
 - **`Processing`** (`3`): The job is being processed or printed.
 - **`Stopped`** (`4`): The job has stopped while processing, for example because the printer needs attention.
-- **`Cancelled`** (`5`): The job was cancelled. This state is final.
+- **`Canceled`** (`5`): The job was cancelled. This state is final.
 - **`Aborted`** (`6`): The job was aborted by the print system because of an error. This state is final.
 - **`Completed`** (`7`): The job finished successfully. This state is final.

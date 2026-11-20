@@ -89,4 +89,29 @@ internal static class PrintOptionsAndJobs
 			Console.WriteLine(cancelled ? "Cancelled the job." : "The job had already finished.");
 		}
 	}
+
+	/// <summary>
+	/// Reports the status of a job submitted before the application restarted, from the IDs it stored then.
+	/// </summary>
+	/// <param name="catalog">The printer catalog.</param>
+	/// <param name="printerId">The job's <see cref="IPrintJob.PrinterId"/>, as stored.</param>
+	/// <param name="jobId">The job's <see cref="IPrintJob.Id"/>, as stored.</param>
+	/// <param name="cancellationToken">A token to cancel the request.</param>
+	/// <returns>A task that completes when the status has been reported.</returns>
+	public static async Task ReportStoredJobAsync(IPrinterCatalog catalog, string printerId, string jobId, CancellationToken cancellationToken)
+	{
+		IPrinter printer = await catalog.GetPrinterAsync(printerId, cancellationToken);
+		IPrintJob? job = await printer.GetJobAsync(jobId, cancellationToken);
+
+		if (job is null)
+		{
+			// Print systems forget finished jobs, so it has most likely finished
+			Console.WriteLine("The print system no longer knows the job.");
+
+			return;
+		}
+
+		PrintJobStatus status = await job.GetStatusAsync(cancellationToken);
+		Console.WriteLine(status.State);
+	}
 }

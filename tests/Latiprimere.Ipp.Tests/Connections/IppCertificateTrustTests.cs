@@ -123,6 +123,26 @@ public sealed class IppCertificateTrustTests
 	}
 
 	[Fact]
+	public void GivenCertificateRefusedThenAcceptedWhenTheRefusalIsLookedUpThenItIsGone()
+	{
+		// Arrange — the application's check refuses it at first, then accepts it, as after the user said to trust it
+		using X509Certificate2 certificate = IppCertificateTrustTests.CreateCertificate();
+		bool accepts = false;
+		IppCertificateTrust trust = new IppCertificateTrust([], (_, _, _, _) => accepts);
+		_ = trust.Validate(new object(), "192.168.1.20", certificate, null, SslPolicyErrors.RemoteCertificateChainErrors);
+		RefusedCertificate? refusedFirst = trust.FindRefusal("192.168.1.20");
+		accepts = true;
+
+		// Act
+		bool trusted = trust.Validate(new object(), "192.168.1.20", certificate, null, SslPolicyErrors.RemoteCertificateChainErrors);
+
+		// Assert — a later TLS failure there mustn't be blamed on the certificate refused before
+		Assert.NotNull(refusedFirst);
+		Assert.True(trusted);
+		Assert.Null(trust.FindRefusal("192.168.1.20"));
+	}
+
+	[Fact]
 	public void GivenPinnedCertificateWithAnotherNameWhenValidatedThenTrusted()
 	{
 		// Arrange — a printer's self-signed certificate, naming another host, pinned in any case
@@ -203,7 +223,7 @@ public sealed class IppCertificateTrustTests
 	/// Creates a self-signed certificate, as printers have.
 	/// </summary>
 	/// <returns>The certificate.</returns>
-	private static X509Certificate2 CreateCertificate()
+	internal static X509Certificate2 CreateCertificate()
 	{
 		using ECDsa key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
 		CertificateRequest request = new CertificateRequest("CN=HP ENVY 5640", key, HashAlgorithmName.SHA256);

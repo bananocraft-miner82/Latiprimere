@@ -35,3 +35,22 @@ The print system. It holds a connection to the scheduler, so dispose it, for exa
 **Exceptions**
 
 - [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): The configured server is not valid; or the credentials have no user name, or one containing a colon. An invalid `CUPS_SERVER` doesn't throw here: each request of the print system fails with a [PrintException](/docs/reference/latiprimere-abstractions/printexception/) that names it.
+
+```csharp
+public static IPrintSystem Create(CupsOptions? options, ILoggerFactory? loggerFactory)
+```
+
+Creates a CUPS print system that logs what it carries on without, such as vendor options it couldn't read.
+
+**Parameters**
+
+- `options`: How to connect to CUPS, or `null` for the defaults.
+- `loggerFactory`: The application's logger factory, or `null` to log nothing. The print system logs under the category `Latiprimere.Ipp`.
+
+**Returns**
+
+The print system. It holds a connection to the scheduler, so dispose it, for example with `using`, when it is no longer needed. It reports itself as unsupported on platforms without CUPS unless a server is set.
+
+**Exceptions**
+
+- [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): The configured server is not valid; or the credentials have no user name, or one containing a colon. An invalid `CUPS_SERVER` doesn't throw here: each request of the print system fails with a [PrintException](/docs/reference/latiprimere-abstractions/printexception/) that names it.
