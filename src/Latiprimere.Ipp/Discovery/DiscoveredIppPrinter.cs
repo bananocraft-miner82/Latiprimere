@@ -31,4 +31,10 @@ internal sealed record DiscoveredIppPrinter
 	/// <see langword="null"/> if not announced.
 	/// </summary>
 	public string? Uuid { get; init; }
+
+	/// <summary>
+	/// Gets when the print system last saw the printer announced, so it can forget printers it no longer sees; or
+	/// <see langword="null"/> for an announcement not yet remembered, or one remembered before this was kept.
+	/// </summary>
+	public DateTimeOffset? LastSeen { get; init; }
 }

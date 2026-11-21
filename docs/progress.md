@@ -14,6 +14,132 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 ---
 
+## 2026-11-21: A sweep for vulnerabilities and bugs, and its fixes
+
+**Done** (owner: "perform a code sweep and look for any potential vulnerabilities, bugs, security/performance issues etc. Are the dependencies all up-to-date?", then "Yes, fix 1 to 4")
+- **Dependencies:**
+  - none has a known vulnerability, direct or transitive;
+  - none of the libraries' is deprecated;
+  - the only update is Microsoft.Extensions.* 11.0.0, held back on purpose (dependabot.yml);
+  - Microsoft.Testing.Platform 2.5.2, which xunit.v3 4.0.3 brings into the tests only, is marked legacy.
+- **1. Remembered printers had no limit** ([ADR 0038](decisions/0038-remembered-addresses.md), amended).
+  - **The problem:** anyone on the network could announce printers without end. Each was kept in memory and in the address store, came back after every restart, and kept its address known.
+  - **The fix:**
+    - at most 256 are remembered, and past that the one seen longest ago is forgotten;
+    - a printer not seen for 90 days is forgotten;
+    - the store records `lastSeen`, and isn't rewritten for a printer seen again within a day;
+    - an oversized store shrinks on loading.
+- **2. Printers' answers have no size limit of Latiprimere's own: checked, and not a problem.**
+  - **The check:** a test printer sent answers that never end, in three shapes, with values of 1,000 bytes. SharpIppNext stopped each within 2.5 to 5 MB, at about 5,000 values or 2,500 groups. A value longer than IPP allows was refused after about 100 bytes.
+  - **So nothing was added,** but [SharpIppResponseLimitTests](../tests/Latiprimere.Ipp.Tests/SharpIppResponseLimitTests.cs) keeps these limits tested, so an update to SharpIppNext that drops them fails the build.
+- **3. A band's row width was worked out as an `int`:** `PdfiumDocument` checked a band's stride against `PageWidth * 4` as an `int`. A page wider than about 537 million pixels wrapped it negative, so any stride passed, and only PDFium refusing the bitmap stood between the band and a write past the caller's pixels. A test showed exactly that before the fix. The sum is now a `long`.
+- **4. The PDFium finaliser no longer waits for the PDFium lock.**
+  - **The problem:** a document left undisposed was closed on the finaliser thread, which serves the whole process, while another thread might be rendering.
+  - **The fix:** it now tries the lock. If the lock is held, the document is queued, and the next PDFium call closes it (`PdfiumLibrary.ReleasePending`).
+- **Checked and sound:**
+  - the PNG, JPEG and EXIF readers;
+  - certificate trust, and credentials only over TLS;
+  - the address store's atomic writes;
+  - raster size limits;
+  - Print Schema XML, with no DTDs;
+  - spooler buffers and handles;
+  - Happy Eyeballs, which cancels and closes losing attempts;
+  - the response timeout;
+  - logging, which writes no secrets.
+- **Tests:** 3,200 in all, none failing and 266 skipped, the integration tests whose printers this machine doesn't have. Of those, 24 are new: 12 tests, run on both target frameworks. Turning off the forgetting fails three of the new tests. The Windows tests' `ManualTimeProvider` moved to `Latiprimere.Ipp.Testing` for both to share.
+
+**Learned**
+- **SharpIppNext limits what it reads** by count and by IPP's length rules, not by bytes, which bounds an answer at a few megabytes.
+
+---
+
+## 2026-11-21: More reliable and faster CI
+
+**Done** (owner: "Can this be more reliable, streamlined, improved and perhaps sped up in any way without affecting what we're doing?", then "Yes, 1 to 6"). A look at the last 100 runs found why runs fail, and six changes. None changes what's tested or how releases work.
+- **The release waits for nuget.org before the post-release steps** ([wait-for-packages.sh](../tools/releasing/wait-for-packages.sh)).
+  - **The cause:** after 11.0.5, 11.0.7 and 11.0.8, the post-release builds failed at Restore on every runner, and the mDNS job with them. post-release.sh makes the version just released the package-validation baseline, and the build started before nuget.org had indexed it. Each needed re-running by hand, up to four times.
+  - **The fix:** the finish job now polls nuget.org's flat container until all six packages are served, for up to 30 minutes.
+- **Time limits:**
+  - each job gets one: 45 minutes for a build and 20 for mDNS, and 10 to 45 for the release's jobs;
+  - the test run gets 30 minutes.
+
+  Before, a hang ran to GitHub's six-hour default, as a release did on 2026-11-17.
+- **Test results are kept when a job fails:** each test project writes HTML and JUnit reports, uploaded as `test-results-<os>`. The log lists the ten slowest tests. Before, a flaky test couldn't be named without the raw log.
+- **The CUPS test container:**
+  - it's built with Docker's layer cache in GitHub's cache, shared by the build and mDNS jobs, rather than from scratch twice a run;
+  - its `apt-get` retries downloads.
+- **NuGet packages are cached between runs,** except in release builds, which restore everything from nuget.org.
+- **A new push to a pull request cancels its previous build.** Pushes to main, release builds and builds started by hand are never cancelled.
+- **[releasing.md](releasing.md)** says finish waits, rather than asking for a re-run.
+
+**Learned**
+- **The flaky tests themselves aren't named yet.** GitHub's logs need a sign-in to download, and CI kept no results. The test-results artifact will name them from the next failure.
+- **Not tested locally:** the Docker cache steps, as Docker isn't installed here, and the workflow-level concurrency inside a release's call to build.yml. The first pull request build tests the first; the next release tests the second.
+
+**Next**
+- **Once some runs have the slowest-tests list and step timings:** consider running the Native AOT checks as parallel jobs.
+- **Fix the flaky tests** that the test-results artifacts name.
+
+---
+
+## 2026-11-21: Security policy, SBOMs and groundwork for the Cyber Resilience Act
+
+**Done** (owner: "Add the CRA groundwork now"), recorded in [ADR 0051](decisions/0051-security-policy-sbom-and-cra.md), proposed:
+- **[SECURITY.md](../SECURITY.md):**
+  - private reports through GitHub or `security@latiprimere.com`;
+  - response goals for one developer;
+  - 90-day coordinated disclosure, and advisories with CVEs;
+  - supported versions and the support period;
+  - scope;
+  - the manufacturer's details.
+- **An SBOM in every package:**
+  - [generate-sboms.sh](../tools/releasing/generate-sboms.sh) writes a CycloneDX SBOM for each package, with the CycloneDX tool 6.3.1 from [dotnet-tools.json](../dotnet-tools.json).
+  - build.yml's Pack step puts it in the package at `sbom/<package>.cdx.json`, checks that every package has one, and keeps the SBOMs as an artifact.
+  - The release publishes those packages, so nuget.org gets the SBOMs too.
+- **Security updates after a Commercial Licence ends:** change 12 of [COMMERCIAL-TERMS.md](../COMMERCIAL-TERMS.md). A lapsed buyer may ship Latiprimere's security updates to the copies it shipped while licensed, for the support period, but not use Latiprimere in its own operations. [COMMERCIAL.md](../COMMERCIAL.md) says so too.
+- **[cyber-resilience-act.md](cyber-resilience-act.md):**
+  - what the Act asks of Latiprimere, and what's done;
+  - the steps for reporting an actively exploited vulnerability;
+  - what's left before 11 December 2027.
+- **README.md and the package README** gain a Security section.
+- **The private list of questions for a lawyer** moved to `private/`, which git ignores. Public documents no longer link to it.
+
+**Learned**
+- **Microsoft.Sbom.Targets wasn't accurate enough.** It listed build-only analyzers, Latiprimere itself, and leftover pack files from `obj/` as dependencies. The CycloneDX tool works from the restore's assets file, and marks build-only packages `excluded`.
+- **The CycloneDX tool reads its metadata template only as XML.**
+
+**Next**
+- **Owner:**
+  - enable private vulnerability reporting on GitHub;
+  - set up `security@latiprimere.com`;
+  - register on ENISA's Single Reporting Platform;
+  - confirm the support period and response goals in ADR 0051.
+
+---
+
+## 2026-11-21: Commercial Licence agreement drafted
+
+**Done** (owner: "Go with drafting the commercial licence from Common Paper's agreement")
+- **[COMMERCIAL-TERMS.md](../COMMERCIAL-TERMS.md):** the Commercial Licence as a Cover Page to Common Paper's Software License Agreement Standard Terms 1.1, under Dutch law. It's recorded in [ADR 0050](decisions/0050-commercial-licence-agreement.md), which is proposed. Owner decisions:
+  - renewal: yearly, until cancelled;
+  - liability: capped at a year's fees, with no IP indemnity;
+  - support: a 3-business-day goal for replies, not a promise.
+- **[COMMERCIAL.md](../COMMERCIAL.md):** links to the terms. It also gives the new renewal rule, refunds on renewals, and the support goal.
+- **The Provider** is Jonathan Price, trading as Prodigy Software Solutions, in Rucphen. Support mail goes to `support@latiprimere.com`. The draft names the Rechtbank Zeeland-West-Brabant, the court for Rucphen, as the chosen court.
+- **A private list of questions for a lawyer** (owner: "Keep a log of everything I need to go through with a lawyer for later"), outside the repository's history. It covers the three licence documents, the business, insurance, and the Cyber Resilience Act and Product Liability Directive.
+
+**Learned**
+- **Common Paper's licence is to install and use the software,** so a library needed more: the right to ship it inside the buyer's products, and to modify its public source.
+- **The seller is the copyright holder:** a sole proprietorship is Jonathan Price himself, so no transfer of rights is needed. A BV would need one.
+- **Latiprimere has no security policy or vulnerability contact.** The Cyber Resilience Act's reporting duties have applied since 11 September 2026.
+
+**Next**
+- **Owner:** confirm the drafted defaults listed in ADR 0050, then accept it.
+- **Owner:** add the KvK number once the business is registered, and set up `support@latiprimere.com`.
+- **A lawyer:** go through the owner's private list.
+
+---
+
 ## 2026-11-20: Review of Phase 4's changes, and fixes
 
 **Done** (owner: "Run a sweep for any potential bugs, security/performance issues etc introduced", then "Fix all of them")

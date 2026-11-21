@@ -28,6 +28,7 @@ jobs:
   rebuild:
     name: Rebuild latiprimere.com
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     # After a release, only once the packages were published; of closed pull requests, only a merged post-release one
     if: >-

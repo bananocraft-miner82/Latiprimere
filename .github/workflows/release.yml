@@ -29,6 +29,7 @@ jobs:
   check:
     name: Check there's something to release
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     outputs:
       release: ${{ steps.check.outputs.release }}
@@ -56,6 +57,7 @@ jobs:
     needs: check
     if: needs.check.outputs.release == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     permissions:
       contents: write # Push the post-release branch
@@ -120,6 +122,8 @@ jobs:
     name: Publish to nuget.org
     needs: [prepare, build]
     runs-on: ubuntu-latest
+    # Counted from when the job starts, so not including any wait for the environment's approval
+    timeout-minutes: 20
 
     # The "release" environment can require an approval before anything is pushed
     environment: release
@@ -170,6 +174,8 @@ jobs:
     name: Tag and open the post-release pull request
     needs: [prepare, publish]
     runs-on: ubuntu-latest
+    # Up to 30 minutes of it waiting for nuget.org
+    timeout-minutes: 45
 
     permissions:
       contents: write      # Push the tag
@@ -194,6 +200,12 @@ jobs:
         run: |
           git tag "v$VERSION" "$SHA"
           git push origin "v$VERSION"
+
+      # nuget.org takes minutes to index the packages just pushed. Once post-release.sh has run, main's package
+      # validation compares with this release, so the post-release build's restore fails on every runner until
+      # nuget.org serves it. Waiting here, up to 30 minutes, means that build needn't be re-run by hand.
+      - name: Wait for nuget.org to serve the packages
+        run: sh tools/releasing/wait-for-packages.sh "$VERSION" 1800
 
       # The release commit compared the packages with the release before this one, as packing it had to. main compares
       # them with this one from now on, so a change to something it first shipped fails on main rather than at the next

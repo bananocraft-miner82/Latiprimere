@@ -1,5 +1,7 @@
+using Latiprimere.Ipp.Discovery;
 using Latiprimere.Ipp.Testing.Builders;
 using Latiprimere.Ipp.Testing.Fakes;
+using Microsoft.Extensions.Logging.Abstractions;
 using SharpIpp.Models.Requests;
 using Xunit;
 
@@ -7,6 +9,9 @@ namespace Latiprimere.Ipp.Tests;
 
 public sealed class IppNetworkPrintSystemTests
 {
+	/// <summary>When the clock starts in tests that move it.</summary>
+	private static readonly DateTimeOffset Start = new DateTimeOffset(2026, 11, 21, 9, 0, 0, TimeSpan.Zero);
+
 	/// <summary>A printer URI used across tests.</summary>
 	private static readonly Uri OfficeUri = new Uri("ipp://192.168.1.20:631/ipp/print");
 
@@ -797,6 +802,185 @@ public sealed class IppNetworkPrintSystemTests
 		}
 	}
 
+	[Fact]
+	public async Task GivenMorePrintersAnnouncedThanCanBeRememberedWhenListedThenTheStoreKeepsOnlyTheLimit()
+	{
+		// Arrange — anyone on the network can announce printers, made up by the hundred
+		FakeIppPrinterDiscovery discovery = IppNetworkPrintSystemTests.CreateDiscovery("Printer", 300);
+
+		await IppNetworkPrintSystemTests.WithAddressStoreAsync(async options =>
+		{
+			ManualTimeProvider clock = new ManualTimeProvider(IppNetworkPrintSystemTests.Start);
+			using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreatePrintSystem(new FakeIppClient(), discovery, options, timeProvider: clock);
+
+			// Act
+			await system.GetPrintersAsync(TestContext.Current.CancellationToken);
+
+			// Assert
+			Assert.Equal(IppNetworkPrintSystem.MaxRememberedPrinters, IppNetworkPrintSystemTests.LoadStore(options).Count);
+		});
+	}
+
+	[Fact]
+	public async Task GivenPrinterSeenLongestAgoWhenMoreAreAnnouncedThanCanBeRememberedThenItIsForgottenFirst()
+	{
+		// Arrange — a printer seen an hour before a full set of others
+		FakeIppPrinterDiscovery discovery = IppNetworkPrintSystemTests.CreateDiscovery("Old", 1);
+
+		await IppNetworkPrintSystemTests.WithAddressStoreAsync(async options =>
+		{
+			ManualTimeProvider clock = new ManualTimeProvider(IppNetworkPrintSystemTests.Start);
+			using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreatePrintSystem(new FakeIppClient(), discovery, options, timeProvider: clock);
+			await system.GetPrintersAsync(TestContext.Current.CancellationToken);
+
+			discovery.Clear();
+			IppNetworkPrintSystemTests.AddPrinters(discovery, "New", IppNetworkPrintSystem.MaxRememberedPrinters);
+			clock.Advance(TimeSpan.FromHours(1));
+
+			// Act
+			await system.GetPrintersAsync(TestContext.Current.CancellationToken);
+
+			// Assert
+			IReadOnlyList<DiscoveredIppPrinter> stored = IppNetworkPrintSystemTests.LoadStore(options);
+			Assert.Equal(IppNetworkPrintSystem.MaxRememberedPrinters, stored.Count);
+			Assert.DoesNotContain(stored, printer => printer.InstanceName == "Old 1");
+		});
+	}
+
+	[Fact]
+	public async Task GivenPrinterNotSeenForLongerThanItIsRememberedWhenListedThenItIsForgotten()
+	{
+		// Arrange — one printer seen, then only another, long after
+		FakeIppPrinterDiscovery discovery = IppNetworkPrintSystemTests.CreateDiscovery("Gone", 1);
+
+		await IppNetworkPrintSystemTests.WithAddressStoreAsync(async options =>
+		{
+			ManualTimeProvider clock = new ManualTimeProvider(IppNetworkPrintSystemTests.Start);
+			using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreatePrintSystem(new FakeIppClient(), discovery, options, timeProvider: clock);
+			await system.GetPrintersAsync(TestContext.Current.CancellationToken);
+
+			discovery.Clear();
+			IppNetworkPrintSystemTests.AddPrinters(discovery, "Here", 1);
+			clock.Advance(IppNetworkPrintSystem.RememberedFor + TimeSpan.FromDays(1));
+
+			// Act
+			await system.GetPrintersAsync(TestContext.Current.CancellationToken);
+
+			// Assert
+			DiscoveredIppPrinter stored = Assert.Single(IppNetworkPrintSystemTests.LoadStore(options));
+			Assert.Equal("Here 1", stored.InstanceName);
+		});
+	}
+
+	[Fact]
+	public async Task GivenPrinterSeenAgainSoonAtTheSameAddressWhenListedThenTheStoreIsNotRewritten()
+	{
+		// Arrange — the same printer, at the same address, an hour apart
+		FakeIppPrinterDiscovery discovery = IppNetworkPrintSystemTests.CreateDiscovery("Office", 1);
+
+		await IppNetworkPrintSystemTests.WithAddressStoreAsync(async options =>
+		{
+			ManualTimeProvider clock = new ManualTimeProvider(IppNetworkPrintSystemTests.Start);
+			using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreatePrintSystem(new FakeIppClient(), discovery, options, timeProvider: clock);
+			await system.GetPrintersAsync(TestContext.Current.CancellationToken);
+			clock.Advance(TimeSpan.FromHours(1));
+
+			// Act
+			await system.GetPrintersAsync(TestContext.Current.CancellationToken);
+
+			// Assert — still the time it was first seen: the second sighting didn't write the store
+			DiscoveredIppPrinter stored = Assert.Single(IppNetworkPrintSystemTests.LoadStore(options));
+			Assert.Equal(IppNetworkPrintSystemTests.Start, stored.LastSeen);
+		});
+	}
+
+	[Fact]
+	public async Task GivenStoreWrittenBeforeTheLimitWhenRestartedThenItShrinksToTheLimit()
+	{
+		// Arrange — a store filled before the limit, without last-seen times
+		await IppNetworkPrintSystemTests.WithAddressStoreAsync(options =>
+		{
+			IEnumerable<DiscoveredIppPrinter> printers = Enumerable.Range(1, 300).Select(number => new DiscoveredIppPrinter
+			{
+				InstanceName = "Printer " + number,
+				PrinterUri   = new Uri($"ipp://10.0.{number / 250}.{number % 250}:631/ipp/print")
+			});
+
+			new IppAddressStore(options.AddressStorePath!, NullLogger.Instance).Save(printers);
+
+			// Act
+			using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreatePrintSystem(new FakeIppClient(), options: options);
+
+			// Assert
+			Assert.Equal(IppNetworkPrintSystem.MaxRememberedPrinters, IppNetworkPrintSystemTests.LoadStore(options).Count);
+
+			return Task.CompletedTask;
+		});
+	}
+
+	/// <summary>
+	/// Runs a test with an address store in a directory of its own, deleted afterwards.
+	/// </summary>
+	/// <param name="test">The test, given options that name the store.</param>
+	/// <returns>A task that completes with the test.</returns>
+	private static async Task WithAddressStoreAsync(Func<IppNetworkOptions, Task> test)
+	{
+		string directory = Path.Combine(Path.GetTempPath(), "latiprimere-tests", Guid.NewGuid().ToString("N"));
+
+		try
+		{
+			await test(new IppNetworkOptions { AddressStorePath = Path.Combine(directory, "printers.json") });
+		}
+		finally
+		{
+			if (Directory.Exists(directory))
+			{
+				Directory.Delete(directory, recursive: true);
+			}
+		}
+	}
+
+	/// <summary>
+	/// Reads the address store a print system wrote.
+	/// </summary>
+	/// <param name="options">The options that name it.</param>
+	/// <returns>The printers in it.</returns>
+	private static IReadOnlyList<DiscoveredIppPrinter> LoadStore(IppNetworkOptions options)
+	{
+		return new IppAddressStore(options.AddressStorePath!, NullLogger.Instance).Load();
+	}
+
+	/// <summary>
+	/// Creates a discovery that finds numbered printers.
+	/// </summary>
+	/// <param name="name">The name each starts with.</param>
+	/// <param name="count">How many.</param>
+	/// <returns>The discovery.</returns>
+	private static FakeIppPrinterDiscovery CreateDiscovery(string name, int count)
+	{
+		FakeIppPrinterDiscovery discovery = new FakeIppPrinterDiscovery();
+		IppNetworkPrintSystemTests.AddPrinters(discovery, name, count);
+
+		return discovery;
+	}
+
+	/// <summary>
+	/// Adds numbered printers, each at an address of its own, to a discovery.
+	/// </summary>
+	/// <param name="discovery">The discovery.</param>
+	/// <param name="name">The name each starts with.</param>
+	/// <param name="count">How many.</param>
+	private static void AddPrinters(FakeIppPrinterDiscovery discovery, string name, int count)
+	{
+		// Each set of names gets addresses of its own, from the length and first letter of its name
+		int set = ((name.Length * 31) + name[0]) % 200;
+
+		for (int number = 1; number <= count; number++)
+		{
+			discovery.AddPrinter($"{name} {number}", new Uri($"ipp://10.{set}.{number / 250}.{number % 250}:631/ipp/print"));
+		}
+	}
+
 	/// <summary>
 	/// Creates a network print system over fakes.
 	/// </summary>
@@ -806,18 +990,21 @@ public sealed class IppNetworkPrintSystemTests
 	/// <param name="knownAddressTimeout">
 	/// How long a remembered address has to answer, or <see langword="null"/> for the default.
 	/// </param>
+	/// <param name="timeProvider">The clock, or <see langword="null"/> for the system's.</param>
 	/// <returns>The print system.</returns>
 	private static IppNetworkPrintSystem CreatePrintSystem
 	(
 		FakeIppClient            client,
 		FakeIppPrinterDiscovery? discovery = null,
 		IppNetworkOptions?       options = null,
-		TimeSpan?                knownAddressTimeout = null
+		TimeSpan?                knownAddressTimeout = null,
+		TimeProvider?            timeProvider = null
 	)
 	{
 		IppPrintContext context = new IppPrintContextBuilder()
 			.WithClient(client)
 			.WithDocumentFormats(IppDocumentFormats.Standard)
+			.WithTimeProvider(timeProvider ?? TimeProvider.System)
 			.Build();
 
 		return new IppNetworkPrintSystem

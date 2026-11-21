@@ -32,8 +32,24 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 	/// <summary>The prefix of identifiers that name a discovered printer rather than give its URI.</summary>
 	internal const string DnsSdPrinterIdPrefix = "ipp:dnssd:";
 
+	/// <summary>
+	/// The most printers remembered: far more than any real network has. Anyone on the network can announce printers,
+	/// so without a limit, made-up announcements would fill memory and the address store, and every address they
+	/// gave would stay known for good. Past it, the printers seen longest ago are forgotten.
+	/// </summary>
+	internal const int MaxRememberedPrinters = 256;
+
+	/// <summary>How long to remember a printer not seen since; searching finds it again if it comes back.</summary>
+	internal static readonly TimeSpan RememberedFor = TimeSpan.FromDays(90);
+
 	/// <summary>How long a remembered address has to answer before the name is searched for instead.</summary>
 	internal static readonly TimeSpan DefaultKnownAddressTimeout = TimeSpan.FromSeconds(3);
+
+	/// <summary>
+	/// How old the last-seen time in the address store may get before a printer seen again rewrites it, so the store
+	/// isn't rewritten every time a printer is seen, yet a printer seen daily isn't forgotten.
+	/// </summary>
+	private static readonly TimeSpan LastSeenRefresh = TimeSpan.FromDays(1);
 
 	private readonly IppPrintContext context;           // Client and settings shared with printers and jobs
 	private readonly IIppPrinterDiscovery discovery;    // Finds printers on the network
@@ -45,6 +61,7 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 	private readonly ConcurrentDictionary<string, DiscoveredIppPrinter> knownPrinters =
 		new ConcurrentDictionary<string, DiscoveredIppPrinter>(StringComparer.OrdinalIgnoreCase); // Last seen, by name
 	private readonly IppAddressStore? addressStore;     // Keeps knownPrinters across restarts, if configured
+	private readonly Lock rememberGate = new Lock();    // One change to knownPrinters at a time
 
 	/// <summary>
 	/// Initialises a new instance of the <see cref="IppNetworkPrintSystem"/> class.
@@ -71,10 +88,25 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 		if (!string.IsNullOrWhiteSpace(options.AddressStorePath))
 		{
 			this.addressStore = new IppAddressStore(options.AddressStorePath, context.Logger);
+			DateTimeOffset now = context.TimeProvider.GetUtcNow();
 
+			// A printer stored before last-seen times were kept counts as seen now, so it gets the full time
 			foreach (DiscoveredIppPrinter printer in this.addressStore.Load())
 			{
-				this.knownPrinters.TryAdd(printer.InstanceName, printer);
+				this.knownPrinters.TryAdd(printer.InstanceName, printer with { LastSeen = printer.LastSeen ?? now });
+			}
+
+			// A store that is out of date, or written before the limit, shrinks to what is remembered now
+			bool isForgotten;
+
+			lock (this.rememberGate)
+			{
+				isForgotten = this.Forget(now);
+			}
+
+			if (isForgotten)
+			{
+				this.addressStore.Save(this.knownPrinters.Select(known => known.Value));
 			}
 		}
 	}
@@ -433,16 +465,25 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 	/// <param name="printers">The printers' announcements.</param>
 	private void Remember(IReadOnlyCollection<DiscoveredIppPrinter> printers)
 	{
+		DateTimeOffset now = this.context.TimeProvider.GetUtcNow();
 		bool changed = false;
 
-		foreach (DiscoveredIppPrinter printer in printers)
+		lock (this.rememberGate)
 		{
-			changed |= !this.knownPrinters.TryGetValue(printer.InstanceName, out DiscoveredIppPrinter? before)
-				|| before.PrinterUri != printer.PrinterUri
-				|| before.SecureUri != printer.SecureUri
-				|| before.Uuid != printer.Uuid;
+			foreach (DiscoveredIppPrinter printer in printers)
+			{
+				// A printer seen again at the same address changes the store only once its last-seen time is old
+				changed |= !this.knownPrinters.TryGetValue(printer.InstanceName, out DiscoveredIppPrinter? before)
+					|| before.PrinterUri != printer.PrinterUri
+					|| before.SecureUri != printer.SecureUri
+					|| before.Uuid != printer.Uuid
+					|| before.LastSeen is not DateTimeOffset seen
+					|| now - seen >= IppNetworkPrintSystem.LastSeenRefresh;
 
-			this.knownPrinters[printer.InstanceName] = printer;
+				this.knownPrinters[printer.InstanceName] = printer with { LastSeen = now };
+			}
+
+			changed |= this.Forget(now);
 		}
 
 		if (changed)
@@ -450,6 +491,45 @@ internal sealed class IppNetworkPrintSystem : IPrintSystem
 			// A live view, read when the store's turn to write comes, so a concurrent write can't leave older addresses
 			this.addressStore?.Save(this.knownPrinters.Select(known => known.Value));
 		}
+	}
+
+	/// <summary>
+	/// Forgets printers not seen for <see cref="RememberedFor"/>, then, past <see cref="MaxRememberedPrinters"/>, those
+	/// seen longest ago. Call while holding <see cref="rememberGate"/>.
+	/// </summary>
+	/// <param name="now">The time now.</param>
+	/// <returns>Whether any printer was forgotten.</returns>
+	private bool Forget(DateTimeOffset now)
+	{
+		bool isForgotten = false;
+
+		foreach (KeyValuePair<string, DiscoveredIppPrinter> known in this.knownPrinters)
+		{
+			if (known.Value.LastSeen is DateTimeOffset seen && now - seen > IppNetworkPrintSystem.RememberedFor)
+			{
+				isForgotten |= this.knownPrinters.TryRemove(known.Key, out _);
+			}
+		}
+
+		int excess = this.knownPrinters.Count - IppNetworkPrintSystem.MaxRememberedPrinters;
+
+		if (excess > 0)
+		{
+			// Seen longest ago first; among those seen at once, by name, so the choice doesn't depend on the order
+			List<string> oldest = this.knownPrinters
+				.OrderBy(known => known.Value.LastSeen ?? DateTimeOffset.MinValue)
+				.ThenBy(known => known.Key, StringComparer.OrdinalIgnoreCase)
+				.Take(excess)
+				.Select(known => known.Key)
+				.ToList();
+
+			foreach (string name in oldest)
+			{
+				isForgotten |= this.knownPrinters.TryRemove(name, out _);
+			}
+		}
+
+		return isForgotten;
 	}
 
 	/// <summary>
