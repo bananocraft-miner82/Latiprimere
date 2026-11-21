@@ -1,9 +1,1 @@
 #nullable enable
-Latiprimere.Ipp.IppNetworkOptions.UploadStallTimeout.get -> System.TimeSpan
-Latiprimere.Ipp.IppNetworkOptions.UploadStallTimeout.set -> void
-static readonly Latiprimere.Ipp.IppNetworkOptions.DefaultUploadStallTimeout -> System.TimeSpan
-Latiprimere.Ipp.IppNetworkOptions.RasterFormats.get -> System.Collections.Generic.IList<Latiprimere.Ipp.IppRasterFormat>!
-Latiprimere.Ipp.IppRasterFormat
-Latiprimere.Ipp.IppRasterFormat.AppleRaster = 1 -> Latiprimere.Ipp.IppRasterFormat
-Latiprimere.Ipp.IppRasterFormat.Pclm = 2 -> Latiprimere.Ipp.IppRasterFormat
-Latiprimere.Ipp.IppRasterFormat.PwgRaster = 0 -> Latiprimere.Ipp.IppRasterFormat

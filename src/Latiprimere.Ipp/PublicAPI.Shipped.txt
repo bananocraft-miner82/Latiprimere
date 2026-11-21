@@ -19,14 +19,21 @@ Latiprimere.Ipp.IppNetworkOptions.MaxRenderDpi.get -> int?
 Latiprimere.Ipp.IppNetworkOptions.MaxRenderDpi.set -> void
 Latiprimere.Ipp.IppNetworkOptions.PrinterCredentials.get -> System.Collections.Generic.IDictionary<System.Uri!, System.Net.NetworkCredential!>!
 Latiprimere.Ipp.IppNetworkOptions.PrinterUris.get -> System.Collections.Generic.IList<System.Uri!>!
+Latiprimere.Ipp.IppNetworkOptions.RasterFormats.get -> System.Collections.Generic.IList<Latiprimere.Ipp.IppRasterFormat>!
 Latiprimere.Ipp.IppNetworkOptions.ServerCertificateValidationCallback.get -> System.Net.Security.RemoteCertificateValidationCallback?
 Latiprimere.Ipp.IppNetworkOptions.ServerCertificateValidationCallback.set -> void
 Latiprimere.Ipp.IppNetworkOptions.TrustedCertificateFingerprints.get -> System.Collections.Generic.IList<string!>!
+Latiprimere.Ipp.IppNetworkOptions.UploadStallTimeout.get -> System.TimeSpan
+Latiprimere.Ipp.IppNetworkOptions.UploadStallTimeout.set -> void
 Latiprimere.Ipp.IppNetworkOptions.UserName.get -> string?
 Latiprimere.Ipp.IppNetworkOptions.UserName.set -> void
 Latiprimere.Ipp.IppNetworkOptions.ValidateJobs.get -> bool
 Latiprimere.Ipp.IppNetworkOptions.ValidateJobs.set -> void
 Latiprimere.Ipp.IppNetworkPrintSystemFactory
+Latiprimere.Ipp.IppRasterFormat
+Latiprimere.Ipp.IppRasterFormat.AppleRaster = 1 -> Latiprimere.Ipp.IppRasterFormat
+Latiprimere.Ipp.IppRasterFormat.Pclm = 2 -> Latiprimere.Ipp.IppRasterFormat
+Latiprimere.Ipp.IppRasterFormat.PwgRaster = 0 -> Latiprimere.Ipp.IppRasterFormat
 Microsoft.Extensions.DependencyInjection.LatiprimereIppServiceCollectionExtensions
 static Latiprimere.Ipp.IppNetworkPrintSystemFactory.Create(Latiprimere.Ipp.IppNetworkOptions? options = null) -> Latiprimere.IPrintSystem!
 static Latiprimere.Ipp.IppNetworkPrintSystemFactory.Create(Latiprimere.Rendering.IPdfRasterizer? pdfRasterizer, Latiprimere.Ipp.IppNetworkOptions? options) -> Latiprimere.IPrintSystem!
@@ -35,3 +42,4 @@ static Microsoft.Extensions.DependencyInjection.LatiprimereIppServiceCollectionE
 static readonly Latiprimere.Ipp.IppNetworkOptions.DefaultBusyRetryDuration -> System.TimeSpan
 static readonly Latiprimere.Ipp.IppNetworkOptions.DefaultConnectTimeout -> System.TimeSpan
 static readonly Latiprimere.Ipp.IppNetworkOptions.DefaultDiscoveryDuration -> System.TimeSpan
+static readonly Latiprimere.Ipp.IppNetworkOptions.DefaultUploadStallTimeout -> System.TimeSpan
