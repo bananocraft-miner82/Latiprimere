@@ -57,6 +57,10 @@ await foreach (PrintJobStatus status in job.WatchStatusAsync())
 
 A print system that isn't available on the machine, such as the Windows spooler on Linux, simply contributes no printers. Use `PrintContent.FromRaw` to send data in the printer's own language, such as ZPL to a label printer.
 
+## Security
+
+Report a vulnerability privately, as the [security policy](https://github.com/bananocraft-miner82/Latiprimere/blob/main/SECURITY.md) describes, not in a public issue. The policy also says which versions get security updates, and for how long. Each package carries a CycloneDX software bill of materials at `sbom/<package>.cdx.json`.
+
 ## Licence
 
 Latiprimere is free under the [Community Licence](https://github.com/bananocraft-miner82/Latiprimere/blob/main/LICENSE) for:

@@ -2,7 +2,7 @@
 
 A cross-platform printing library for .NET: discover printers, read their capabilities, submit jobs and track them to completion, with the same code on Windows, Linux and macOS.
 
-> **Status:** preview. Version 11.0.7-preview is on [NuGet](https://www.nuget.org/packages/Latiprimere) for evaluation. The API may still change before 1.0, so it isn't ready for production use yet.
+> **Status:** preview. Version 11.0.8-preview is on [NuGet](https://www.nuget.org/packages/Latiprimere) for evaluation. The API may still change before 1.0, so it isn't ready for production use yet.
 
 ## Goals
 
@@ -105,6 +105,10 @@ catch (OperationCanceledException) when (timeout.IsCancellationRequested)
 - **[Developer documentation](https://latiprimere.com/docs/)**: installation, guides and the print systems, from easy to advanced. The pages are in [docs/site/](docs/site/).
 - **[Examples](samples/Latiprimere.Examples/)**: every example from the documentation, as a program built with every change. Run one with `dotnet run --project samples/Latiprimere.Examples -f net10.0 -- list`.
 - **[Project documents](docs/README.md)**: the feasibility research, project plan, decision records and progress log.
+
+## Security
+
+Report a vulnerability privately, as the [security policy](SECURITY.md) describes, not in a public issue. The policy also says which versions get security updates, and for how long. Each package carries a software bill of materials. How Latiprimere meets the EU Cyber Resilience Act is in [docs/cyber-resilience-act.md](docs/cyber-resilience-act.md).
 
 ## Licence
 

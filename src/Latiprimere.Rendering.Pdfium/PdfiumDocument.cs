@@ -37,7 +37,7 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 	/// </summary>
 	~PdfiumDocument()
 	{
-		this.Release();
+		this.ReleaseWithoutWaiting();
 	}
 
 	/// <inheritdoc/>
@@ -50,6 +50,8 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 
 		lock (PdfiumLibrary.Lock)
 		{
+			PdfiumLibrary.ReleasePending();
+
 			// Again under the lock: Dispose on another thread may have closed the document since the first check
 			ObjectDisposedException.ThrowIf(this.isDisposed, this);
 			PdfiumNative.GetPageSizeByIndex(this.document, pageIndex, out PdfiumSize size);
@@ -76,6 +78,8 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 		{
 			lock (PdfiumLibrary.Lock)
 			{
+				PdfiumLibrary.ReleasePending();
+
 				// Again under the lock: Dispose on another thread may have closed the document since the first check
 				ObjectDisposedException.ThrowIf(this.isDisposed, this);
 				IntPtr page = this.LoadPage(pageIndex);
@@ -112,7 +116,9 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 			throw new ArgumentOutOfRangeException(nameof(band), band, ExceptionMessages.BandOutsidePage);
 		}
 
-		if (band.Stride < band.PageWidth * RasterBand.BytesPerPixel)
+		// In long: a page wider than about 537 million pixels would wrap an int negative and let any stride through, so
+		// PDFium alone would stand between the band and a write past the caller's pixels
+		if (band.Stride < (long)band.PageWidth * RasterBand.BytesPerPixel)
 		{
 			throw new ArgumentOutOfRangeException(nameof(band), band, ExceptionMessages.StrideTooSmall);
 		}
@@ -216,20 +222,79 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 	/// </summary>
 	private void Release()
 	{
+		bool isClosed;
+
 		lock (PdfiumLibrary.Lock)
 		{
-			if (this.isDisposed)
-			{
-				return;
-			}
-
-			this.CloseLoadedPage();
-			PdfiumNative.CloseDocument(this.document);
-			this.document = IntPtr.Zero;
-			this.isDisposed = true;
+			PdfiumLibrary.ReleasePending();
+			isClosed = this.Close();
 		}
 
 		// PDFium may read the bytes until the document is closed, so free them last
-		NativeMemory.Free((void*)this.data);
+		if (isClosed)
+		{
+			NativeMemory.Free((void*)this.data);
+		}
+	}
+
+	/// <summary>
+	/// Releases the document without waiting for the PDFium lock, as the finaliser must: the finaliser thread serves
+	/// the whole process, and another thread may be rendering. If the lock is held, the document is left for the
+	/// next PDFium call to close. Call only when no other thread can use the document.
+	/// </summary>
+	/// <returns><see langword="true"/> if it was released now; <see langword="false"/> if it was left for later.</returns>
+	internal bool ReleaseWithoutWaiting()
+	{
+		if (PdfiumLibrary.Lock.TryEnter())
+		{
+			bool isClosed;
+
+			try
+			{
+				PdfiumLibrary.ReleasePending();
+				isClosed = this.Close();
+			}
+			finally
+			{
+				PdfiumLibrary.Lock.Exit();
+			}
+
+			if (isClosed)
+			{
+				NativeMemory.Free((void*)this.data);
+			}
+
+			return true;
+		}
+
+		if (!this.isDisposed)
+		{
+			PdfiumLibrary.QueueRelease(this.document, this.loadedPage, this.data);
+			this.document = IntPtr.Zero;
+			this.loadedPage = IntPtr.Zero;
+			this.loadedPageIndex = -1;
+			this.isDisposed = true;
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// Closes the loaded page and the document, but leaves their bytes. Call while holding the PDFium lock.
+	/// </summary>
+	/// <returns><see langword="true"/> if it closed them; <see langword="false"/> if they were already closed.</returns>
+	private bool Close()
+	{
+		if (this.isDisposed)
+		{
+			return false;
+		}
+
+		this.CloseLoadedPage();
+		PdfiumNative.CloseDocument(this.document);
+		this.document = IntPtr.Zero;
+		this.isDisposed = true;
+
+		return true;
 	}
 }

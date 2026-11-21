@@ -45,8 +45,15 @@
 	     sets the baseline; empty means there is no earlier release to compare with. -->
 	<PropertyGroup>
 		<EnablePackageValidation>true</EnablePackageValidation>
-		<PackageValidationBaselineVersion>11.0.7-preview</PackageValidationBaselineVersion>
+		<PackageValidationBaselineVersion>11.0.8-preview</PackageValidationBaselineVersion>
 	</PropertyGroup>
+
+	<!-- A software bill of materials in each package, at sbom/<package>.cdx.json, as the EU Cyber Resilience Act asks of
+	     a product's manufacturer (ADR 0051). tools/releasing/generate-sboms.sh writes them; set SbomDirectory to its
+	     output directory when packing. CI always does, and the pack fails if a package's SBOM is missing. -->
+	<ItemGroup Condition="'$(SbomDirectory)' != ''">
+		<None Include="$(SbomDirectory)/$(PackageId).cdx.json" Pack="true" PackagePath="sbom/" Visible="false" />
+	</ItemGroup>
 
 	<!-- Every public API change shows up as a change to PublicAPI.Unshipped.txt, which reviewers see (ADR 0018).
 	     tools/releasing/prepare-release.sh moves its lines to PublicAPI.Shipped.txt for each release. -->

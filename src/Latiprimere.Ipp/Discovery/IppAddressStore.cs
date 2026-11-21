@@ -161,7 +161,8 @@ internal sealed class IppAddressStore
 			SecureUri    = secureUri,
 			Uuid         = DnsSdServiceMapper.NormalizeUuid(stored.Uuid),
 			MakeAndModel = stored.MakeAndModel,
-			Location     = stored.Location
+			Location     = stored.Location,
+			LastSeen     = stored.LastSeen
 		};
 	}
 
@@ -179,7 +180,8 @@ internal sealed class IppAddressStore
 			SecureUri    = printer.SecureUri?.AbsoluteUri,
 			Uuid         = printer.Uuid,
 			MakeAndModel = printer.MakeAndModel,
-			Location     = printer.Location
+			Location     = printer.Location,
+			LastSeen     = printer.LastSeen
 		};
 	}
 
