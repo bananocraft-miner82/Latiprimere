@@ -1,4 +1,1 @@
 #nullable enable
-Latiprimere.PrinterExtensions
-static Latiprimere.PrinterExtensions.WatchStatusAsync(this Latiprimere.IPrinter! printer, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<Latiprimere.PrinterStatus!>!
-static readonly Latiprimere.PrinterExtensions.DefaultPollInterval -> System.TimeSpan

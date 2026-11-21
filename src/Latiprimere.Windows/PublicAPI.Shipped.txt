@@ -6,7 +6,14 @@ Latiprimere.Windows.IWindowsPrinter.QueueName.get -> string!
 Latiprimere.Windows.WindowsOptions
 Latiprimere.Windows.WindowsOptions.AllowAnyPrinterName.get -> bool
 Latiprimere.Windows.WindowsOptions.AllowAnyPrinterName.set -> void
+Latiprimere.Windows.WindowsOptions.IppCredentials.get -> System.Net.NetworkCredential?
+Latiprimere.Windows.WindowsOptions.IppCredentials.set -> void
+Latiprimere.Windows.WindowsOptions.IppPrinterCredentials.get -> System.Collections.Generic.IDictionary<System.Uri!, System.Net.NetworkCredential!>!
 Latiprimere.Windows.WindowsOptions.IppPrinterUris.get -> System.Collections.Generic.IDictionary<string!, System.Uri!>!
+Latiprimere.Windows.WindowsOptions.IppRasterFormats.get -> System.Collections.Generic.IList<Latiprimere.Ipp.IppRasterFormat>!
+Latiprimere.Windows.WindowsOptions.IppServerCertificateValidationCallback.get -> System.Net.Security.RemoteCertificateValidationCallback?
+Latiprimere.Windows.WindowsOptions.IppServerCertificateValidationCallback.set -> void
+Latiprimere.Windows.WindowsOptions.IppTrustedCertificateFingerprints.get -> System.Collections.Generic.IList<string!>!
 Latiprimere.Windows.WindowsOptions.MaxRenderDpi.get -> int?
 Latiprimere.Windows.WindowsOptions.MaxRenderDpi.set -> void
 Latiprimere.Windows.WindowsOptions.PrintPdfOverIpp.get -> bool
