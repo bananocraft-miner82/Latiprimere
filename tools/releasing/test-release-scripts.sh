@@ -113,6 +113,14 @@ if tr -d '\r' < README.md | grep -Eq '^> \*\*Status:\*\* stable\.'; then
 	exit 0
 fi
 
+# The switch adds the 1.0 paragraph and a blank line under "## Unreleased". The release commit has none, as
+# prepare-release.sh has dated it, so there the switch adds the heading and another blank line too
+if tr -d '\r' < CHANGELOG.md | grep -qx '## Unreleased'; then
+	CHANGELOG_LINES=2
+else
+	CHANGELOG_LINES=4
+fi
+
 for endings in lf crlf; do
 	COPY="$WORK/$endings"
 
@@ -152,7 +160,7 @@ for endings in lf crlf; do
 	done
 
 	check "the README's status is the only line changed there" at_most_lines_changed README.md 5
-	check "the changelog gains only the 1.0 paragraph" at_most_lines_changed CHANGELOG.md 2
+	check "the changelog gains only the 1.0 paragraph" at_most_lines_changed CHANGELOG.md "$CHANGELOG_LINES"
 	check "the package README changes only its status and install lines" at_most_lines_changed src/PACKAGE-README.md 5
 
 	check "switch-to-stable.sh refuses a second run" refuses sh "$TOOLS/switch-to-stable.sh"
