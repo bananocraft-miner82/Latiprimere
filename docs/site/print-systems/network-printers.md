@@ -84,6 +84,7 @@ options.AddressStorePath = Path.Combine(AppContext.BaseDirectory, "printers.json
 - **Used only while it's the same printer:** a remembered address is used only while the printer there still reports the UUID it announced, and the search follows if it doesn't answer.
 - **Never an error:** a missing or damaged file means starting with nothing remembered, and is logged. So does a file a later version of Latiprimere wrote in a newer format, which is then left as it is.
 - **Keep it where only your application can write:** its addresses count as printers found on the network.
+- **Limited:** at most 256 printers are remembered, and one not seen for 90 days is forgotten, so made-up announcements can't fill the file. A forgotten printer is found again by searching.
 
 ### Anyone on the network can announce a printer
 

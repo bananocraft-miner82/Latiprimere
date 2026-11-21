@@ -17,6 +17,12 @@ internal sealed record StoredPrinter
 	/// <summary>Gets the UUID it announced, which it must still report at the address, or <see langword="null"/>.</summary>
 	public string? Uuid { get; init; }
 
+	/// <summary>
+	/// Gets when it was last seen announced, or <see langword="null"/> in a file written before this was kept. Added
+	/// within format 1: earlier versions ignore it, as they do any property they don't know.
+	/// </summary>
+	public DateTimeOffset? LastSeen { get; init; }
+
 	/// <summary>Gets its make and model, or <see langword="null"/>.</summary>
 	public string? MakeAndModel { get; init; }
 

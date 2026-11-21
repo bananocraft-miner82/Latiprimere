@@ -1,3 +1,4 @@
+using Latiprimere.Rendering.Pdfium.Interop;
 using Latiprimere.Testing.Fixtures;
 using Xunit;
 
@@ -148,6 +149,22 @@ public sealed class PdfiumDocumentTests
 	}
 
 	[Fact]
+	public void GivenPageSoWideItsRowBytesOverflowAnIntWhenRenderBandThenThrowsArgumentOutOfRangeException()
+	{
+		// Arrange — 600 million pixels across need 2.4 billion bytes a row, past int.MaxValue, so a stride of 4 bytes
+		// must be refused rather than handed to PDFium
+		using IRasterDocument document = PdfiumDocumentTests.OpenOnePage();
+		RasterBand band = new RasterBand(600_000_000, 1, 0, 1, 4);
+		byte[] pixels = new byte[band.ByteCount];
+
+		// Act
+		Action render = () => document.RenderBand(0, band, pixels);
+
+		// Assert
+		Assert.Throws<ArgumentOutOfRangeException>(render);
+	}
+
+	[Fact]
 	public void GivenBufferTooSmallWhenRenderBandThenThrowsArgumentException()
 	{
 		// Arrange
@@ -190,6 +207,70 @@ public sealed class PdfiumDocumentTests
 
 		// Assert
 		Assert.Null(exception);
+	}
+
+	[Fact]
+	public void GivenPdfiumLockFreeWhenReleasedWithoutWaitingThenClosesTheDocumentAtOnce()
+	{
+		// Arrange
+		PdfiumDocument document = (PdfiumDocument)PdfiumDocumentTests.OpenOnePage();
+		RasterBand band = RasterBand.Create(PdfiumDocumentTests.PageWidth, PdfiumDocumentTests.PageHeight, 0, 1);
+
+		// Act
+		bool isReleased = document.ReleaseWithoutWaiting();
+
+		// Assert — closed, and a later Dispose has nothing left to free
+		Assert.True(isReleased);
+		Assert.Throws<ObjectDisposedException>(() => document.RenderBand(0, band, new byte[band.ByteCount]));
+		Assert.Null(Record.Exception(document.Dispose));
+	}
+
+	[Fact]
+	public void GivenPdfiumLockHeldElsewhereWhenReleasedWithoutWaitingThenReturnsAtOnceAndTheNextCallClosesIt()
+	{
+		// Arrange — another thread holds the lock, as one rendering a large page would
+		CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+		PdfiumDocument document = (PdfiumDocument)PdfiumDocumentTests.OpenOnePage();
+		using ManualResetEventSlim isHeld = new ManualResetEventSlim();
+		using ManualResetEventSlim mayRelease = new ManualResetEventSlim();
+
+		Thread holder = new Thread(() =>
+		{
+			lock (PdfiumLibrary.Lock)
+			{
+				isHeld.Set();
+				mayRelease.Wait(TimeSpan.FromSeconds(30), cancellationToken);
+			}
+		});
+
+		holder.Start();
+		isHeld.Wait(TimeSpan.FromSeconds(30), cancellationToken);
+		bool isReleased;
+		int pendingWhileHeld;
+
+		try
+		{
+			// Act
+			isReleased = document.ReleaseWithoutWaiting();
+			pendingWhileHeld = PdfiumLibrary.PendingReleaseCount;
+		}
+		finally
+		{
+			mayRelease.Set();
+			holder.Join();
+		}
+
+		// The next PDFium call, from any document, closes what was left
+		using (IRasterDocument next = PdfiumDocumentTests.OpenOnePage())
+		{
+			_ = next.GetPageSize(0);
+		}
+
+		// Assert — it didn't wait, it was left for later, and the next call closed it
+		Assert.False(isReleased);
+		Assert.True(pendingWhileHeld >= 1);
+		Assert.Equal(0, PdfiumLibrary.PendingReleaseCount);
+		Assert.Null(Record.Exception(document.Dispose));
 	}
 
 	/// <summary>

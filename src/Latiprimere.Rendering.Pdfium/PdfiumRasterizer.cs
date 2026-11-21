@@ -43,6 +43,7 @@ public sealed unsafe class PdfiumRasterizer : IPdfRasterizer
 			lock (PdfiumLibrary.Lock)
 			{
 				PdfiumLibrary.EnsureInitialised();
+				PdfiumLibrary.ReleasePending();
 				IntPtr document = PdfiumNative.LoadMemDocument((byte*)data, (nuint)length, null);
 
 				if (document == IntPtr.Zero)

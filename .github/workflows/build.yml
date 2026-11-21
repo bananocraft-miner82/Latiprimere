@@ -17,6 +17,13 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request cancels the build still running for its previous push, whose result no longer
+# matters. Every other run, including pushes to main, release builds and builds started by hand, has a group of its
+# own, so it's never cancelled or held back by another.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('build-pr-{0}', github.event.pull_request.number) || format('build-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     name: Build and test (${{ matrix.os }})
@@ -25,6 +32,8 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    # A run takes about 10 minutes, and has taken up to 18. Without a limit, a hang would hold the runner for six hours
+    timeout-minutes: 45
 
     steps:
       # The release commit when release.yml calls this, otherwise the commit of the event
@@ -40,8 +49,37 @@ jobs:
           global-json-file: global.json
           dotnet-version: 10.0.x
 
+      # Downloaded NuGet packages, kept between runs, so restores are faster and depend less on nuget.org. Not for a
+      # release build, which release.yml starts with a ref: it restores everything from nuget.org, so nothing cached
+      # can reach the packages it publishes.
+      - name: Cache NuGet packages
+        if: inputs.ref == ''
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'global.json', 'nuget.config', 'dotnet-tools.json', '**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
       # Integration tests are skipped unless their LATIPRIMERE_TEST_* variable is set (see CONTRIBUTING.md). Each
       # runner sets the variables for the virtual printers it has; once set, a test that can't reach them fails.
+
+      # Ubuntu: the CUPS test container's image, built with its layers kept in GitHub's cache, so its Debian packages
+      # are downloaded only when the Dockerfile changes, rather than twice in every run. The mDNS job shares the cache.
+      - name: Set up Docker Buildx
+        if: runner.os == 'Linux'
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build the test container
+        if: runner.os == 'Linux'
+        uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: tools/virtual-printers
+          tags: latiprimere-virtual-printers
+          load: true
+          cache-from: type=gha,scope=virtual-printers
+          cache-to: type=gha,scope=virtual-printers,mode=max
 
       # Ubuntu: the CUPS test container, with its five queues and ippeveprinter. Addresses are 127.0.0.1, not
       # localhost, because the container publishes on IPv4 only.
@@ -51,7 +89,7 @@ jobs:
           LATIPRIMERE_TEST_CUPS_OUTPUT: ${{ runner.temp }}/cups-output
         run: |
           mkdir -p "$LATIPRIMERE_TEST_CUPS_OUTPUT"
-          docker compose -f tools/virtual-printers/compose.yaml up -d --build --wait
+          docker compose -f tools/virtual-printers/compose.yaml up -d --no-build --wait
           {
             echo "LATIPRIMERE_TEST_CUPS_SERVER=127.0.0.1:631"
             echo "LATIPRIMERE_TEST_CUPS_OUTPUT=$LATIPRIMERE_TEST_CUPS_OUTPUT"
@@ -93,8 +131,27 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
+      # A limit on the whole test run, so a hung test fails the step rather than the job's time limit. Each test
+      # project writes HTML and JUnit reports, kept below if the job fails, so a failing test can be named. The
+      # slowest tests are listed in the log, to show where the time goes.
       - name: Test
-        run: dotnet test --no-build --configuration Release
+        run: >
+          dotnet test --no-build --configuration Release
+          --timeout 30m
+          --results-directory "${{ github.workspace }}/artifacts/test-results"
+          --results-directory-layout per-module
+          --report-xunit-html
+          --report-xunit-junit
+          --show-slowest-tests 10
+
+      - name: Keep test results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.os }}
+          path: artifacts/test-results
+          retention-days: 7
+          if-no-files-found: ignore
 
       # The API reference in docs/site/reference is generated from the public types and their documentation
       # comments by tools/api-reference. It's committed, so each release tag carries the reference for its own API,
@@ -192,6 +249,7 @@ jobs:
   mdns:
     name: mDNS discovery (Ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Check out
@@ -205,8 +263,31 @@ jobs:
           global-json-file: global.json
           dotnet-version: 10.0.x
 
+      - name: Cache NuGet packages
+        if: inputs.ref == ''
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'global.json', 'nuget.config', 'dotnet-tools.json', '**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      # The same image as the build job's, from the same cache
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build the test container
+        uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: tools/virtual-printers
+          tags: latiprimere-virtual-printers
+          load: true
+          cache-from: type=gha,scope=virtual-printers
+          cache-to: type=gha,scope=virtual-printers,mode=max
+
       - name: Start the test container on the host network
-        run: docker compose -f tools/virtual-printers/compose.yaml -f tools/virtual-printers/compose.host-network.yaml up -d --build --wait
+        run: docker compose -f tools/virtual-printers/compose.yaml -f tools/virtual-printers/compose.host-network.yaml up -d --no-build --wait
 
       - name: Find the virtual printer over mDNS
         env:

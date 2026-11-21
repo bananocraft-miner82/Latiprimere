@@ -52,3 +52,26 @@ A printer found on the network is identified by its announced name, such as `ipp
   - **Unit tests:** reading back what was written, a missing file, three unreadable ones, entries that make no sense, and a path that can't be written.
   - **A restart:** a printer listed by one print system is found by the next one without a search, and only while the printer at the address reports the remembered UUID.
   - **Harness, through the public API:** `ipp.discovery.remembered-address` writes the store as an earlier run would, then prints to a printer that announces nothing; with another UUID remembered, the printer isn't used. It also runs in CI's Native AOT check, which exercises the source-generated JSON natively.
+
+## Amendment, 2026-11-21
+
+From a sweep for vulnerabilities and bugs (owner: "Yes, fix 1 to 4"):
+
+- **The problem:** every announced name was remembered for good and written to the store. Anyone on the network can announce printers, so made-up announcements could:
+  - fill memory and the file;
+  - rewrite the file for each new name;
+  - come back after every restart;
+  - keep each address they gave known, so a lookup could reach it, for good.
+- **A limit:** at most 256 printers are remembered (`IppNetworkPrintSystem.MaxRememberedPrinters`), far more than any real network has. Past it, the printers seen longest ago are forgotten.
+- **Forgetting:** a printer not seen for 90 days is forgotten (`RememberedFor`). Searching finds it again if it comes back.
+- **When each was last seen:** each entry has `lastSeen`.
+  - It's added within format 1, since earlier versions ignore properties they don't know.
+  - An entry without one, from a file written before, counts as seen when the file is loaded.
+- **Fewer writes:** a printer seen again at the same address rewrites the store only once its `lastSeen` is a day old, rather than every time.
+- **A store written before the limit** shrinks to it when it's loaded.
+- **Tests:**
+  - more printers than the limit;
+  - the one seen longest ago going first;
+  - forgetting after 90 days;
+  - no rewrite for a printer seen again soon;
+  - an old, oversized store shrinking on restart.
