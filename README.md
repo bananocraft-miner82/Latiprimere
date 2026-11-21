@@ -106,6 +106,10 @@ catch (OperationCanceledException) when (timeout.IsCancellationRequested)
 - **[Examples](samples/Latiprimere.Examples/)**: every example from the documentation, as a program built with every change. Run one with `dotnet run --project samples/Latiprimere.Examples -f net10.0 -- list`.
 - **[Project documents](docs/README.md)**: the feasibility research, project plan, decision records and progress log.
 
+## Security
+
+Report a vulnerability privately, as the [security policy](SECURITY.md) describes, not in a public issue. The policy also says which versions get security updates, and for how long. Each package carries a software bill of materials. How Latiprimere meets the EU Cyber Resilience Act is in [docs/cyber-resilience-act.md](docs/cyber-resilience-act.md).
+
 ## Licence
 
 Latiprimere is free under the [Community Licence](LICENSE) for:

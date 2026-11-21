@@ -138,9 +138,21 @@ jobs:
 
       # Packs on one runner, so every change shows that the packages still build and pass package validation. The
       # packages are kept for a few days to inspect. When release.yml calls this, these are the ones it publishes.
+      # Each package carries its CycloneDX SBOM, at sbom/<package>.cdx.json (tools/releasing/generate-sboms.sh, ADR
+      # 0051), and the step fails if one doesn't.
       - name: Pack
         if: runner.os == 'Linux'
-        run: dotnet pack --no-build --configuration Release --output artifacts/packages
+        run: |
+          dotnet tool restore
+          sh tools/releasing/generate-sboms.sh artifacts/sbom
+          dotnet pack --no-build --configuration Release --output artifacts/packages -p:SbomDirectory="$PWD/artifacts/sbom"
+          for package in artifacts/packages/*.nupkg; do
+            id=$(unzip -p "$package" '*.nuspec' | sed -n 's|.*<id>\(.*\)</id>.*|\1|p')
+            if ! unzip -l "$package" "sbom/$id.cdx.json" > /dev/null; then
+              echo "::error::$package has no SBOM at sbom/$id.cdx.json."
+              exit 1
+            fi
+          done
 
       - name: Keep packages
         if: runner.os == 'Linux'
@@ -148,6 +160,14 @@ jobs:
         with:
           name: packages
           path: artifacts/packages
+          retention-days: 7
+
+      - name: Keep SBOMs
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom
+          path: artifacts/sbom
           retention-days: 7
 
       - name: Show virtual printer logs

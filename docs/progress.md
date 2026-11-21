@@ -14,6 +14,64 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 ---
 
+## 2026-11-21: Security policy, SBOMs and groundwork for the Cyber Resilience Act
+
+**Done** (owner: "Add the CRA groundwork now"), recorded in [ADR 0051](decisions/0051-security-policy-sbom-and-cra.md), proposed:
+- **[SECURITY.md](../SECURITY.md):**
+  - private reports through GitHub or `security@latiprimere.com`;
+  - response goals for one developer;
+  - 90-day coordinated disclosure, and advisories with CVEs;
+  - supported versions and the support period;
+  - scope;
+  - the manufacturer's details.
+- **An SBOM in every package:**
+  - [generate-sboms.sh](../tools/releasing/generate-sboms.sh) writes a CycloneDX SBOM for each package, with the CycloneDX tool 6.3.1 from [dotnet-tools.json](../dotnet-tools.json).
+  - build.yml's Pack step puts it in the package at `sbom/<package>.cdx.json`, checks that every package has one, and keeps the SBOMs as an artifact.
+  - The release publishes those packages, so nuget.org gets the SBOMs too.
+- **Security updates after a Commercial Licence ends:** change 12 of [COMMERCIAL-TERMS.md](../COMMERCIAL-TERMS.md). A lapsed buyer may ship Latiprimere's security updates to the copies it shipped while licensed, for the support period, but not use Latiprimere in its own operations. [COMMERCIAL.md](../COMMERCIAL.md) says so too.
+- **[cyber-resilience-act.md](cyber-resilience-act.md):**
+  - what the Act asks of Latiprimere, and what's done;
+  - the steps for reporting an actively exploited vulnerability;
+  - what's left before 11 December 2027.
+- **README.md and the package README** gain a Security section.
+- **The private list of questions for a lawyer** moved to `private/`, which git ignores. Public documents no longer link to it.
+
+**Learned**
+- **Microsoft.Sbom.Targets wasn't accurate enough.** It listed build-only analyzers, Latiprimere itself, and leftover pack files from `obj/` as dependencies. The CycloneDX tool works from the restore's assets file, and marks build-only packages `excluded`.
+- **The CycloneDX tool reads its metadata template only as XML.**
+
+**Next**
+- **Owner:**
+  - enable private vulnerability reporting on GitHub;
+  - set up `security@latiprimere.com`;
+  - register on ENISA's Single Reporting Platform;
+  - confirm the support period and response goals in ADR 0051.
+
+---
+
+## 2026-11-21: Commercial Licence agreement drafted
+
+**Done** (owner: "Go with drafting the commercial licence from Common Paper's agreement")
+- **[COMMERCIAL-TERMS.md](../COMMERCIAL-TERMS.md):** the Commercial Licence as a Cover Page to Common Paper's Software License Agreement Standard Terms 1.1, under Dutch law. It's recorded in [ADR 0050](decisions/0050-commercial-licence-agreement.md), which is proposed. Owner decisions:
+  - renewal: yearly, until cancelled;
+  - liability: capped at a year's fees, with no IP indemnity;
+  - support: a 3-business-day goal for replies, not a promise.
+- **[COMMERCIAL.md](../COMMERCIAL.md):** links to the terms. It also gives the new renewal rule, refunds on renewals, and the support goal.
+- **The Provider** is Jonathan Price, trading as Prodigy Software Solutions, in Rucphen. Support mail goes to `support@latiprimere.com`. The draft names the Rechtbank Zeeland-West-Brabant, the court for Rucphen, as the chosen court.
+- **A private list of questions for a lawyer** (owner: "Keep a log of everything I need to go through with a lawyer for later"), outside the repository's history. It covers the three licence documents, the business, insurance, and the Cyber Resilience Act and Product Liability Directive.
+
+**Learned**
+- **Common Paper's licence is to install and use the software,** so a library needed more: the right to ship it inside the buyer's products, and to modify its public source.
+- **The seller is the copyright holder:** a sole proprietorship is Jonathan Price himself, so no transfer of rights is needed. A BV would need one.
+- **Latiprimere has no security policy or vulnerability contact.** The Cyber Resilience Act's reporting duties have applied since 11 September 2026.
+
+**Next**
+- **Owner:** confirm the drafted defaults listed in ADR 0050, then accept it.
+- **Owner:** add the KvK number once the business is registered, and set up `support@latiprimere.com`.
+- **A lawyer:** go through the owner's private list.
+
+---
+
 ## 2026-11-20: Review of Phase 4's changes, and fixes
 
 **Done** (owner: "Run a sweep for any potential bugs, security/performance issues etc introduced", then "Fix all of them")

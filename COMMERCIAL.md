@@ -1,6 +1,6 @@
 # Commercial Licence
 
-> **Draft.** The terms of the Commercial Licence aren't written yet. Have a lawyer draft the agreement before any licence is sold.
+> **Draft.** The terms of the Commercial Licence are drafted in [COMMERCIAL-TERMS.md](COMMERCIAL-TERMS.md), but not yet reviewed by a lawyer. No licence is sold until they are.
 
 Latiprimere is free under the [Community Licence](LICENSE) for small organisations, individuals, non-profits and education, open-source projects, evaluation and development, and indirect use. Section 1 of the licence gives the exact conditions.
 
@@ -31,18 +31,24 @@ Prices exclude VAT and sales tax, which are added at checkout where they apply.
 - **Production use** for organisations of any size.
 - **Every developer and product** in the company.
 - **All updates** while the licence is active.
-- **Email support,** as well as GitHub issues.
+- **Email support** at support@latiprimere.com, as well as GitHub issues. We aim to reply within 3 business days.
 - **Invoice and VAT handled for you.**
 
 Everyone, with either licence, can use [GitHub issues](https://github.com/bananocraft-miner82/Latiprimere/issues) and the documentation at [latiprimere.com](https://latiprimere.com), which is still being written.
 
 ## Renewal
 
-A licence lasts a year. To keep using Latiprimere in production after that, renew within 30 days of the end date. Otherwise, stop using it in production. Evaluation and development stay free under the Community Licence.
+A licence lasts a year, and renews each year until you cancel it. You can cancel at any time before the end date, and the licence then ends on that date. If a renewal payment fails, you have 30 days to pay before the licence ends.
+
+When a licence ends, stop using Latiprimere in production, and stop shipping it in new copies of your products. Copies you've already shipped can stay with your customers. You can keep shipping them Latiprimere's security updates, for as long as the [security policy](SECURITY.md#supported-versions) supports their version. Evaluation and development stay free under the Community Licence.
 
 ## Refunds
 
-If a licence isn't right for you, ask for a refund within 30 days of buying it.
+If a licence isn't right for you, ask for a refund within 30 days of paying for it, whether you bought it or it renewed.
+
+## The terms
+
+The full terms are in [COMMERCIAL-TERMS.md](COMMERCIAL-TERMS.md). They're based on the Common Paper Software License Agreement, under Dutch law. Where this page and the terms differ, the terms apply.
 
 ## How to get one
 

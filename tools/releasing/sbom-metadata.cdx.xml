@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The manufacturer's details for every SBOM that generate-sboms.sh writes (ADR 0051). The CycloneDX tool reads its
+     metadata template only as XML. -->
+<bom xmlns="http://cyclonedx.org/schema/bom/1.7" version="1">
+  <metadata>
+    <manufacturer>
+      <name>Jonathan Price, trading as Prodigy Software Solutions</name>
+      <address>
+        <country>NL</country>
+        <locality>Rucphen</locality>
+        <postalCode>4715 BL</postalCode>
+        <streetAddress>Jeroen Boschstraat 11</streetAddress>
+      </address>
+      <url>https://latiprimere.com</url>
+      <contact>
+        <email>security@latiprimere.com</email>
+      </contact>
+    </manufacturer>
+    <supplier>
+      <name>Jonathan Price, trading as Prodigy Software Solutions</name>
+      <url>https://latiprimere.com</url>
+      <contact>
+        <email>security@latiprimere.com</email>
+      </contact>
+    </supplier>
+  </metadata>
+</bom>

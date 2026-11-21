@@ -55,6 +55,8 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0047](0047-printing-images.md) | Printing JPEG and PNG images | Accepted |
 | [0048](0048-printing-plain-text.md) | Printing plain text | Accepted |
 | [0049](0049-following-printers-and-jobs.md) | Following printers and jobs | Accepted |
+| [0050](0050-commercial-licence-agreement.md) | Commercial Licence agreement, from Common Paper's Software License Agreement | Proposed |
+| [0051](0051-security-policy-sbom-and-cra.md) | Security policy, SBOMs and groundwork for the Cyber Resilience Act | Proposed |
 
 ## Template
 
