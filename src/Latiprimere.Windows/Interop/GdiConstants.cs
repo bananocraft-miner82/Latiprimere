@@ -44,8 +44,11 @@ internal static class GdiConstants
 	/// <summary>SRCCOPY raster operation.</summary>
 	internal const uint SourceCopy = 0x00CC0020;
 
-	/// <summary>Bits per pixel of the rendered bands.</summary>
+	/// <summary>Bits per pixel of the rendered bands in colour.</summary>
 	internal const ushort BitsPerPixel = 32;
+
+	/// <summary>Bits per pixel of the rendered bands in grey, for monochrome jobs.</summary>
+	internal const ushort GreyBitsPerPixel = 8;
 
 	/// <summary>Win32 error: the operation was cancelled by the user (for example, a Save As dialog).</summary>
 	internal const int ErrorCancelled = 1223;

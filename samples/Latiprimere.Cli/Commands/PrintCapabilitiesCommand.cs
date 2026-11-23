@@ -64,7 +64,7 @@ internal static class PrintCapabilitiesCommand
 
 		IPrinter printer = await catalog.GetPrinterAsync(arguments[0], CancellationToken.None);
 
-		if (printer is not IWindowsPrinter windowsPrinter)
+		if (printer.GetFeature<IWindowsPrinter>() is not { } windowsPrinter)
 		{
 			ConsoleOutput.WriteError(CliMessages.InvalidArguments, CliMessages.FormatNotAWindowsPrinter(printer.Info.Id));
 

@@ -63,8 +63,57 @@ internal static class WindowsCapabilitiesMapper
 				: new[] { PageOrientation.Portrait },
 			InputTrays        = record.Bins
 				.Select(bin => new InputTray { Id = bin.Id.ToString(CultureInfo.InvariantCulture), Name = bin.Name })
-				.ToList()
+				.ToList(),
+			MediaTypes        = record.MediaTypes
+				.Select(type => new MediaType { Id = type.Id.ToString(CultureInfo.InvariantCulture), Name = type.Name })
+				.ToList(),
+			CustomMediaSizes  = WindowsCapabilitiesMapper.ToCustomRange(record) is { } range ? [range] : []
 		};
+	}
+
+	/// <summary>
+	/// Gets the custom sizes a driver takes: its DC_MINEXTENT to DC_MAXEXTENT, when it lists DMPAPER_USER among its
+	/// papers, as drivers that take no custom size may still give extents (ADR 0056).
+	/// </summary>
+	/// <param name="record">The driver's capabilities.</param>
+	/// <returns>The range, or <see langword="null"/> if the driver takes no custom size.</returns>
+	internal static MediaSizeRange? ToCustomRange(WindowsCapabilitiesRecord record)
+	{
+		ArgumentNullException.ThrowIfNull(record);
+
+		bool takesCustom = record.Papers.Any(paper => paper.Id == DevModeConstants.PaperUser);
+
+		if (!takesCustom || record.MinExtent is not { } min || record.MaxExtent is not { } max)
+		{
+			return null;
+		}
+
+		return new MediaSizeRange
+		{
+			MinWidthMillimeters  = min.Width / 10.0,
+			MaxWidthMillimeters  = max.Width / 10.0,
+			MinHeightMillimeters = min.Length / 10.0,
+			MaxHeightMillimeters = max.Length / 10.0
+		};
+	}
+
+	/// <summary>
+	/// Finds the driver's paper type with a given ID, as <see cref="ToCapabilities"/> gives it.
+	/// </summary>
+	/// <param name="record">The driver's capabilities.</param>
+	/// <param name="typeId">The type's ID.</param>
+	/// <returns>The DMMEDIA_* number, or <see langword="null"/> if the driver has no such type.</returns>
+	internal static uint? FindMediaTypeId(WindowsCapabilitiesRecord record, string typeId)
+	{
+		ArgumentNullException.ThrowIfNull(record);
+		ArgumentNullException.ThrowIfNull(typeId);
+
+		if (!uint.TryParse(typeId, NumberStyles.None, CultureInfo.InvariantCulture, out uint id))
+		{
+			return null;
+		}
+
+		return record.MediaTypes.Any(type => type.Id == id) ? id : null;
 	}
 
 	/// <summary>

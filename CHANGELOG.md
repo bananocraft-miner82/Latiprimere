@@ -6,6 +6,29 @@ Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` 
 
 ## Unreleased
 
+### Added
+
+- **Print password-protected PDFs** with `PrintContent.FromPdf(stream, password)`. Where Latiprimere renders the PDF, on the Windows spooler or as raster, it opens it with the password. A network printer that takes PDF is sent the password with the document when it lists `document-password-supported`, and otherwise the pages as raster. A CUPS queue that takes no passwords refuses the job with `NotSupportedException`. The password is never logged ([ADR 0054](docs/decisions/0054-rasteriser-options.md)).
+- **Render in grey, and without smoothing:** `RasterBand.PixelFormat` chooses `RasterPixelFormat.Bgra32` or `Gray8`, a quarter of the memory, and `RasterRenderOptions` turns off the smoothing of text, lines and images, for printers that print only black dots. `PdfOpenOptions` gives a PDF's password to the rasteriser ([ADR 0054](docs/decisions/0054-rasteriser-options.md)).
+- **`IPrinter.AppliedOptions`** says which `PrintOptions` settings a printer applies, as `PrintOptionKinds` flags. A printer from the catalog refuses a job that sets any other with `NotSupportedException`, before anything is sent, so a setting added in a later version is never dropped without a word by a print system that doesn't know it. Every print system applies every setting there is today ([ADR 0055](docs/decisions/0055-catalog-printers.md)).
+- **More print options** ([ADR 0056](docs/decisions/0056-typed-options-before-1-0.md)):
+  - `PrintOptions.PageRanges`, of `PageRange`s, to print some pages: only those are rendered on the Windows spooler and as raster, and IPP printers sent the PDF are asked for them with `page-ranges`;
+  - `Collate`, `Quality` (`Draft`, `Normal`, `High`), `Finishings` (staples, holes and a fold), `OutputBin` and `MediaType`;
+  - custom and roll paper: `MediaSize.Custom(width, height)`, inside a printer's `PrinterCapabilities.CustomMediaSizes`;
+  - `PrinterCapabilities.CustomMediaSizes`, `MediaTypes`, `PrintQualities`, `DefaultPrintQuality`, `Finishings`, `OutputBins` and `SupportsPageRanges`.
+
+  The Windows spooler applies all but finishings and output bins, which a Windows printer refuses rather than ignores.
+- **`IPrinter.GetFeature<T>()` and `IPrintJob.GetFeature<T>()`** give what a print system's printer or job offers beyond the interface, such as `IWindowsPrinter` ([ADR 0055](docs/decisions/0055-catalog-printers.md)).
+- **Documentation and samples:** the guides show printing some of a PDF's pages, following a printer, and PDF labels on a custom paper size. The CLI sample's `print` takes `--pages` and `--quality`, and opens a password-protected PDF with the password in `LATIPRIMERE_PDF_PASSWORD`; its `caps` lists custom sizes, media types, qualities, finishings, output bins and whether page ranges work.
+
+### Changed
+
+- **IPP printers no longer list `ipp:print-quality`, `ipp:output-bin`, `ipp:media-type` or `ipp:multiple-document-handling` among their vendor options,** as the typed `Quality`, `OutputBin`, `MediaType` and `Collate` set them on every print system. The keys still work on their own. `ipp:finishings` is still listed, as it holds far more than the `Finishing` names ([ADR 0057](docs/decisions/0057-api-review-phase-4.md)).
+- **Breaking: the catalog's printers are its own,** around the print system's, so `printer is IWindowsPrinter` is now false. Use `printer.GetFeature<IWindowsPrinter>()` ([ADR 0055](docs/decisions/0055-catalog-printers.md)).
+
+- **Grey and black jobs use a quarter of the memory:** IPP raster in grey or black, and monochrome jobs on the Windows spooler, are rendered in 8-bit grey instead of 32-bit colour. Grey comes from PDFium, whose weighting of colours differs from before by a few levels at most ([ADR 0054](docs/decisions/0054-rasteriser-options.md)).
+- **Breaking, for classes implementing the rasteriser:** `IPdfRasterizer.Open` takes `PdfOpenOptions? options = null`, and `IRasterDocument.RenderBand` takes `RasterRenderOptions? options = null`. Code calling them compiles as before. The static `RasterBand.BytesPerPixel` is now an instance property, from the band's pixel format; `RasterBand.GetBytesPerPixel(format)` gives it for any format ([ADR 0054](docs/decisions/0054-rasteriser-options.md)).
+
 ## 11.0.9-preview - 2026-11-21
 
 ### Added

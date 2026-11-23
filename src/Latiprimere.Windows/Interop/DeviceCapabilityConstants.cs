@@ -8,6 +8,22 @@ internal static class DeviceCapabilityConstants
 	/// <summary>DC_PAPERS: the DMPAPER_* identifiers of the supported paper sizes (WORD each).</summary>
 	internal const ushort Papers = 2;
 
+	/// <summary>DC_MINEXTENT: the smallest custom paper, width in the low word and length in the high, in tenths
+	/// of a millimetre.</summary>
+	internal const ushort MinExtent = 4;
+
+	/// <summary>DC_MAXEXTENT: the largest custom paper, as <see cref="MinExtent"/>.</summary>
+	internal const ushort MaxExtent = 5;
+
+	/// <summary>DC_MEDIATYPENAMES: the names of the paper types, 64 characters each.</summary>
+	internal const ushort MediaTypeNames = 34;
+
+	/// <summary>DC_MEDIATYPES: the DMMEDIA_* numbers of the paper types, a DWORD each.</summary>
+	internal const ushort MediaTypes = 35;
+
+	/// <summary>The characters in each name DC_MEDIATYPENAMES returns.</summary>
+	internal const int MediaTypeNameLength = 64;
+
 	/// <summary>DC_PAPERSIZE: the paper sizes, in tenths of a millimetre (POINT each).</summary>
 	internal const ushort PaperSize = 3;
 

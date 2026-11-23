@@ -37,8 +37,50 @@ internal static class IppCapabilitiesMapper
 			DefaultColorMode  = defaultColorMode is null ? null : IppCapabilitiesMapper.ToColorMode(defaultColorMode.Value),
 			MaxCopies         = copies?.Upper,
 			Orientations      = IppCapabilitiesMapper.ToOrientations(attributes),
-			InputTrays        = IppCapabilitiesMapper.ToInputTrays(attributes)
+			InputTrays        = IppCapabilitiesMapper.ToInputTrays(attributes),
+			CustomMediaSizes  = PwgMediaNames.ToSizeRanges((IppValueReader.ReadReference(attributes.MediaSupported) ?? []).Select(medium => medium.Value)),
+			MediaTypes        = IppCapabilitiesMapper.ToKeywordRecords
+			(
+				(IppValueReader.ReadReference(attributes.MediaTypeSupported) ?? []).Select(type => type.Value),
+				(id, name) => new MediaType { Id = id, Name = name }
+			),
+			OutputBins        = IppCapabilitiesMapper.ToKeywordRecords
+			(
+				(IppValueReader.ReadReference(attributes.OutputBinSupported) ?? []).Select(bin => bin.Value),
+				(id, name) => new OutputBin { Id = id, Name = name }
+			),
+			PrintQualities    = (IppValueReader.ReadReference(attributes.PrintQualitySupported) ?? [])
+									.Select(IppJobTemplateMapper.ToPrintQuality)
+									.Distinct()
+									.Order()
+									.ToList(),
+			DefaultPrintQuality = IppValueReader.ReadValue(attributes.PrintQualityDefault) is { } quality
+									? IppJobTemplateMapper.ToPrintQuality(quality)
+									: null,
+			Finishings        = (IppValueReader.ReadReference(attributes.FinishingsSupported) ?? [])
+									.Select(IppJobTemplateMapper.ToFinishing)
+									.OfType<Finishing>()
+									.Distinct()
+									.Order()
+									.ToList(),
+			SupportsPageRanges = IppValueReader.ReadValue(attributes.PageRangesSupported)
 		};
+	}
+
+	/// <summary>
+	/// Makes records of keywords a printer lists, with names to show people, skipping blanks and repeats.
+	/// </summary>
+	/// <typeparam name="T">The record.</typeparam>
+	/// <param name="keywords">The keywords.</param>
+	/// <param name="create">Makes a record from a keyword and its name.</param>
+	/// <returns>The records.</returns>
+	private static List<T> ToKeywordRecords<T>(IEnumerable<string> keywords, Func<string, string, T> create)
+	{
+		return keywords
+			.Where(keyword => !string.IsNullOrWhiteSpace(keyword))
+			.Distinct(StringComparer.Ordinal)
+			.Select(keyword => create(keyword, IppKeywords.Describe(keyword)))
+			.ToList();
 	}
 
 	/// <summary>

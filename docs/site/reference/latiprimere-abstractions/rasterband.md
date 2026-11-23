@@ -28,7 +28,7 @@ Describes one horizontal band of a page rendered at a given pixel size.
 - `PageHeight`: The height in pixels the whole page is rendered at.
 - `Top`: The first row of the page to produce, from 0.
 - `Height`: The number of rows to produce.
-- `Stride`: The number of bytes from the start of one row to the next; at least `PageWidth` × 4.
+- `Stride`: The number of bytes from the start of one row to the next; at least `PageWidth` × [RasterBand.BytesPerPixel](/docs/reference/latiprimere-abstractions/rasterband/#bytesperpixel).
 
 ## Properties
 
@@ -39,6 +39,18 @@ public long ByteCount { get; }
 ```
 
 Gets the number of bytes the band's pixels occupy.
+
+### BytesPerPixel
+
+```csharp
+public int BytesPerPixel { get; }
+```
+
+Gets the number of bytes in each pixel of the band's [RasterBand.PixelFormat](/docs/reference/latiprimere-abstractions/rasterband/#pixelformat).
+
+**Exceptions**
+
+- [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception): The pixel format isn't one this version knows.
 
 ### Height
 
@@ -64,6 +76,16 @@ public int PageWidth { get; init; }
 
 The width in pixels the whole page is rendered at.
 
+### PixelFormat
+
+```csharp
+public RasterPixelFormat PixelFormat { get; init; }
+```
+
+Gets how the band's pixels are laid out; [RasterPixelFormat.Bgra32](/docs/reference/latiprimere-abstractions/rasterpixelformat/#values) by default.
+
+An [IRasterDocument](/docs/reference/latiprimere-abstractions/irasterdocument/) that can't render a format throws [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) for it, rather than rendering another.
+
 ### Rotation
 
 ```csharp
@@ -80,7 +102,7 @@ An [IRasterDocument](/docs/reference/latiprimere-abstractions/irasterdocument/) 
 public int Stride { get; init; }
 ```
 
-The number of bytes from the start of one row to the next; at least `PageWidth` × 4.
+The number of bytes from the start of one row to the next; at least `PageWidth` × [RasterBand.BytesPerPixel](/docs/reference/latiprimere-abstractions/rasterband/#bytesperpixel).
 
 ### Top
 
@@ -98,7 +120,7 @@ The first row of the page to produce, from 0.
 public static RasterBand Create(int pageWidth, int pageHeight, int top, int height)
 ```
 
-Creates a band with the tightest stride for the page width.
+Creates a band of 32-bit pixels ([RasterPixelFormat.Bgra32](/docs/reference/latiprimere-abstractions/rasterpixelformat/#values)) with the tightest stride for the page width.
 
 **Parameters**
 
@@ -111,12 +133,44 @@ Creates a band with the tightest stride for the page width.
 
 The band.
 
-## Fields
-
-### BytesPerPixel
-
 ```csharp
-public static readonly int BytesPerPixel
+public static RasterBand Create(int pageWidth, int pageHeight, int top, int height, RasterPixelFormat pixelFormat)
 ```
 
-The number of bytes in each pixel (B, G, R and an unused byte).
+Creates a band with the tightest stride for the page width in the given pixel format.
+
+**Parameters**
+
+- `pageWidth`: The width in pixels the whole page is rendered at.
+- `pageHeight`: The height in pixels the whole page is rendered at.
+- `top`: The first row of the page to produce.
+- `height`: The number of rows to produce.
+- `pixelFormat`: How the pixels are laid out.
+
+**Returns**
+
+The band.
+
+**Exceptions**
+
+- [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception): The pixel format isn't one this version knows.
+
+### GetBytesPerPixel
+
+```csharp
+public static int GetBytesPerPixel(RasterPixelFormat pixelFormat)
+```
+
+Gets the number of bytes in each pixel of a format.
+
+**Parameters**
+
+- `pixelFormat`: The pixel format.
+
+**Returns**
+
+4 for [RasterPixelFormat.Bgra32](/docs/reference/latiprimere-abstractions/rasterpixelformat/#values), 1 for [RasterPixelFormat.Gray8](/docs/reference/latiprimere-abstractions/rasterpixelformat/#values).
+
+**Exceptions**
+
+- [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception): The pixel format isn't one this version knows.

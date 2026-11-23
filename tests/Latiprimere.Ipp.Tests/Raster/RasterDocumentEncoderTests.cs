@@ -176,13 +176,56 @@ public sealed class RasterDocumentEncoderTests
 
 		// Act
 		byte[] whole = RasterDocumentEncoderTests.Encode(oneBand, settings);
-		byte[] banded = RasterDocumentEncoderTests.Encode(manyBands, settings with { MaxBandBytes = 595 * 4 * 7 });
+		// Grey is rendered a byte a pixel (ADR 0054), so 7 lines of the 595-pixel page fit in 595 × 7 bytes
+		byte[] banded = RasterDocumentEncoderTests.Encode(manyBands, settings with { MaxBandBytes = 595 * 7 });
 
 		// Assert
 		Assert.Equal(2, oneBand.Bands.Count);
 		Assert.True(manyBands.Bands.Count > 200, $"{manyBands.Bands.Count} bands");
 		Assert.All(manyBands.Bands, band => Assert.True(band.Height <= 7));
 		Assert.Equal(whole, banded);
+	}
+
+	[Fact]
+	public void GivenPageRangesWhenEncodedTwoSidedThenOnlyThosePagesArePrintedWithSidesByTheirPlace()
+	{
+		// Arrange: pages 2 and 3 of three identical pages are pages 1 and 2 of two, front and back alike (ADR 0056)
+		QuadrantDocument three = new QuadrantDocument(RasterDocumentEncoderTests.PortraitA4, RasterDocumentEncoderTests.PortraitA4, RasterDocumentEncoderTests.PortraitA4);
+		QuadrantDocument two = new QuadrantDocument(RasterDocumentEncoderTests.PortraitA4, RasterDocumentEncoderTests.PortraitA4);
+
+		RasterSettings settings = RasterDocumentEncoderTests.Settings(RasterFormat.PwgRaster, RasterColorSpace.Gray8, dpi: 72) with
+		{
+			Duplex   = DuplexMode.LongEdge,
+			BackSide = RasterBackSide.Rotated
+		};
+
+		// Act
+		byte[] chosen = RasterDocumentEncoderTests.Encode(three, settings with { PageRanges = [new PageRange(2, 3)] });
+		byte[] whole = RasterDocumentEncoderTests.Encode(two, settings);
+
+		// Assert
+		Assert.Equal(whole, chosen);
+		Assert.Equal(2, RasterDocumentReader.Read(chosen).Pages.Count);
+	}
+
+	[Fact]
+	public void GivenPageRangesPastTheEndWhenEncodedThenThrowsArgumentExceptionBeforeWriting()
+	{
+		// Arrange
+		QuadrantDocument document = new QuadrantDocument(RasterDocumentEncoderTests.PortraitA4);
+		RasterSettings settings = RasterDocumentEncoderTests.Settings(RasterFormat.PwgRaster, RasterColorSpace.Gray8, dpi: 72) with
+		{
+			PageRanges = [new PageRange(2, 4)]
+		};
+
+		using MemoryStream output = new MemoryStream();
+
+		// Act
+		Action encode = () => RasterDocumentEncoder.Encode(document, settings, output, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Throws<ArgumentException>(encode);
+		Assert.Empty(document.Bands);
 	}
 
 	[Fact]
@@ -368,7 +411,7 @@ public sealed class RasterDocumentEncoderTests
 		}
 
 		/// <inheritdoc/>
-		public void RenderBand(int pageIndex, RasterBand band, Span<byte> pixels)
+		public void RenderBand(int pageIndex, RasterBand band, Span<byte> pixels, RasterRenderOptions? options = null)
 		{
 			pixels[..(int)band.ByteCount].Fill(byte.MaxValue);
 		}

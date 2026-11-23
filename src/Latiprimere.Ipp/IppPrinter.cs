@@ -17,6 +17,9 @@ namespace Latiprimere.Ipp;
 internal sealed class IppPrinter : IPrinter
 {
 	private static readonly string[] MediaDefaultAttributes = ["media-default"]; // Asked for an image's paper
+	private static readonly string[] PasswordAttributes = [DocumentPasswordSupported]; // Asked for a PDF's password
+	private const string DocumentPasswordSupported = "document-password-supported"; // Longest password, in octets
+	private const string DocumentPassword = "document-password";  // The operation attribute carrying it (PWG 5100.13)
 	private static readonly TimeSpan DefaultPaperLifetime = TimeSpan.FromMinutes(5); // How long it is kept
 
 	private readonly Lock defaultPaperLock = new Lock();          // Guards the two fields below
@@ -99,6 +102,12 @@ internal sealed class IppPrinter : IPrinter
 			throw new NotSupportedException(ExceptionMessages.OutputFileNotSupported);
 		}
 
+		// Raw data's pages can't be seen, and a printer's own page-ranges for it would apply to who knows what
+		if (content.Format == Latiprimere.DocumentFormat.Raw && options.PageRanges.Count > 0)
+		{
+			throw new NotSupportedException(ExceptionMessages.PageRangesNotForRawData);
+		}
+
 		// An image or text the printer can't take itself goes as a PDF on its paper, then as any PDF does (ADR 0047,
 		// ADR 0048)
 		if (!this.TakesAsItIs(content.Format))
@@ -128,6 +137,20 @@ internal sealed class IppPrinter : IPrinter
 		// A PDF to a printer that can't take PDF goes as raster, when it takes a raster format (ADR 0035)
 		RasterJobPlan? rasterPlan = await this.PlanRasterAsync(content.Format, options, cancellationToken).ConfigureAwait(false);
 
+		// A password-protected PDF the printer would take as it is goes with its password, if the printer takes one,
+		// and otherwise as raster, rendered here with the password (ADR 0054)
+		IppAttribute? password = null;
+
+		if (content.Password is not null && content.Format == Latiprimere.DocumentFormat.Pdf && rasterPlan is null)
+		{
+			password = await this.CreatePasswordAttributeAsync(content.Password, cancellationToken).ConfigureAwait(false);
+
+			if (password is null)
+			{
+				rasterPlan = await this.PlanPasswordRasterAsync(options, cancellationToken).ConfigureAwait(false);
+			}
+		}
+
 		// Vendor options are checked against the typed request before the job is sent
 		PrintJobRequest request = this.CreatePrintJobRequest(content, options, rasterPlan);
 
@@ -139,7 +162,17 @@ internal sealed class IppPrinter : IPrinter
 		);
 
 		// Opened before anything is sent, so a PDF that can't be read fails first; rendered as it is uploaded
-		using IRasterDocument? rasterDocument = rasterPlan is null ? null : this.context.PdfRasterizer!.Open(content.Content);
+		using IRasterDocument? rasterDocument = rasterPlan is null
+			? null
+			: this.context.PdfRasterizer!.Open(content.Content, new PdfOpenOptions { Password = content.Password });
+
+		// The password goes with the document only, not with Validate-Job, which has none
+		IppVendorAttributes printAttributes = vendorAttributes;
+
+		if (password is not null)
+		{
+			printAttributes = vendorAttributes with { Operation = [.. vendorAttributes.Operation, password.Value] };
+		}
 
 		IppJobDocument document = rasterDocument is null
 			? new StreamJobDocument(content.Content)
@@ -154,7 +187,7 @@ internal sealed class IppPrinter : IPrinter
 
 			// Send the document with its job attributes
 			response = await this
-				.SendPrintJobAsync(request, document, vendorAttributes, cancellationToken)
+				.SendPrintJobAsync(request, document, printAttributes, cancellationToken)
 				.ConfigureAwait(false);
 		}
 		catch (PrintAuthenticationException exception) when (this.CreateAuthenticationHint() is { } hint)
@@ -537,15 +570,78 @@ internal sealed class IppPrinter : IPrinter
 			throw new NotSupportedException(ExceptionMessages.FormatPdfNeedsRasterizerForPrinter(accepted));
 		}
 
+		return await this.PlanRasterAsync(rasterFormat.Value, options, cancellationToken).ConfigureAwait(false);
+	}
+
+	/// <summary>
+	/// Plans a password-protected PDF as raster, for a printer that would take the PDF but not its password.
+	/// </summary>
+	/// <param name="options">The job's options.</param>
+	/// <param name="cancellationToken">A token to cancel the request.</param>
+	/// <returns>The plan.</returns>
+	/// <exception cref="NotSupportedException">The printer takes no raster format Latiprimere writes, its formats
+	/// aren't known, as for a CUPS queue, or no PDF rasteriser is registered.</exception>
+	private async Task<RasterJobPlan> PlanPasswordRasterAsync(PrintOptions options, CancellationToken cancellationToken)
+	{
+		RasterFormat? rasterFormat = this.supportedFormats is null
+			? null
+			: RasterJobPlanner.ChooseFormat(this.supportedFormats, this.context.RasterFormats);
+
+		if (rasterFormat is null || this.context.PdfRasterizer is null)
+		{
+			throw new NotSupportedException(ExceptionMessages.FormatPdfPasswordNotSupported(this.printerUri));
+		}
+
+		return await this.PlanRasterAsync(rasterFormat.Value, options, cancellationToken).ConfigureAwait(false);
+	}
+
+	/// <summary>
+	/// Reads what the printer needs to plan a raster job, and plans it.
+	/// </summary>
+	/// <param name="rasterFormat">The raster format chosen.</param>
+	/// <param name="options">The job's options.</param>
+	/// <param name="cancellationToken">A token to cancel the request.</param>
+	/// <returns>The plan.</returns>
+	/// <exception cref="PrintException">The printer is no longer there.</exception>
+	private async Task<RasterJobPlan> PlanRasterAsync(RasterFormat rasterFormat, PrintOptions options, CancellationToken cancellationToken)
+	{
 		IReadOnlyList<IppAttribute> attributes = await IppPrinterQueries
 			.GetAttributeListAsync(this.context, this.printerUri, RasterJobPlanner.Attributes, cancellationToken)
 			.ConfigureAwait(false)
 			?? throw new PrintException(ExceptionMessages.FormatPrinterNoLongerAvailable(this.printerUri));
 
-		RasterJobPlan plan = RasterJobPlanner.Plan(rasterFormat.Value, attributes, options, this.context.MaxRenderDpi);
+		RasterJobPlan plan = RasterJobPlanner.Plan(rasterFormat, attributes, options, this.context.MaxRenderDpi);
 		IppLog.PrintingAsRaster(this.context.Logger, this.printerUri, plan.MimeType, plan.Settings.ColorSpace, plan.Settings.Dpi, plan.Gzip);
 
 		return plan;
+	}
+
+	/// <summary>
+	/// Makes the <c>document-password</c> operation attribute for a PDF's password, if the printer takes one that
+	/// long (PWG 5100.13: <c>document-password-supported</c> is the longest it takes, in octets, and 0 for none).
+	/// </summary>
+	/// <param name="password">The password.</param>
+	/// <param name="cancellationToken">A token to cancel the request.</param>
+	/// <returns>The attribute, or <see langword="null"/> if the printer can't be sent the password.</returns>
+	/// <exception cref="PrintException">The printer is no longer there.</exception>
+	private async Task<IppAttribute?> CreatePasswordAttributeAsync(string password, CancellationToken cancellationToken)
+	{
+		IReadOnlyList<IppAttribute> attributes = await IppPrinterQueries
+			.GetAttributeListAsync(this.context, this.printerUri, IppPrinter.PasswordAttributes, cancellationToken)
+			.ConfigureAwait(false)
+			?? throw new PrintException(ExceptionMessages.FormatPrinterNoLongerAvailable(this.printerUri));
+
+		int longest = attributes
+			.Where(attribute => attribute.Name == IppPrinter.DocumentPasswordSupported)
+			.Select(attribute => attribute.Value is int octets ? octets : 0)
+			.FirstOrDefault();
+
+		// As bytes: SharpIppNext writes a string value as ASCII, which would turn other characters into question marks
+		byte[] octets = System.Text.Encoding.UTF8.GetBytes(password);
+
+		return longest > 0 && octets.Length <= longest
+			? new IppAttribute(Tag.OctetStringWithAnUnspecifiedFormat, IppPrinter.DocumentPassword, octets)
+			: null;
 	}
 
 	/// <summary>
@@ -661,8 +757,9 @@ internal sealed class IppPrinter : IPrinter
 
 		if (rasterPlan is not null)
 		{
-			// The pages are turned as they are rendered, so the printer mustn't turn them again
+			// The pages are turned and chosen as they are rendered, so the printer mustn't turn or choose them again
 			jobAttributes.OrientationRequested = null;
+			jobAttributes.PageRanges = null;
 		}
 
 		// An image sent as it is is sized by the printer

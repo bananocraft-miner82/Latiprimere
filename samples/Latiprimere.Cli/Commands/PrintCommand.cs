@@ -11,6 +11,9 @@ internal static class PrintCommand
 	/// <summary>The command name.</summary>
 	internal const string Name = "print";
 
+	/// <summary>The environment variable holding a password-protected PDF's password.</summary>
+	private const string PasswordVariable = "LATIPRIMERE_PDF_PASSWORD";
+
 	/// <summary>Bytes in a mebibyte, for reporting memory use.</summary>
 	private const double BytesPerMebibyte = 1024.0 * 1024.0;
 
@@ -131,6 +134,20 @@ internal static class PrintCommand
 	}
 
 	/// <summary>
+	/// Gets the password for a password-protected PDF, from <c>LATIPRIMERE_PDF_PASSWORD</c>, which keeps it out of the
+	/// command line and the shell's history; or <see langword="null"/> when it isn't set.
+	/// </summary>
+	private static string? Password
+	{
+		get
+		{
+			string? password = Environment.GetEnvironmentVariable(PrintCommand.PasswordVariable);
+
+			return string.IsNullOrEmpty(password) ? null : password;
+		}
+	}
+
+	/// <summary>
 	/// Wraps a file as an image, text or a PDF, by its extension.
 	/// </summary>
 	/// <param name="document">The open file.</param>
@@ -143,7 +160,9 @@ internal static class PrintCommand
 			".PNG"           => PrintContent.FromPng(document),
 			".JPG" or ".JPEG" => PrintContent.FromJpeg(document),
 			".TXT"           => PrintContent.FromText(document, System.Text.Encoding.UTF8),
-			_                => PrintContent.FromPdf(document),
+			_                => PrintCommand.Password is string password
+				? PrintContent.FromPdf(document, password)
+				: PrintContent.FromPdf(document),
 		};
 	}
 

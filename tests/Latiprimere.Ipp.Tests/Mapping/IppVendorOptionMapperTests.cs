@@ -9,7 +9,7 @@ namespace Latiprimere.Ipp.Tests.Mapping;
 public sealed class IppVendorOptionMapperTests
 {
 	[Fact]
-	public async Task GivenHpEnvyAttributesWhenToVendorOptionsThenListsQualityAndResolutionWithDefaults()
+	public async Task GivenHpEnvyAttributesWhenToVendorOptionsThenListsResolutionWithDefaultsButNotQuality()
 	{
 		// Arrange — a real printer's response
 		IReadOnlyList<IppAttribute> attributes = await IppVendorOptionMapperTests.LoadAsync("hp-envy-5640");
@@ -18,15 +18,13 @@ public sealed class IppVendorOptionMapperTests
 		IReadOnlyList<VendorOption> options = IppVendorOptionMapper.ToVendorOptions(attributes);
 
 		// Assert
-		VendorOption quality = Assert.Single(options, option => option.Key == "ipp:print-quality");
-		Assert.Equal("Print quality", quality.DisplayName);
-		Assert.Equal(VendorOptionKind.Choice, quality.Kind);
-		Assert.Equal(["3", "4", "5"], quality.Choices.Select(choice => choice.Value));
-		Assert.Equal(["Draft", "Normal", "High"], quality.Choices.Select(choice => choice.DisplayName));
-		Assert.Equal("4", quality.DefaultValue);
-		Assert.False(quality.AllowsSeveralValues);
+		// print-quality has a typed option, PrintOptions.Quality, so it isn't listed (ADR 0057)
+		Assert.DoesNotContain(options, option => option.Key == "ipp:print-quality");
 
 		VendorOption resolution = Assert.Single(options, option => option.Key == "ipp:printer-resolution");
+		Assert.Equal("Resolution", resolution.DisplayName);
+		Assert.Equal(VendorOptionKind.Choice, resolution.Kind);
+		Assert.False(resolution.AllowsSeveralValues);
 		Assert.Equal(["300dpi", "600dpi", "1200dpi"], resolution.Choices.Select(choice => choice.Value));
 		Assert.Equal("600dpi", resolution.DefaultValue);
 
@@ -53,7 +51,8 @@ public sealed class IppVendorOptionMapperTests
 		[
 			"ipp:copies", "ipp:sides", "ipp:media", "ipp:media-col", "ipp:media-source", "ipp:orientation-requested",
 			"ipp:print-color-mode", "ipp:job-name", "ipp:ipp-attribute-fidelity", "ipp:page-ranges", "ipp:finishings-col",
-			"ipp:document-format", "ipp:document-name", "ipp:overrides", "ipp:media-type"
+			"ipp:document-format", "ipp:document-name", "ipp:overrides", "ipp:media-type", "ipp:print-quality",
+			"ipp:output-bin", "ipp:multiple-document-handling"
 		];
 
 		Assert.DoesNotContain(options, option => excluded.Contains(option.Key));

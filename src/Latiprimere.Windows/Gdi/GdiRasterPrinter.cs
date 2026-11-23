@@ -10,8 +10,8 @@ namespace Latiprimere.Windows.Gdi;
 /// Prints rendered documents by drawing each page, band by band, onto a printer device context.
 /// </summary>
 /// <remarks>
-/// For a monochrome job, each band is turned grey (<see cref="GreyscaleConverter"/>) before it is drawn, as well as
-/// the DEVMODE asking the driver for monochrome: some drivers ignore that setting.
+/// For a monochrome job, each band is rendered in grey and drawn as an 8-bit bitmap of greys, in a quarter of the
+/// memory, as well as the DEVMODE asking the driver for monochrome: some drivers ignore that setting (ADR 0054).
 /// </remarks>
 [SupportedOSPlatform("windows")]
 internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
@@ -48,7 +48,7 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 		ArgumentNullException.ThrowIfNull(request);
 
 		// Settings go in the DEVMODE before the device context exists; the driver may adjust them
-		bool isFirstPageLandscape = request.Document.PageCount > 0 && request.Document.GetPageSize(0).IsLandscape;
+		bool isFirstPageLandscape = request.Pages.Count > 0 && request.Document.GetPageSize(request.Pages[0]).IsLandscape;
 
 		byte[] devModeBuffer = GdiRasterPrinter.CreateDevMode(request, isFirstPageLandscape);
 
@@ -89,16 +89,14 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 
 		try
 		{
-			// Copies outermost, so the output is collated
+			// Copies outermost, so the output is collated, unless the job asks for each page's copies together; only
+			// the pages chosen (ADR 0056)
 			BandBuffer buffer = new BandBuffer();
 
-			for (int copy = 0; copy < copies; copy++)
+			foreach (int pageIndex in GdiRasterPrinter.PrintOrder(request.Pages, copies, request.Options.Collate != false))
 			{
-				for (int pageIndex = 0; pageIndex < request.Document.PageCount; pageIndex++)
-				{
-					cancellationToken.ThrowIfCancellationRequested();
-					this.PrintPage(deviceContext, request, pageIndex, area, buffer);
-				}
+				cancellationToken.ThrowIfCancellationRequested();
+				this.PrintPage(deviceContext, request, pageIndex, area, buffer);
 			}
 
 			SpoolerErrors.ThrowIfFailed
@@ -120,6 +118,20 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 	}
 
 	/// <summary>
+	/// Lists the pages in the order they are printed, for the copies rendered here.
+	/// </summary>
+	/// <param name="pages">The zero-based pages chosen, in order.</param>
+	/// <param name="copies">The copies rendered here: 1 when the driver makes them.</param>
+	/// <param name="collate">Whether each copy is whole before the next, or each page's copies come together.</param>
+	/// <returns>The pages, each as many times as it is printed.</returns>
+	internal static IEnumerable<int> PrintOrder(IReadOnlyList<int> pages, int copies, bool collate)
+	{
+		return collate
+			? Enumerable.Range(0, copies).SelectMany(_ => pages)
+			: pages.SelectMany(page => Enumerable.Repeat(page, copies));
+	}
+
+	/// <summary>
 	/// Renders one page and draws it, band by band.
 	/// </summary>
 	/// <param name="deviceContext">The printer device context.</param>
@@ -136,22 +148,23 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 			request.PrinterName
 		);
 
+		// Grey before the driver sees it, since drivers may ignore the DEVMODE's colour setting
+		RasterPixelFormat pixelFormat = request.Options.ColorMode == ColorMode.Monochrome
+			? RasterPixelFormat.Gray8
+			: RasterPixelFormat.Bgra32;
+
 		PageLayout layout = PageLayout.Fit(request.Document.GetPageSize(pageIndex), area, this.maxRenderDpi);
-		int rowsPerBand = layout.GetRowsPerBand(GdiRenderSettings.MaxBandBytes);
-		byte[] pixels = buffer.Get((long)rowsPerBand * layout.RenderWidth * RasterBand.BytesPerPixel);
+		int rowsPerBand = layout.GetRowsPerBand(GdiRenderSettings.MaxBandBytes, pixelFormat);
+		int stride = layout.GetStride(pixelFormat);
+		byte[] pixels = buffer.Get((long)rowsPerBand * stride);
 
 		int top = 0;
 
 		while (top < layout.RenderHeight)
 		{
-			RasterBand band = RasterBand.Create(layout.RenderWidth, layout.RenderHeight, top, Math.Min(rowsPerBand, layout.RenderHeight - top));
+			int rows = Math.Min(rowsPerBand, layout.RenderHeight - top);
+			RasterBand band = new RasterBand(layout.RenderWidth, layout.RenderHeight, top, rows, stride) { PixelFormat = pixelFormat };
 			request.Document.RenderBand(pageIndex, band, pixels);
-
-			// Grey before the driver sees it, since drivers may ignore the DEVMODE's colour setting
-			if (request.Options.ColorMode == ColorMode.Monochrome)
-			{
-				GreyscaleConverter.ToGrey(pixels.AsSpan(0, (int)band.ByteCount));
-			}
 
 			GdiRasterPrinter.DrawBand(deviceContext, request.PrinterName, layout, band, pixels);
 			top += band.Height;
@@ -178,16 +191,22 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 		// Where this band's rows land on the device, after any scaling
 		(int deviceTop, int deviceHeight) = layout.MapBandToDevice(band.Top, band.Height);
 
-		// A negative height marks the bitmap as top-down, matching the rasteriser's row order
-		BitmapInfoHeader header = new BitmapInfoHeader
-		{
-			Size        = (uint)sizeof(BitmapInfoHeader),
-			Width       = band.PageWidth,
-			Height      = -band.Height,
-			Planes      = 1,
-			BitCount    = GdiConstants.BitsPerPixel,
-			Compression = GdiConstants.BitmapUncompressed
-		};
+		// A negative height marks the bitmap as top-down, matching the rasteriser's row order. Grey needs a colour
+		// table of its 256 greys after the header; colour needs none
+		GreyBitmapInfo info = band.PixelFormat == RasterPixelFormat.Gray8
+			? GreyBitmapInfo.Create(band.PageWidth, band.Height)
+			: new GreyBitmapInfo
+			{
+				Header = new BitmapInfoHeader
+				{
+					Size        = (uint)sizeof(BitmapInfoHeader),
+					Width       = band.PageWidth,
+					Height      = -band.Height,
+					Planes      = 1,
+					BitCount    = GdiConstants.BitsPerPixel,
+					Compression = GdiConstants.BitmapUncompressed
+				}
+			};
 
 		fixed (byte* bits = pixels)
 		{
@@ -196,7 +215,7 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 				deviceContext,
 				layout.X, deviceTop, layout.Width, deviceHeight,
 				0, 0, band.PageWidth, band.Height,
-				bits, &header, GdiConstants.DibRgbColors, GdiConstants.SourceCopy
+				bits, &info.Header, GdiConstants.DibRgbColors, GdiConstants.SourceCopy
 			);
 
 			SpoolerErrors.ThrowIfFailed(rowsDrawn > 0, nameof(GdiNative.StretchDIBits), printerName);
@@ -279,7 +298,11 @@ internal sealed unsafe class GdiRasterPrinter : IGdiPrinter
 			DevMode* requestedMode = (DevMode*)requestedData;
 
 			// Merge the changes through the driver, which drops or adjusts anything it can't do
-			DevModeEditor.Apply(ref *requestedMode, request.Options, request.PaperId, request.BinId, isFirstPageLandscape);
+			DevModeEditor.Apply
+			(
+				ref *requestedMode, request.Options, request.PaperId, request.BinId, isFirstPageLandscape,
+				request.CustomPaper, request.MediaTypeId
+			);
 
 			result = WinSpoolNative.DocumentProperties
 			(

@@ -216,8 +216,13 @@ public sealed class PdfiumDocumentTests
 		PdfiumDocument document = (PdfiumDocument)PdfiumDocumentTests.OpenOnePage();
 		RasterBand band = RasterBand.Create(PdfiumDocumentTests.PageWidth, PdfiumDocumentTests.PageHeight, 0, 1);
 
-		// Act
-		bool isReleased = document.ReleaseWithoutWaiting();
+		// Act — holding the lock, which is reentrant, so tests rendering in parallel can't take it in between
+		bool isReleased;
+
+		lock (PdfiumLibrary.Lock)
+		{
+			isReleased = document.ReleaseWithoutWaiting();
+		}
 
 		// Assert — closed, and a later Dispose has nothing left to free
 		Assert.True(isReleased);
@@ -273,6 +278,83 @@ public sealed class PdfiumDocumentTests
 		Assert.Null(Record.Exception(document.Dispose));
 	}
 
+	[Fact]
+	public void GivenGreyBandWhenRenderBandThenItIsTheColourRenderingInGrey()
+	{
+		// Arrange
+		using IRasterDocument document = PdfiumDocumentTests.OpenOnePage();
+		RasterBand colourBand = RasterBand.Create(PdfiumDocumentTests.PageWidth, PdfiumDocumentTests.PageHeight, 0, PdfiumDocumentTests.PageHeight);
+		RasterBand greyBand = colourBand with { Stride = PdfiumDocumentTests.PageWidth, PixelFormat = RasterPixelFormat.Gray8 };
+		byte[] colour = new byte[colourBand.ByteCount];
+		byte[] grey = new byte[greyBand.ByteCount];
+
+		// Act
+		document.RenderBand(0, colourBand, colour);
+		document.RenderBand(0, greyBand, grey);
+
+		// Assert: a quarter of the bytes; solid colour the grey of its luma, as RasterPixels weighs it; and the page
+		// as a whole alike, though PDFium smooths the edges of text and scales the image a little differently in grey
+		Assert.Equal(colourBand.ByteCount / 4, greyBand.ByteCount);
+		long total = 0;
+
+		for (int pixel = 0; pixel < grey.Length; pixel++)
+		{
+			int offset = pixel * 4;
+			int luma = ((77 * colour[offset + 2]) + (150 * colour[offset + 1]) + (29 * colour[offset]) + 128) >> 8;
+			total += Math.Abs(luma - grey[pixel]);
+		}
+
+		Assert.InRange(total / (double)grey.Length, 0, 4.0);
+		Assert.InRange(grey[(500 * PdfiumDocumentTests.PageWidth) + 150], 94, 102); // The blue rectangle, RGB(51,102,204)
+		Assert.Equal(255, grey[(5 * PdfiumDocumentTests.PageWidth) + 5]);
+		Assert.Equal(0, grey[(592 * PdfiumDocumentTests.PageWidth) + 515]);
+	}
+
+	[Fact]
+	public void GivenSmoothingOffWhenBlackLineArtRenderedInGreyThenThereIsNoGrey()
+	{
+		// Arrange: black text, a diagonal line and a circle, whose edges are grey when smoothed
+		using FileStream content = TestDocuments.Open(TestDocuments.LineArt);
+		using IRasterDocument document = new PdfiumRasterizer().Open(content);
+		RasterBand band = RasterBand.Create(PdfiumDocumentTests.PageWidth, PdfiumDocumentTests.PageHeight, 0, PdfiumDocumentTests.PageHeight, RasterPixelFormat.Gray8);
+		RasterRenderOptions sharp = new RasterRenderOptions { SmoothText = false, SmoothLines = false, SmoothImages = false };
+		byte[] smoothed = new byte[band.ByteCount];
+		byte[] unsmoothed = new byte[band.ByteCount];
+
+		// Act
+		document.RenderBand(0, band, smoothed);
+		document.RenderBand(0, band, unsmoothed, sharp);
+
+		// Assert
+		Assert.True(PdfiumDocumentTests.CountGrey(smoothed) > 500, "smoothed edges are grey");
+		Assert.Equal(0, PdfiumDocumentTests.CountGrey(unsmoothed));
+		Assert.True(unsmoothed.Count(value => value == 0) > 10_000, "the circle and text are black");
+	}
+
+	[Fact]
+	public void GivenFormatThisVersionDoesNotKnowWhenRenderBandThenThrowsNotSupportedException()
+	{
+		// Arrange
+		using IRasterDocument document = PdfiumDocumentTests.OpenOnePage();
+		RasterBand band = RasterBand.Create(10, 10, 0, 10) with { PixelFormat = (RasterPixelFormat)99 };
+
+		// Act
+		Action render = () => document.RenderBand(0, band, new byte[1000]);
+
+		// Assert
+		Assert.Throws<NotSupportedException>(render);
+	}
+
+	/// <summary>
+	/// Counts the pixels that are neither black nor white.
+	/// </summary>
+	/// <param name="grey">Pixels, a byte of grey each.</param>
+	/// <returns>The count.</returns>
+	private static int CountGrey(byte[] grey)
+	{
+		return grey.Count(value => value is not 0 and not 255);
+	}
+
 	/// <summary>
 	/// Opens the one-page mixed-content test document.
 	/// </summary>
@@ -294,7 +376,7 @@ public sealed class PdfiumDocumentTests
 	/// <returns>The red, green and blue values.</returns>
 	private static (int Red, int Green, int Blue) ReadPixel(byte[] pixels, RasterBand band, int x, int y)
 	{
-		int offset = (y * band.Stride) + (x * RasterBand.BytesPerPixel);
+		int offset = (y * band.Stride) + (x * RasterBand.GetBytesPerPixel(RasterPixelFormat.Bgra32));
 
 		return (pixels[offset + 2], pixels[offset + 1], pixels[offset]);
 	}

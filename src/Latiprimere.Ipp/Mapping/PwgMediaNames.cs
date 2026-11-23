@@ -30,6 +30,62 @@ internal static partial class PwgMediaNames
 	{
 		ArgumentNullException.ThrowIfNull(name);
 
+		return PwgMediaNames.ReadDimensions(name, out string sizeName) is { } size && sizeName is not "min" and not "max"
+			? size
+			: null;
+	}
+
+	/// <summary>
+	/// Reads the custom or roll size limits a printer lists among its media, such as <c>custom_min_25.4x25.4mm</c>
+	/// and <c>roll_max_104x3000mm</c>, as ranges (ADR 0056).
+	/// </summary>
+	/// <param name="names">The media names.</param>
+	/// <returns>A range for each class, custom or roll, that has both a <c>min</c> and a <c>max</c>.</returns>
+	internal static List<MediaSizeRange> ToSizeRanges(IEnumerable<string> names)
+	{
+		ArgumentNullException.ThrowIfNull(names);
+
+		Dictionary<string, MediaSize> limits = new Dictionary<string, MediaSize>(StringComparer.Ordinal);
+
+		foreach (string name in names)
+		{
+			if (PwgMediaNames.ReadDimensions(name, out string sizeName) is { } size && sizeName is "min" or "max")
+			{
+				limits.TryAdd(name.Split('_')[0] + "_" + sizeName, size);
+			}
+		}
+
+		List<MediaSizeRange> ranges = new List<MediaSizeRange>();
+
+		foreach (string sizeClass in new[] { PwgMediaNames.CustomClass, "roll" })
+		{
+			if (limits.TryGetValue(sizeClass + "_min", out MediaSize? min) && limits.TryGetValue(sizeClass + "_max", out MediaSize? max))
+			{
+				ranges.Add(new MediaSizeRange
+				{
+					MinWidthMillimeters  = min.WidthMillimeters,
+					MaxWidthMillimeters  = max.WidthMillimeters,
+					MinHeightMillimeters = min.HeightMillimeters,
+					MaxHeightMillimeters = max.HeightMillimeters,
+					IsRoll               = sizeClass == "roll"
+				});
+			}
+		}
+
+		return ranges;
+	}
+
+	/// <summary>
+	/// Reads the dimensions of a self-describing media name, whatever its size name.
+	/// </summary>
+	/// <param name="name">The name.</param>
+	/// <param name="sizeName">The size name between the class and the dimensions, such as <c>a4</c> or <c>min</c>.</param>
+	/// <returns>The size, or <see langword="null"/> if the name isn't self-describing.</returns>
+	private static MediaSize? ReadDimensions(string name, out string sizeName)
+	{
+		sizeName = string.Empty;
+		ArgumentNullException.ThrowIfNull(name);
+
 		// Class first, dimensions last; the size name in between may itself hold underscores
 		string[] parts = name.Split('_');
 
@@ -39,9 +95,9 @@ internal static partial class PwgMediaNames
 		}
 
 		Match dimensions = PwgMediaNames.DimensionsPattern().Match(parts[^1]);
-		string sizeName = string.Join('_', parts[1..^1]);
+		sizeName = string.Join('_', parts[1..^1]);
 
-		if (!dimensions.Success || sizeName is "min" or "max")
+		if (!dimensions.Success)
 		{
 			return null;
 		}

@@ -1,3 +1,4 @@
+using Latiprimere.Ipp.Resources;
 using SharpIpp.Protocol.Models;
 using IppMediaSize = SharpIpp.Protocol.Models.MediaSize;
 using IppRange = SharpIpp.Protocol.Models.Range;
@@ -56,18 +57,136 @@ internal static class IppJobTemplateMapper
 			attributes.PrintColorMode = new IppValue<PrintColorMode>(colorMode.Value);
 		}
 
-		// Paper: media-source exists only inside media-col, and media and media-col can't both be sent, so a tray
-		// takes the size into media-col with it; a size alone goes as the simpler media keyword
-		if (options.InputTray is not null)
+		// Paper: media-source and media-type exist only inside media-col, and media and media-col can't both be sent,
+		// so a tray or a type takes the size into media-col with it, as does a custom size, whose name a printer may
+		// not know; a listed size alone goes as the simpler media keyword
+		bool isCustomSize = options.MediaSize?.Name.StartsWith(IppJobTemplateMapper.CustomSizePrefix, StringComparison.Ordinal) == true;
+
+		if (options.InputTray is not null || options.MediaType is not null || isCustomSize)
 		{
-			attributes.MediaCol = new IppValue<MediaCol>(IppJobTemplateMapper.ToMediaCol(options.InputTray, options.MediaSize));
+			attributes.MediaCol = new IppValue<MediaCol>(IppJobTemplateMapper.ToMediaCol(options.InputTray, options.MediaSize, options.MediaType));
 		}
 		else if (options.MediaSize is not null)
 		{
 			attributes.Media = new IppValue<Media>(new Media(options.MediaSize.Name, true));
 		}
 
+		// The settings added before 1.0 (ADR 0056), each only when chosen
+		if (options.PageRanges.Count > 0)
+		{
+			attributes.PageRanges = new IppValue<IppRange[]>(options.PageRanges.Select(range => new IppRange(range.First, range.Last)).ToArray());
+		}
+
+		if (options.Collate is bool collate)
+		{
+			MultipleDocumentHandling handling = collate
+				? MultipleDocumentHandling.SeparateDocumentsCollatedCopies
+				: MultipleDocumentHandling.SeparateDocumentsUncollatedCopies;
+
+			attributes.MultipleDocumentHandling = new IppValue<MultipleDocumentHandling>(handling);
+		}
+
+		SharpIpp.Protocol.Models.PrintQuality? quality = IppJobTemplateMapper.ToPrintQuality(options.Quality);
+
+		if (quality is not null)
+		{
+			attributes.PrintQuality = new IppValue<SharpIpp.Protocol.Models.PrintQuality>(quality.Value);
+		}
+
+		if (options.Finishings.Count > 0)
+		{
+			attributes.Finishings = new IppValue<Finishings[]>(options.Finishings.Select(IppJobTemplateMapper.ToFinishings).ToArray());
+		}
+
+		if (options.OutputBin is not null)
+		{
+			attributes.OutputBin = new IppValue<SharpIpp.Protocol.Models.OutputBin>(new SharpIpp.Protocol.Models.OutputBin(options.OutputBin.Id, true));
+		}
+
 		return attributes;
+	}
+
+	/// <summary>The start of the PWG name of a size without a standard name.</summary>
+	internal const string CustomSizePrefix = "custom_";
+
+	/// <summary>
+	/// Maps a print quality to IPP's <c>print-quality</c>.
+	/// </summary>
+	/// <param name="quality">The quality.</param>
+	/// <returns>The IPP value, or <see langword="null"/> for the printer's default.</returns>
+	internal static SharpIpp.Protocol.Models.PrintQuality? ToPrintQuality(PrintQuality quality)
+	{
+		return quality switch
+		{
+			PrintQuality.Draft  => SharpIpp.Protocol.Models.PrintQuality.Draft,
+			PrintQuality.Normal => SharpIpp.Protocol.Models.PrintQuality.Normal,
+			PrintQuality.High   => SharpIpp.Protocol.Models.PrintQuality.High,
+			_                   => null,
+		};
+	}
+
+	/// <summary>
+	/// Maps a print quality back from IPP's <c>print-quality</c>.
+	/// </summary>
+	/// <param name="quality">The IPP value.</param>
+	/// <returns>The quality.</returns>
+	internal static PrintQuality ToPrintQuality(SharpIpp.Protocol.Models.PrintQuality quality)
+	{
+		return quality switch
+		{
+			SharpIpp.Protocol.Models.PrintQuality.Draft => PrintQuality.Draft,
+			SharpIpp.Protocol.Models.PrintQuality.High  => PrintQuality.High,
+			_                                           => PrintQuality.Normal,
+		};
+	}
+
+	/// <summary>
+	/// Maps a finishing to IPP's <c>finishings</c> enum (PWG 5100.1).
+	/// </summary>
+	/// <param name="finishing">The finishing.</param>
+	/// <returns>The IPP value.</returns>
+	/// <exception cref="NotSupportedException">The finishing isn't one this version knows.</exception>
+	internal static Finishings ToFinishings(Finishing finishing)
+	{
+		return finishing switch
+		{
+			Finishing.Staple            => Finishings.Staple,
+			Finishing.StapleTopLeft     => Finishings.StapleTopLeft,
+			Finishing.StapleBottomLeft  => Finishings.StapleBottomLeft,
+			Finishing.StapleTopRight    => Finishings.StapleTopRight,
+			Finishing.StapleBottomRight => Finishings.StapleBottomRight,
+			Finishing.StapleDualLeft    => Finishings.StapleDualLeft,
+			Finishing.StapleDualTop     => Finishings.StapleDualTop,
+			Finishing.Punch             => Finishings.Punch,
+			Finishing.PunchDualLeft     => Finishings.PunchDualLeft,
+			Finishing.PunchDualTop      => Finishings.PunchDualTop,
+			Finishing.Fold              => Finishings.Fold,
+			_                           => throw new NotSupportedException(ExceptionMessages.FormatFinishingNotSupported(finishing)),
+		};
+	}
+
+	/// <summary>
+	/// Maps IPP's <c>finishings</c> enum to a finishing, for those <see cref="Finishing"/> names.
+	/// </summary>
+	/// <param name="finishings">The IPP value.</param>
+	/// <returns>The finishing, or <see langword="null"/> for one it doesn't name.</returns>
+	internal static Finishing? ToFinishing(Finishings finishings)
+	{
+		return finishings switch
+		{
+			Finishings.Staple            => Finishing.Staple,
+			Finishings.StapleTopLeft     => Finishing.StapleTopLeft,
+			Finishings.StapleBottomLeft  => Finishing.StapleBottomLeft,
+			Finishings.StapleTopRight    => Finishing.StapleTopRight,
+			Finishings.StapleBottomRight => Finishing.StapleBottomRight,
+			Finishings.StapleDualLeft    => Finishing.StapleDualLeft,
+			Finishings.StapleDualTop     => Finishing.StapleDualTop,
+			Finishings.Punch             => Finishing.Punch,
+			Finishings.PunchDualLeft     => Finishing.PunchDualLeft,
+			Finishings.PunchDualTop      => Finishing.PunchDualTop,
+			Finishings.Fold              => Finishing.Fold,
+			_                            => null,
+		};
 	}
 
 	/// <summary>
@@ -86,23 +205,30 @@ internal static class IppJobTemplateMapper
 	}
 
 	/// <summary>
-	/// Builds the <c>media-col</c> collection for a tray, with the paper size when one is chosen.
+	/// Builds the <c>media-col</c> collection for a tray, a kind of paper or a custom size, with the paper size when
+	/// one is chosen.
 	/// </summary>
-	/// <param name="tray">The tray, whose ID is a <c>media-source</c> keyword.</param>
+	/// <param name="tray">The tray, whose ID is a <c>media-source</c> keyword, or <see langword="null"/>.</param>
 	/// <param name="size">The paper size, or <see langword="null"/> to leave it to the printer.</param>
+	/// <param name="type">The kind of paper, whose ID is a <c>media-type</c> keyword, or <see langword="null"/>.</param>
 	/// <returns>The collection.</returns>
 	/// <remarks>
 	/// The size goes as <c>media-size</c> dimensions rather than <c>media-size-name</c>: IPP Everywhere requires
 	/// printers to support the dimensions, but not the name.
 	/// </remarks>
-	internal static MediaCol ToMediaCol(InputTray tray, MediaSize? size)
+	internal static MediaCol ToMediaCol(InputTray? tray, MediaSize? size, MediaType? type = null)
 	{
-		ArgumentNullException.ThrowIfNull(tray);
+		MediaCol mediaCol = new MediaCol();
 
-		MediaCol mediaCol = new MediaCol
+		if (tray is not null)
 		{
-			MediaSource = new IppValue<MediaSource>(new MediaSource(tray.Id))
-		};
+			mediaCol.MediaSource = new IppValue<MediaSource>(new MediaSource(tray.Id));
+		}
+
+		if (type is not null)
+		{
+			mediaCol.MediaType = new IppValue<SharpIpp.Protocol.Models.MediaType>(new SharpIpp.Protocol.Models.MediaType(type.Id));
+		}
 
 		if (size is not null)
 		{

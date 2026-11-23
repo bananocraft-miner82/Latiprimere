@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
 	<resheader name="resmimetype">
 		<value>text/microsoft-resx</value>
@@ -188,5 +188,13 @@
 	</data>
 	<data name="WindowsOnly" xml:space="preserve">
 		<value>The Windows print spooler is only available on Windows.</value>
+	</data>
+	<data name="MediaTypeNotListed" xml:space="preserve">
+		<value>The driver of '{0}' doesn't list the paper type '{1}' ({2}). Choose one of the printer's MediaTypes.</value>
+		<comment>{0} is the printer; {1} the type name; {2} its ID.</comment>
+	</data>
+	<data name="PageRangesNotForRawData" xml:space="preserve">
+		<value>Page ranges can't be applied to raw printer data, whose pages Latiprimere can't see. Leave PrintOptions.PageRanges empty for raw jobs.</value>
+		<comment>Thrown when a raw job sets PrintOptions.PageRanges.</comment>
 	</data>
 </root>

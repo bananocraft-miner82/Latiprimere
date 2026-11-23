@@ -264,10 +264,10 @@ public sealed class IppPrinterTests
 		(
 			IppPrinterTests.PrinterUri,
 			[
-				new IppAttribute(Tag.Keyword, "job-creation-attributes-supported", "print-quality"),
-				new IppAttribute(Tag.Enum, "print-quality-supported", 4),
-				new IppAttribute(Tag.Enum, "print-quality-supported", 5),
-				new IppAttribute(Tag.Enum, "print-quality-default", 4),
+				new IppAttribute(Tag.Keyword, "job-creation-attributes-supported", "print-content-optimize"),
+				new IppAttribute(Tag.Keyword, "print-content-optimize-supported", "auto"),
+				new IppAttribute(Tag.Keyword, "print-content-optimize-supported", "text"),
+				new IppAttribute(Tag.Keyword, "print-content-optimize-default", "auto"),
 			]
 		);
 
@@ -278,10 +278,10 @@ public sealed class IppPrinterTests
 
 		// Assert
 		Assert.Equal(1, client.AttributeListRequestCount);
-		VendorOption quality = Assert.Single(capabilities.VendorOptions);
-		Assert.Equal("ipp:print-quality", quality.Key);
-		Assert.Equal(["4", "5"], quality.Choices.Select(choice => choice.Value));
-		Assert.Equal("4", quality.DefaultValue);
+		VendorOption optimise = Assert.Single(capabilities.VendorOptions);
+		Assert.Equal("ipp:print-content-optimize", optimise.Key);
+		Assert.Equal(["auto", "text"], optimise.Choices.Select(choice => choice.Value));
+		Assert.Equal("auto", optimise.DefaultValue);
 	}
 
 	[Fact]

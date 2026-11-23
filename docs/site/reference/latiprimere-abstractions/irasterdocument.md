@@ -14,7 +14,7 @@ public interface IRasterDocument : IDisposable
 
 An opened document whose pages can be rendered to pixels, one horizontal band at a time.
 
-Pixels are 32 bits each in B, G, R, unused byte order, rows top to bottom, on a white background: the layout of a top-down 32-bit Windows device-independent bitmap. Rendering in bands keeps memory bounded at printer resolutions, where a whole A4 page at 600 DPI would need about 139 MB.
+Pixels are laid out as the band's [RasterBand.PixelFormat](/docs/reference/latiprimere-abstractions/rasterband/#pixelformat) says, rows top to bottom, on a white background: by default 32 bits each in B, G, R, unused byte order, the layout of a top-down 32-bit Windows device-independent bitmap, or 8 bits of grey. Rendering in bands keeps memory bounded at printer resolutions, where a whole A4 page at 600 DPI would need about 139 MB in colour.
 
 ## Properties
 
@@ -52,7 +52,7 @@ The page size in points (1/72 inch).
 ### RenderBand
 
 ```csharp
-void RenderBand(int pageIndex, RasterBand band, Span<byte> pixels)
+void RenderBand(int pageIndex, RasterBand band, Span<byte> pixels, RasterRenderOptions? options = null)
 ```
 
 Renders part of a page.
@@ -62,10 +62,12 @@ Renders part of a page.
 - `pageIndex`: The zero-based page index.
 - `band`: The size the whole page is rendered at, and which rows of it to produce.
 - `pixels`: Receives the band's pixels; at least [RasterBand.Stride](/docs/reference/latiprimere-abstractions/rasterband/#stride) × [RasterBand.Height](/docs/reference/latiprimere-abstractions/rasterband/#height) bytes.
+- `options`: How to render, such as whether to smooth text; `null` for [RasterRenderOptions.Default](/docs/reference/latiprimere-abstractions/rasterrenderoptions/#default).
 
 **Exceptions**
 
 - [ArgumentOutOfRangeException](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception): `pageIndex` or `band` is invalid.
 - [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): `pixels` is too small for the band.
+- [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception): The band's pixel format or rotation, or one of the options, is one this document can't render.
 - [ObjectDisposedException](https://learn.microsoft.com/dotnet/api/system.objectdisposedexception): The document has been disposed.
 - [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The rasteriser failed to render the page.

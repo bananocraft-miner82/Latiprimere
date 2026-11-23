@@ -22,6 +22,29 @@ internal sealed class FakePrinter : IPrinter
 	public PrinterInfo Info { get; }
 
 	/// <summary>
+	/// Gets the settings this printer says it applies; by default every setting <see cref="PrintOptions"/> has.
+	/// </summary>
+	public PrintOptionKinds AppliedOptions { get; init; } = PrintOptionKinds.JobName
+															| PrintOptionKinds.Copies
+															| PrintOptionKinds.Duplex
+															| PrintOptionKinds.Orientation
+															| PrintOptionKinds.MediaSize
+															| PrintOptionKinds.ColorMode
+															| PrintOptionKinds.Scaling
+															| PrintOptionKinds.InputTray
+															| PrintOptionKinds.VendorOptions
+															| PrintOptionKinds.OutputFile
+															| PrintOptionKinds.PageRanges
+															| PrintOptionKinds.Collate
+															| PrintOptionKinds.Quality
+															| PrintOptionKinds.Finishings
+															| PrintOptionKinds.OutputBin
+															| PrintOptionKinds.MediaType;
+
+	/// <summary>Gets the number of jobs submitted.</summary>
+	public int SubmitCount { get; private set; }
+
+	/// <summary>
 	/// Accepts the document and returns a job that has already completed.
 	/// </summary>
 	/// <param name="content">The document to print. Not used.</param>
@@ -31,6 +54,7 @@ internal sealed class FakePrinter : IPrinter
 	public Task<IPrintJob> SubmitAsync(PrintContent content, PrintOptions options, CancellationToken cancellationToken)
 	{
 		// Hand back a job that has already finished
+		this.SubmitCount++;
 		PrintJobStatus completedStatus = new PrintJobStatusBuilder()
 			.WithState(PrintJobState.Completed)
 			.Build();

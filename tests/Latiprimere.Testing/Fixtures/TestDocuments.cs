@@ -12,6 +12,21 @@ public static class TestDocuments
 	/// <summary>The same page repeated 100 times.</summary>
 	public const string MixedHundredPages = "mixed-100-pages.pdf";
 
+	/// <summary>
+	/// One A4 page of black text, a diagonal line and a filled circle: only black on white, so it renders without
+	/// any grey when smoothing is off.
+	/// </summary>
+	public const string LineArt = "line-art.pdf";
+
+	/// <summary>
+	/// The same page, encrypted with 128-bit RC4: it opens with <see cref="LineArtPassword"/>, or the owner password
+	/// <c>test-owner</c>.
+	/// </summary>
+	public const string LineArtWithPassword = "line-art-password.pdf";
+
+	/// <summary>The password that opens <see cref="LineArtWithPassword"/>.</summary>
+	public const string LineArtPassword = "test-password";
+
 	/// <summary>Three pages of plain text, small enough for quick print jobs.</summary>
 	public const string ThreePages = "three-pages.pdf";
 

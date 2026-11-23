@@ -36,6 +36,16 @@ public DocumentFormat Format { get; }
 
 Gets the format of the document data.
 
+### Password
+
+```csharp
+public string? Password { get; }
+```
+
+Gets the password that opens a password-protected PDF, or `null` for none.
+
+Print systems pass it only to whatever opens the PDF: the rasteriser, or a printer that takes a password with the document. It is never written to logs or exception messages.
+
 ### TextEncoding
 
 ```csharp
@@ -88,6 +98,30 @@ The print content.
 **Exceptions**
 
 - [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `content` is `null`.
+- [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): `content` cannot be read.
+
+```csharp
+public static PrintContent FromPdf(Stream content, string password)
+```
+
+Creates print content from a stream containing a password-protected PDF document.
+
+The PDF is rendered by Latiprimere wherever it is printed as raster or through the Windows spooler. A printer that takes PDF itself is sent the password with the document when it lists IPP's `document-password-supported`, and otherwise is sent the pages as raster, when it takes a raster format. A printer or CUPS queue that can do neither refuses the job with [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception).
+
+A wrong password fails the job with a [PrintException](/docs/reference/latiprimere-abstractions/printexception/) before anything is printed.
+
+**Parameters**
+
+- `content`: A readable stream containing the PDF document.
+- `password`: The password that opens it: the one for opening the document, or the owner's.
+
+**Returns**
+
+The print content.
+
+**Exceptions**
+
+- [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `content` or `password` is `null`.
 - [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): `content` cannot be read.
 
 ### FromPng

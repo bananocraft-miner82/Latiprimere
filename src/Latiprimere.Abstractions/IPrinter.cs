@@ -100,4 +100,60 @@ public interface IPrinter
 	{
 		return StatusPolling.WatchPrinterAsync(this, pollInterval, cancellationToken);
 	}
+
+	/// <summary>
+	/// Gets the settings of <see cref="PrintOptions"/> this printer applies to a job.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// A printer from <see cref="IPrinterCatalog"/> refuses a job that sets anything else to other than its default,
+	/// with <see cref="NotSupportedException"/>, before anything is sent, rather than printing as if it weren't set.
+	/// That matters for settings a later version of Latiprimere adds, which a print system written for this one
+	/// wouldn't know to apply. A setting the printer applies may still be refused for a job, as when the printer
+	/// lacks the paper size asked for.
+	/// </para>
+	/// <para>
+	/// The default implementation gives every setting this version of <see cref="PrintOptions"/> has. A print system
+	/// that applies a setting added later says so by overriding this.
+	/// </para>
+	/// </remarks>
+	PrintOptionKinds AppliedOptions
+	{
+		get
+		{
+			return PrintOptionKinds.JobName
+					| PrintOptionKinds.Copies
+					| PrintOptionKinds.Duplex
+					| PrintOptionKinds.Orientation
+					| PrintOptionKinds.MediaSize
+					| PrintOptionKinds.ColorMode
+					| PrintOptionKinds.Scaling
+					| PrintOptionKinds.InputTray
+					| PrintOptionKinds.VendorOptions
+					| PrintOptionKinds.OutputFile
+					| PrintOptionKinds.PageRanges
+					| PrintOptionKinds.Collate
+					| PrintOptionKinds.Quality
+					| PrintOptionKinds.Finishings
+					| PrintOptionKinds.OutputBin
+					| PrintOptionKinds.MediaType;
+		}
+	}
+
+	/// <summary>
+	/// Gets what a printer of one print system offers beyond <see cref="IPrinter"/>, such as
+	/// <c>Latiprimere.Windows.IWindowsPrinter</c>, or <see langword="null"/> if it offers none of that kind.
+	/// </summary>
+	/// <typeparam name="T">The interface asked for.</typeparam>
+	/// <returns>The printer as <typeparamref name="T"/>, or <see langword="null"/>.</returns>
+	/// <remarks>
+	/// Use this rather than a cast: printers from <see cref="IPrinterCatalog"/> are Latiprimere's own, around the
+	/// print system's, so a cast to a print system's interface fails where this finds it. The default implementation
+	/// casts this printer.
+	/// </remarks>
+	T? GetFeature<T>()
+		where T : class
+	{
+		return this as T;
+	}
 }

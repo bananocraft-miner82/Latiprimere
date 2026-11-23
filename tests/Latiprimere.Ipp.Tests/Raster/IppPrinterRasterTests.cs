@@ -265,6 +265,58 @@ public sealed class IppPrinterRasterTests
 		Assert.Equal(0, client.AttributeListRequestCount);
 	}
 	[Fact]
+	public async Task GivenPageRangesWhenAPdfIsSentAsRasterThenOnlyThosePagesAreRenderedAndNoneAreAskedFor()
+	{
+		// Arrange
+		FakeIppClient client = IppPrinterRasterTests.CreateClient(RasterJobPlannerTests.PwgAttributes("sgray_8"));
+		QuadrantRasterizer rasterizer = new QuadrantRasterizer(pageCount: 5);
+		IppPrinter printer = IppPrinterRasterTests.CreatePrinter(client, rasterizer, ["image/pwg-raster"]);
+		PrintOptions options = new PrintOptions { PageRanges = [new PageRange(2, 3), new PageRange(5, 5)], Quality = PrintQuality.Draft };
+
+		// Act
+		await printer.SubmitAsync(IppPrinterRasterTests.Pdf(), options, TestContext.Current.CancellationToken);
+
+		// Assert: three pages rendered, at draft quality in the headers, and the printer not asked to choose again
+		RasterDocument raster = RasterDocumentReader.Read(Assert.Single(client.ReceivedDocuments));
+		Assert.Equal(3, raster.Pages.Count);
+		Assert.Null(client.LastPrintJobRequest?.JobTemplateAttributes?.PageRanges);
+		Assert.Equal(SharpIpp.Protocol.Models.PrintQuality.Draft, client.LastPrintJobRequest?.JobTemplateAttributes?.PrintQuality?.Value);
+	}
+
+	[Fact]
+	public async Task GivenPageRangesWhenAPdfIsSentAsItIsThenThePrinterIsAskedForThem()
+	{
+		// Arrange
+		FakeIppClient client = IppPrinterRasterTests.CreateClient(RasterJobPlannerTests.PwgAttributes("sgray_8"));
+		IppPrinter printer = IppPrinterRasterTests.CreatePrinter(client, new QuadrantRasterizer(pageCount: 5), ["application/pdf"]);
+		PrintOptions options = new PrintOptions { PageRanges = [new PageRange(2, 3)] };
+
+		// Act
+		await printer.SubmitAsync(IppPrinterRasterTests.Pdf(), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal([new SharpIpp.Protocol.Models.Range(2, 3)], Assert.NotNull(client.LastPrintJobRequest?.JobTemplateAttributes?.PageRanges).Value);
+	}
+
+	[Fact]
+	public async Task GivenPageRangesWhenRawDataIsSubmittedThenNotSupportedBeforeAnythingIsSent()
+	{
+		// Arrange
+		FakeIppClient client = IppPrinterRasterTests.CreateClient(RasterJobPlannerTests.PwgAttributes("sgray_8"));
+		IppPrinter printer = IppPrinterRasterTests.CreatePrinter(client, new QuadrantRasterizer(pageCount: 1), ["application/octet-stream"]);
+		using MemoryStream raw = new MemoryStream([0x1B, 0x45]);
+		PrintOptions options = new PrintOptions { PageRanges = [new PageRange(1, 1)] };
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromRaw(raw), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		NotSupportedException exception = await Assert.ThrowsAsync<NotSupportedException>(submit);
+		Assert.Contains("raw", exception.Message, StringComparison.Ordinal);
+		Assert.Null(client.LastPrintJobRequest);
+	}
+
+	[Fact]
 	public async Task GivenRawDataWhenSubmittedToARasterPrinterWithoutOctetStreamThenNotSupported()
 	{
 		// Arrange — raw data is never rendered

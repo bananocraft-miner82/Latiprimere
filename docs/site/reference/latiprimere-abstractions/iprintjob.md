@@ -57,6 +57,24 @@ Asks the print system to cancel the job.
 - [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception): The print system can't cancel jobs.
 - [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system refused or failed to cancel the job.
 
+### GetFeature
+
+```csharp
+T? GetFeature<T>()
+```
+
+Gets what a job of one print system offers beyond [IPrintJob](/docs/reference/latiprimere-abstractions/iprintjob/), or `null` if it offers none of that kind.
+
+Use this rather than a cast: jobs from printers the [IPrinterCatalog](/docs/reference/latiprimere-abstractions/iprintercatalog/) gives are Latiprimere's own, around the print system's. The default implementation casts this job.
+
+**Type parameters**
+
+- `T`: The interface asked for.
+
+**Returns**
+
+The job as `T`, or `null`.
+
 ### GetStatusAsync
 
 ```csharp

@@ -1,11 +1,11 @@
 ---
 title: Vendor options and Windows Print Capabilities
-description: Set print quality, resolution, finishing and a driver's own settings with vendor options, list the ones a printer offers, and use Windows Print Capabilities and Print Tickets.
+description: Set resolution, pages per sheet, finishing and a driver's own settings with vendor options, list the ones a printer offers, and use Windows Print Capabilities and Print Tickets.
 sidebar:
   order: 3
 ---
 
-The typed options in `PrintOptions` cover what every printer has: copies, sides, orientation, paper, colour and trays. Printers offer far more: print quality, resolution, finishing such as stapling, media types, pages per sheet, and settings a driver invents for itself. Vendor options reach those, through `PrintOptions.VendorOptions`, and a printer's capabilities list the ones it takes.
+The typed options in `PrintOptions` cover what most printers have: copies, sides, orientation, paper, colour, trays, pages, collation, quality, the common finishings, output bins and media types. Printers offer far more: resolution, pages per sheet, banner pages, finishings beyond staples, holes and folds, and settings a driver invents for itself. Vendor options reach those, through `PrintOptions.VendorOptions`, and a printer's capabilities list the ones it takes.
 
 ## Keys
 
@@ -13,9 +13,9 @@ Each key starts with the print system that reads it, and each print system ignor
 
 | Key                                  | Read by                         | Example                                              |
 | ------------------------------------ | ------------------------------- | ---------------------------------------------------- |
-| `ipp:<attribute>`                    | CUPS and network printers       | `ipp:print-quality` = `5`, `ipp:printer-resolution` = `1200dpi` |
+| `ipp:<attribute>`                    | CUPS and network printers       | `ipp:number-up` = `2`, `ipp:printer-resolution` = `1200dpi` |
 | `cups:<option>`                      | CUPS                            | `cups:fit-to-page` = `true`                          |
-| `windows:feature:<feature>`          | Windows                         | `windows:feature:psk:PageOutputQuality` = `psk:High` |
+| `windows:feature:<feature>`          | Windows                         | `windows:feature:psk:DocumentNUp` = `psk:PagesPerSheet=2` |
 | `windows:parameter:<parameter>`      | Windows                         | `windows:parameter:ns0000:JobDarkness` = `2`         |
 | `windows:print-ticket`               | Windows                         | A Print Ticket, as XML                               |
 | `windows:devmode`                    | Windows                         | A DEVMODE saved from the driver, in base64           |
@@ -59,7 +59,6 @@ windows:feature:psk:PageMediaType (Media Type): ns0000:_0_1004_4770 (Plain Paper
 and for the same printer over IPP:
 
 ```text
-ipp:print-quality (Print quality): 3 (Draft), 4 (Normal), 5 (High); default 4
 ipp:printer-resolution (Resolution): 300dpi (300dpi), 600dpi (600dpi), 1200dpi (1200dpi); default 600dpi
 ipp:print-content-optimize (Optimise for): auto (Auto), photo (Photo), graphics (Graphics), text (Text), text-and-graphics (Text and graphics); default auto
 ```
@@ -80,30 +79,29 @@ Settings the typed options cover, such as paper size, duplex, colour, trays, cop
 
 ## Print with one
 
-Pass a listed value back. This asks for the best print quality, on whichever print system the printer is on:
+Pass a listed value back. This asks for two pages on each sheet, on whichever print system the printer is on:
 
 ```csharp
-static async Task<PrintOptions> ChooseBestQualityAsync(IPrinter printer)
+static async Task<PrintOptions> ChooseTwoPagesPerSheetAsync(IPrinter printer)
 {
 	PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync();
 
-	// IPP printers and CUPS list ipp:print-quality; Windows drivers list the Print Schema's PageOutputQuality
-	VendorOption? quality = capabilities.VendorOptions.FirstOrDefault
+	// IPP printers and CUPS list ipp:number-up; Windows drivers list the Print Schema's DocumentNUp
+	VendorOption? pagesPerSheet = capabilities.VendorOptions.FirstOrDefault
 	(
-		option => option.Key is "ipp:print-quality" or "windows:feature:psk:PageOutputQuality"
+		option => option.Key is "ipp:number-up" or "windows:feature:psk:DocumentNUp"
 	);
 
-	// 5 is IPP's "high"; psk:High is the Print Schema's
-	VendorOptionChoice? best = quality?.Choices.FirstOrDefault(choice => choice.Value is "5" or "psk:High");
+	VendorOptionChoice? two = pagesPerSheet?.Choices.FirstOrDefault(choice => choice.Value is "2" or "psk:PagesPerSheet=2");
 
-	if (quality is null || best is null)
+	if (pagesPerSheet is null || two is null)
 	{
 		return PrintOptions.Default;
 	}
 
 	return new PrintOptions
 	{
-		VendorOptions = new Dictionary<string, string> { [quality.Key] = best.Value }
+		VendorOptions = new Dictionary<string, string> { [pagesPerSheet.Key] = two.Value }
 	};
 }
 ```
@@ -112,15 +110,15 @@ static async Task<PrintOptions> ChooseBestQualityAsync(IPrinter printer)
 
 ## Where they come from
 
-- **CUPS and network printers** list the job attributes they accept (`job-creation-attributes-supported`) with their supported values, as `ipp:` keys. They're sent as IPP job attributes. A printer that can't do one may print something close instead, or refuse the job with a `PrintException` naming the setting; a network printer that lists Validate-Job refuses it before the document is sent.
-- **Windows** lists the driver's Print Capabilities: its features as `windows:feature:` keys, and its parameters as `windows:parameter:` keys. A feature's name and its options use the prefixes the driver's document declares, such as `psk:` for the Print Schema's own keywords and `ns0000:` for the driver's. An option without a name is identified by its properties, as in `psk:PagesPerSheet=4`.
+- **CUPS and network printers** list the job attributes they accept (`job-creation-attributes-supported`) with their supported values, as `ipp:` keys, except those a typed option sets, such as `print-quality` for `Quality`. `finishings` is listed, as it holds far more than the `Finishing` names. They're sent as IPP job attributes. A printer that can't do one may print something close instead, or refuse the job with a `PrintException` naming the setting; a network printer that lists Validate-Job refuses it before the document is sent.
+- **Windows** lists the driver's Print Capabilities: its features as `windows:feature:` keys, and its parameters as `windows:parameter:` keys. A feature's name and its options use the prefixes the driver's document declares, such as `psk:` for the Print Schema's own keywords and `ns0000:` for the driver's. An option without a name is identified by its properties, as in `psk:PagesPerSheet=4`. Features a typed option also sets, such as `psk:PageOutputQuality`, are listed as the driver gives them; the typed option is the one that works on every print system.
   - **When printed,** each key is checked against the printer's Print Capabilities, for the job's own settings (its `windows:devmode` and `windows:print-ticket`, if it has them). A feature, option or value the printer doesn't offer is refused with `ArgumentException` before anything is queued, and the message lists what it does offer.
   - **Options the device or an administrator rules out** aren't listed, and are refused if asked for, since the driver would only print with another one instead.
   - **Secrets aren't listed,** such as Microsoft Print to PDF's PDF passwords. The driver expects them encrypted, and a password in plain text would sit in the job's settings and in the spooler's files. An application that knows how to encrypt them can still set them by key.
 
 ## Windows: Print Capabilities and Print Tickets
 
-Every `windows:` printer is an `IWindowsPrinter`, which reads the driver's own documents in Microsoft's Print Schema:
+Every `windows:` printer offers `IWindowsPrinter`, which reads the driver's own documents in Microsoft's Print Schema. Ask for it with `GetFeature<IWindowsPrinter>()`, not a cast: the catalog's printers are its own, around the Windows printer.
 
 - `GetPrintCapabilitiesAsync()` returns the driver's Print Capabilities: every feature, option and parameter, with the driver's names for them. Pass a Print Ticket to see the options that remain once its choices are made, such as the media types one tray takes.
 - `GetDefaultPrintTicketAsync()` returns the driver's defaults as a Print Ticket: a starting point for writing one.
@@ -128,7 +126,7 @@ Every `windows:` printer is an `IWindowsPrinter`, which reads the driver's own d
 ```csharp
 static async Task SavePrintCapabilitiesAsync(IPrinter printer, string folder)
 {
-	if (printer is not IWindowsPrinter windowsPrinter)
+	if (printer.GetFeature<IWindowsPrinter>() is not { } windowsPrinter)
 	{
 		return;
 	}

@@ -48,6 +48,18 @@ public static class OutputScenarios
 	};
 
 	/// <summary>
+	/// CUPS prints only the pages chosen, as it is sent <c>page-ranges</c> (ADR 0056).
+	/// </summary>
+	public static readonly Scenario CupsPageRanges = new Scenario
+	{
+		Id = "cups.output.page-ranges",
+		Area = ScenarioArea.Rendering,
+		Title = "Pages 2 and 3 of a three-page PDF to CUPS-PDF come out as two pages with text on each, CUPS choosing them from page-ranges",
+		Needs = TargetNeeds.CupsServer | TargetNeeds.CupsOutput | TargetNeeds.CupsContainer,
+		RunAsync = OutputScenarios.CupsPageRangesAsync
+	};
+
+	/// <summary>
 	/// Microsoft Print to PDF prints on the chosen paper, turned for landscape, with the content intact.
 	/// </summary>
 	public static readonly Scenario WindowsPaperAndOrientation = new Scenario
@@ -69,6 +81,18 @@ public static class OutputScenarios
 		Title = "Two copies of a one-page PDF to Microsoft Print to PDF come out as two pages, each with the page's content",
 		Needs = TargetNeeds.MicrosoftPrintToPdf,
 		RunAsync = OutputScenarios.WindowsCopiesAsync
+	};
+
+	/// <summary>
+	/// Microsoft Print to PDF prints only the pages chosen (ADR 0056).
+	/// </summary>
+	public static readonly Scenario WindowsPageRanges = new Scenario
+	{
+		Id = "windows.output.page-ranges",
+		Area = ScenarioArea.Rendering,
+		Title = "Pages 2 and 3 of a three-page PDF, at draft quality, to Microsoft Print to PDF come out as two pages with text on each",
+		Needs = TargetNeeds.MicrosoftPrintToPdf,
+		RunAsync = OutputScenarios.WindowsPageRangesAsync
 	};
 
 	/// <summary>
@@ -170,6 +194,26 @@ public static class OutputScenarios
 	}
 
 	/// <summary>
+	/// Runs <see cref="CupsPageRanges"/>.
+	/// </summary>
+	/// <param name="context">The scenario's context.</param>
+	/// <returns>A task that completes when the scenario has run.</returns>
+	private static async Task CupsPageRangesAsync(ScenarioContext context)
+	{
+		await using CatalogFixture fixture = context.CreateCatalog();
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(TestPrinters.CupsPdf, context.CancellationToken);
+		PrintOptions options = new PrintOptions { PageRanges = [new PageRange(2, 3)] };
+
+		PdfSummary summary = await PdfPrinters.PrintToCupsPdfAsync(context, printer, TestDocuments.ThreePages, options, "page-ranges");
+		context.CheckEqual("pages 2 and 3 come out as two pages", 2, summary.PageCount);
+
+		for (int index = 0; index < summary.PageCount; index++)
+		{
+			context.Check($"page {index + 1} has text on it", summary.Pages[index].Ink > OutputScenarios.NotBlank, summary.Pages[index].ToString());
+		}
+	}
+
+	/// <summary>
 	/// Runs <see cref="WindowsPaperAndOrientation"/>.
 	/// </summary>
 	/// <param name="context">The scenario's context.</param>
@@ -244,6 +288,26 @@ public static class OutputScenarios
 		for (int index = 0; index < summary.PageCount; index++)
 		{
 			OutputScenarios.CheckContent(context, $"in copy {index + 1}", source, summary.Pages[index]);
+		}
+	}
+
+	/// <summary>
+	/// Runs <see cref="WindowsPageRanges"/>.
+	/// </summary>
+	/// <param name="context">The scenario's context.</param>
+	/// <returns>A task that completes when the scenario has run.</returns>
+	private static async Task WindowsPageRangesAsync(ScenarioContext context)
+	{
+		await using CatalogFixture fixture = context.CreateCatalog();
+		IPrinter printer = await fixture.Catalog.GetPrinterAsync(TestPrinters.MicrosoftPrintToPdf, context.CancellationToken);
+		PrintOptions options = new PrintOptions { PageRanges = [new PageRange(2, 3)], Quality = PrintQuality.Draft };
+
+		PdfSummary summary = await PdfPrinters.PrintToMicrosoftPdfAsync(context, printer, TestDocuments.ThreePages, options, "page-ranges");
+		context.CheckEqual("pages 2 and 3 come out as two pages", 2, summary.PageCount);
+
+		for (int index = 0; index < summary.PageCount; index++)
+		{
+			context.Check($"page {index + 1} has text on it", summary.Pages[index].Ink > OutputScenarios.NotBlank, summary.Pages[index].ToString());
 		}
 	}
 

@@ -21,7 +21,7 @@ Rasterising is CPU-bound, so the members are synchronous; print systems call the
 ### Open
 
 ```csharp
-IRasterDocument Open(Stream content)
+IRasterDocument Open(Stream content, PdfOpenOptions? options = null)
 ```
 
 Opens a PDF document for rasterising.
@@ -29,6 +29,7 @@ Opens a PDF document for rasterising.
 **Parameters**
 
 - `content`: A readable stream containing the PDF, read from its current position to the end. The caller keeps ownership of the stream; the document does not need it after this call returns.
+- `options`: How to open it, such as its password; `null` for [PdfOpenOptions.Default](/docs/reference/latiprimere-abstractions/pdfopenoptions/#default).
 
 **Returns**
 
@@ -37,4 +38,4 @@ The opened document. Dispose it when finished.
 **Exceptions**
 
 - [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `content` is `null`.
-- [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The content is not a PDF the rasteriser can read, or is password-protected.
+- [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The content is not a PDF the rasteriser can read, or is password-protected and the password is missing or wrong.

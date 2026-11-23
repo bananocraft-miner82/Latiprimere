@@ -1,3 +1,4 @@
+using Latiprimere.Ipp.Documents;
 using Latiprimere.Ipp.Resources;
 using Latiprimere.Rendering;
 
@@ -59,16 +60,19 @@ internal static class RasterDocumentEncoder
 
 		try
 		{
-			writer.WriteStart(document.PageCount);
+			// Only the pages asked for; sides alternate by the pages printed, not by their place in the document
+			IReadOnlyList<int> pages = PageSelection.Select(settings.PageRanges, document.PageCount);
+			writer.WriteStart(pages.Count);
 
 			int mediaWidth = RasterDocumentEncoder.ToPixels(settings.Media.WidthMillimeters, settings.Dpi);
 			int mediaHeight = RasterDocumentEncoder.ToPixels(settings.Media.HeightMillimeters, settings.Dpi);
 			PageBuffers buffers = new PageBuffers(mediaWidth, settings.ColorSpace);
 
-			for (int pageIndex = 0; pageIndex < document.PageCount; pageIndex++)
+			for (int sheetSide = 0; sheetSide < pages.Count; sheetSide++)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
-				RasterDocumentEncoder.EncodePage(document, pageIndex, settings, mediaWidth, mediaHeight, writer, buffers, cancellationToken);
+				PrintedPage page = new PrintedPage(pages[sheetSide], sheetSide, pages.Count);
+				RasterDocumentEncoder.EncodePage(document, page, settings, mediaWidth, mediaHeight, writer, buffers, cancellationToken);
 			}
 
 			writer.Flush();
@@ -146,7 +150,7 @@ internal static class RasterDocumentEncoder
 	/// Works out a page's back-side transform: libcups' table for <c>pwg-raster-document-sheet-back</c>.
 	/// </summary>
 	/// <param name="settings">The settings.</param>
-	/// <param name="pageIndex">The page, from 0: odd pages are back sides when two-sided.</param>
+	/// <param name="pageIndex">The page's place among those printed, from 0: odd ones are back sides when two-sided.</param>
 	/// <returns>Whether to mirror left to right, and top to bottom.</returns>
 	internal static (bool FlipX, bool FlipY) BackSideTransform(RasterSettings settings, int pageIndex)
 	{
@@ -172,7 +176,7 @@ internal static class RasterDocumentEncoder
 	/// Renders and writes one page.
 	/// </summary>
 	/// <param name="document">The document.</param>
-	/// <param name="pageIndex">The page.</param>
+	/// <param name="page">The page, and where it falls among those printed.</param>
 	/// <param name="settings">The settings.</param>
 	/// <param name="mediaWidth">The paper's width in pixels.</param>
 	/// <param name="mediaHeight">The paper's height in pixels.</param>
@@ -182,7 +186,7 @@ internal static class RasterDocumentEncoder
 	private static void EncodePage
 	(
 		IRasterDocument   document,
-		int               pageIndex,
+		PrintedPage       page,
 		RasterSettings    settings,
 		int               mediaWidth,
 		int               mediaHeight,
@@ -193,10 +197,11 @@ internal static class RasterDocumentEncoder
 	{
 		(RasterRotation rotation, int x, int y, int width, int height) = RasterDocumentEncoder.Layout
 		(
-			document.GetPageSize(pageIndex), settings.Orientation, mediaWidth, mediaHeight, settings.Dpi
+			document.GetPageSize(page.Index), settings.Orientation, mediaWidth, mediaHeight, settings.Dpi
 		);
 
-		(bool flipX, bool flipY) = RasterDocumentEncoder.BackSideTransform(settings, pageIndex);
+		int pageIndex = page.Index;
+		(bool flipX, bool flipY) = RasterDocumentEncoder.BackSideTransform(settings, page.Position);
 		int left = flipX ? mediaWidth - (x + width) : x;
 		int top = flipY ? mediaHeight - (y + height) : y;
 
@@ -207,7 +212,7 @@ internal static class RasterDocumentEncoder
 			Dpi          = settings.Dpi,
 			ColorSpace   = settings.ColorSpace,
 			Media        = settings.Media,
-			TotalPages   = document.PageCount,
+			TotalPages   = page.Count,
 			Duplex       = settings.Duplex is DuplexMode.LongEdge or DuplexMode.ShortEdge,
 			Tumble       = settings.Duplex == DuplexMode.ShortEdge,
 			PrintQuality = settings.PrintQuality,
@@ -219,8 +224,11 @@ internal static class RasterDocumentEncoder
 			ImageBottom  = top + height
 		});
 
-		// Bands as tall as the memory limit allows; back sides mirrored top to bottom are rendered bottom up
-		int stride = width * RasterBand.BytesPerPixel;
+		// Bands as tall as the memory limit allows, in grey for grey and black (ADR 0054); back sides mirrored top to
+		// bottom are rendered bottom up
+		RasterPixelFormat pixelFormat = RasterPixels.RenderFormat(settings.ColorSpace);
+		int bytesPerPixel = RasterBand.GetBytesPerPixel(pixelFormat);
+		int stride = width * bytesPerPixel;
 		int rowsPerBand = (int)Math.Clamp(settings.MaxBandBytes / stride, 1, height);
 		byte[] band = buffers.GetBand(rowsPerBand * stride);
 		int bandTop = -1;
@@ -245,18 +253,18 @@ internal static class RasterDocumentEncoder
 				cancellationToken.ThrowIfCancellationRequested();
 				bandTop = flipY ? Math.Max(0, row - rowsPerBand + 1) : row;
 				bandRows = Math.Min(rowsPerBand, height - bandTop);
-				RasterBand area = new RasterBand(width, height, bandTop, bandRows, stride) { Rotation = rotation };
+				RasterBand area = new RasterBand(width, height, bandTop, bandRows, stride) { Rotation = rotation, PixelFormat = pixelFormat };
 				document.RenderBand(pageIndex, area, band);
 			}
 
 			// The content row, on white, at its place across the paper
 			Span<byte> pixels = buffers.Pixels;
 			pixels.Fill(byte.MaxValue);
-			band.AsSpan((row - bandTop) * stride, stride).CopyTo(pixels[(x * RasterBand.BytesPerPixel)..]);
+			band.AsSpan((row - bandTop) * stride, stride).CopyTo(pixels[(x * bytesPerPixel)..]);
 
 			if (flipX)
 			{
-				RasterPixels.Mirror(pixels, mediaWidth);
+				RasterPixels.Mirror(pixels, mediaWidth, pixelFormat);
 			}
 
 			RasterPixels.Convert(pixels, mediaWidth, settings.ColorSpace, line, buffers.Converted);
@@ -265,6 +273,15 @@ internal static class RasterDocumentEncoder
 
 		lines.Flush();
 	}
+
+	/// <summary>
+	/// A page to print: its index in the document, and its place among the pages printed, which decides its side of
+	/// the sheet.
+	/// </summary>
+	/// <param name="Index">The page's zero-based index in the document.</param>
+	/// <param name="Position">Its zero-based place among the pages printed.</param>
+	/// <param name="Count">The pages printed.</param>
+	private readonly record struct PrintedPage(int Index, int Position, int Count);
 
 	/// <summary>
 	/// Line buffers for one paper width and colour space, reused across pages.
@@ -281,14 +298,14 @@ internal static class RasterDocumentEncoder
 		internal PageBuffers(int mediaWidth, RasterColorSpace colorSpace)
 		{
 			int bytesPerLine = RasterPixels.BytesPerLine(colorSpace, mediaWidth);
-			this.Pixels = new byte[mediaWidth * RasterBand.BytesPerPixel];
+			this.Pixels = new byte[mediaWidth * RasterBand.GetBytesPerPixel(RasterPixels.RenderFormat(colorSpace))];
 			this.Converted = new byte[bytesPerLine];
 			this.Previous = new byte[bytesPerLine];
 			this.WhiteLine = new byte[bytesPerLine];
 			RasterPixels.FillWhite(colorSpace, this.WhiteLine);
 		}
 
-		/// <summary>Gets a line of the paper's width, four bytes a pixel, for composing a line.</summary>
+		/// <summary>Gets a line of the paper's width, in the colour space's render format, for composing a line.</summary>
 		internal byte[] Pixels { get; }
 
 		/// <summary>Gets a converted line.</summary>

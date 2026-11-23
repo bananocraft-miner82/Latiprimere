@@ -35,6 +35,27 @@ internal static class DevModeConstants
 	/// <summary>DM_COLLATE.</summary>
 	internal const uint FieldCollate = 0x00008000;
 
+	/// <summary>DM_PRINTQUALITY.</summary>
+	internal const uint FieldPrintQuality = 0x00000400;
+
+	/// <summary>DM_MEDIATYPE.</summary>
+	internal const uint FieldMediaType = 0x02000000;
+
+	/// <summary>DMPAPER_USER: a size given by dmPaperWidth and dmPaperLength.</summary>
+	internal const short PaperUser = 256;
+
+	/// <summary>DMCOLLATE_FALSE.</summary>
+	internal const short CollateFalse = 0;
+
+	/// <summary>DMRES_DRAFT.</summary>
+	internal const short QualityDraft = -1;
+
+	/// <summary>DMRES_MEDIUM, Windows' nearest to normal quality.</summary>
+	internal const short QualityMedium = -3;
+
+	/// <summary>DMRES_HIGH.</summary>
+	internal const short QualityHigh = -4;
+
 	/// <summary>DMORIENT_PORTRAIT.</summary>
 	internal const short OrientationPortrait = 1;
 

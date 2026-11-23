@@ -6,11 +6,79 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 | Item | Value |
 |---|---|
-| Phase | 4: PCLm, images and text, and events, before 1.0 ([phase-4-plan.md](phase-4-plan.md), accepted 2026-11-20). P4-1 to P4-5 done; P4-6, the docs, samples and 1.0 API review, and P4-7, the sign-off's additions, to come. P4-8 to P4-10, changes to the interface that are easy only before 1.0, proposed 2026-11-23 with decisions D11 to D18 for the owner. Phase 3 ([phase-3-plan.md](phase-3-plan.md)) is done but for its checks on the HP, the Mac (P3-8) and the stable switch, which wait for the sign-off |
-| Released | `11.0.7-preview` on nuget.org, 2026-11-20, with the 1.0 API ([ADR 0040](decisions/0040-api-review-1-0.md)). Its post-release pull request is merged into `main`. The next release is `11.0.8-preview`, or the first stable one, 1.0, after the sign-off ([releasing.md](releasing.md#the-first-stable-release-10)) |
-| State | Committed on `feature/release-prep-cleanup`, rebased onto `main` after the 11.0.7-preview post-release merge: Phase 4's P4-1 to P4-5 ([ADR 0045](decisions/0045-pdf-writer.md) to [ADR 0049](decisions/0049-following-printers-and-jobs.md)) and the fixes from their review; before them, the pre-1.0 work found by the review of 2026-11-20: a time limit on a printer that stops taking a job ([ADR 0041](decisions/0041-upload-stall-timeout.md)); IPPS, pinned certificates and passwords for Windows queues, and what printers say each address asks for ([ADR 0042](decisions/0042-ipps-for-windows-queues-and-uri-authentication.md)); why a job is in its state, `PrintJobStatus.StateReasons` ([ADR 0043](decisions/0043-job-state-reasons.md)); the docs on printers anyone can announce; room to grow after 1.0 ([ADR 0044](decisions/0044-room-to-grow-after-1-0.md)); and the stable switch, ready to run. 3,176 tests pass here; not yet through CI. Every ADR is accepted (owner). |
-| Next step | Owner: merge this branch's pull request, and release it as `11.0.8-preview`. Then the sign-off, as [releasing.md](releasing.md#1-the-sign-off) lists it: the HP over IPP, IPPS and its Windows queue (about ten sheets, each only when you say), and the Mac. Then the stable switch. |
+| Phase | 4: PCLm, images and text, and events, before 1.0 ([phase-4-plan.md](phase-4-plan.md), accepted 2026-11-20). P4-1 to P4-5 and P4-8 to P4-10 done ([ADR 0045](decisions/0045-pdf-writer.md) to [ADR 0049](decisions/0049-following-printers-and-jobs.md), [ADR 0054](decisions/0054-rasteriser-options.md) to [ADR 0056](decisions/0056-typed-options-before-1-0.md)). P4-6 done 2026-11-23, its API review accepted ([ADR 0057](decisions/0057-api-review-phase-4.md)). P4-7, the sign-off's additions, to come. Phase 3 ([phase-3-plan.md](phase-3-plan.md)) is done but for its checks on the HP, the Mac (P3-8) and the stable switch, which wait for the sign-off |
+| Released | `11.0.9-preview` on nuget.org, 2026-11-21, with P4-1 to P4-5. Its post-release pull request is merged into `main`. The next release is a preview with P4-6 and P4-8 to P4-10, or the first stable one, 1.0, after the sign-off ([releasing.md](releasing.md#the-first-stable-release-10)) |
+| State | P4-8 to P4-10 and P4-6 are uncommitted on `feature/phasefour-prerelease-extras`. Not yet through CI. Every ADR from 0053 on is accepted (owner). |
+| Next step | Owner: commit, and release a preview. Then the sign-off, as [releasing.md](releasing.md#1-the-sign-off) lists it, extended by P4-7: the HP over IPP, IPPS and its Windows queue (each sheet only when you say), and the Mac. Then the stable switch. |
 | Blockers | The sign-off waits on the HP being on and on time at a Mac. Owner: delete the leftover branches `post-release/v11.0.4-preview` and `post-release/v11.0.6-preview`, and reserve the `Latiprimere.` ID prefix on nuget.org ([releasing.md](releasing.md#one-time-setup-owner)). |
+
+---
+
+## 2026-11-23: P4-6, docs, samples and the API review of Phase 4
+
+**Done** (owner: "Start P4-6", then "Accept all")
+- **API review:** [api-review-phase-4.md](api-review-phase-4.md) and [ADR 0057](decisions/0057-api-review-phase-4.md), accepted. The shape held. The new names stay; `PrintOptionKinds` is a `long`; IPP printers no longer list `print-quality`, `output-bin`, `media-type` and `multiple-document-handling` among their vendor options; `Finishing.None`, Windows finishings and output bins, and other additions wait for after 1.0. The vendor options example moved from print quality to pages per sheet.
+- **Harness:** seven scenarios: `ipp.submission.typed-options`, `ipp.raster.page-ranges`, `ipp.submission.pdf-password-sent`, `ipp.raster.pdf-password-rendered`, `windows.pdf.password`, `windows.output.finishings-refused` and `cups.output.page-ranges`. The CLI and examples scenarios check the new samples.
+- **Native AOT check:** adds a job followed by spooler notifications, the typed options, and password-protected PDFs through PDFium natively.
+- **Samples:** the CLI's `print` takes `--pages` and `--quality`, and a PDF's password from `LATIPRIMERE_PDF_PASSWORD`; `caps` lists the new capabilities. The examples print some pages, follow a printer, and print a PDF label on a custom size.
+- **Docs:** the options guide gains printing some pages and following a printer; the labels guide, PDF labels on a custom size; the vendor options and capabilities guides no longer say quality, finishing and media types need vendor options. An empty `Finishings` is documented as the printer's default, not none.
+
+**Learned**
+- **ippeveprinter lists `document-password-supported`,** so a password-protected PDF to it is sent with its password, not rendered.
+- **Following a printer polls every five seconds,** where following a job polls every half second.
+- **A PDFium test raced with others:** `GivenPdfiumLockFreeWhenReleasedWithoutWaitingThenClosesTheDocumentAtOnce` assumed PDFium's global lock was free, which tests rendering in parallel could break. It now holds the lock, which is reentrant, while it releases the document.
+- **`windows.ipp-route.fallback-no-pdf` had broken since PCLm (P4-2):** its printer still listed PCLm, so the PDF went to it as raster instead of falling back to the spooler. It runs only with the Windows test printers, which earlier runs here hadn't set up. Its profile now leaves PCLm out.
+
+**Next**
+- A preview release with P4-6 and P4-8 to P4-10.
+- Then the sign-off, extended by P4-7, and the stable switch.
+
+---
+
+## 2026-11-23: P4-10, typed options before 1.0
+
+**Done** (owner: "Start P4-10"; [ADR 0056](decisions/0056-typed-options-before-1-0.md))
+- **Public API:** `PageRange`; `PrintOptions.PageRanges`, `Collate`, `Quality` (`PrintQuality`), `Finishings` (`Finishing`), `OutputBin` and `MediaType`; `MediaSize.Custom` and `MediaSizeRange`; `PrinterCapabilities.CustomMediaSizes`, `MediaTypes`, `PrintQualities`, `DefaultPrintQuality`, `Finishings`, `OutputBins` and `SupportsPageRanges`; six `PrintOptionKinds` flags.
+- **IPP and CUPS:** each as its attribute; media type and custom sizes in `media-col`; raster renders only the chosen pages, with sides by the pages printed, and doesn't send `page-ranges`; raw data with page ranges refused; the new capabilities, custom and roll ranges among them.
+- **Windows:** only the chosen pages rendered; `dmCollate`, `dmPrintQuality` and `dmMediaType`; custom sizes as `DMPAPER_USER` within the driver's extents; the driver's media types. Finishings and output bins left out of `AppliedOptions`, so the catalog refuses them on Windows.
+- **Docs:** the options and capabilities guides, the changelog, CONTRIBUTING.md's list of enums that may grow, the API reference.
+- **Tests:** 60 new; 3,366 on both target frameworks, none failing, 268 skipped; the harness passes 60 scenarios, `windows.output.page-ranges` among them, printing pages 2 and 3 of three to Microsoft Print to PDF.
+
+**Learned**
+- **Back sides follow the pages printed:** with pages 2 and 3 of three, page 2 is a front. The raster encoder had used the page's place in the document.
+- **`DC_MINEXTENT` and `DC_MAXEXTENT` aren't enough to say a driver takes custom sizes;** it must also list `DMPAPER_USER`.
+
+**Next**
+- P4-6: the docs, samples and API review of Phase 4's additions, P4-8 to P4-10 among them: the names, IPP's vendor options the typed ones now cover, and finishings and output bins on Windows.
+- Then the sign-off, extended by P4-7, and the stable switch.
+
+---
+
+## 2026-11-23: P4-8 and P4-9, rasteriser options and the catalog's own printers
+
+**Done** (owner: "Start P4-8 and P4-9")
+- **P4-8, options for the PDF rasteriser** ([ADR 0054](decisions/0054-rasteriser-options.md)):
+  - `RasterPixelFormat` and `RasterBand.PixelFormat`; `RasterBand.BytesPerPixel` an instance property, and `GetBytesPerPixel(format)`;
+  - `RasterRenderOptions` (smoothing of text, lines and images) for `RenderBand`, and `PdfOpenOptions` (the password, never shown by `ToString`) for `Open`, as optional parameters;
+  - `PrintContent.FromPdf(stream, password)`: the Windows spooler and raster render with it; IPP printers taking PDF are sent it as `document-password` when they list `document-password-supported`, and otherwise raster; a CUPS queue without password support refuses;
+  - grey inside Latiprimere: IPP raster in grey and black, and Windows monochrome jobs as 8-bit bitmaps with a grey colour table. `GreyscaleConverter` is gone.
+- **P4-9, the catalog's own printers** ([ADR 0055](decisions/0055-catalog-printers.md)):
+  - `CatalogPrinter` and `CatalogPrintJob` around the print systems' printers and jobs;
+  - `IPrinter.GetFeature<T>()` and `IPrintJob.GetFeature<T>()`; the samples, the vendor options guide and the harness ask for `IWindowsPrinter` that way;
+  - `PrintOptionKinds` and `IPrinter.AppliedOptions`; a setting a printer doesn't apply is refused before anything is sent.
+- **Docs:** the password in the print options guide; the API reference regenerated; CONTRIBUTING.md lists `RasterPixelFormat` among the enums that may grow; the changelog.
+- **New test documents:** `line-art.pdf` and `line-art-password.pdf`, from `tools/test-documents/make-line-art.py`, Python's standard library only, as Docker wasn't running for Ghostscript.
+- **Tests:** after P4-8, 3,230 on both target frameworks, none failing, 266 skipped for printers this machine doesn't have. After P4-9, 3,244 on both, none failing, 266 skipped, and the harness passes all 59 scenarios this machine can run, 31 skipped without the CUPS container.
+- **Package validation:** suppressions for the two rasteriser methods in `Latiprimere.Abstractions` and `Latiprimere.Rendering.Pdfium`; the new interface members with default implementations need none.
+
+**Learned**
+- **SharpIppNext writes an octetString given as a string in ASCII,** so `é` became `?`. Given as bytes, it writes them as they are.
+- **PDFium's grey rendering isn't Latiprimere's luma of its colour one:** solid colour agrees within a few levels, but text edges and scaled images differ, so grey tests compare with PDFium's grey.
+- **Heredocs with apostrophes don't survive this machine's shell tool;** edits went through script files.
+
+**Next**
+- P4-10, the typed options, with its ADR. Each new option adds a `PrintOptionKinds` value and an `AppliedOptions` override in each adapter that applies it.
+- Then P4-6, whose API review covers P4-8 to P4-10, including the names `GetFeature`, `AppliedOptions` and `PrintOptionKinds`.
 
 ---
 
@@ -36,7 +104,7 @@ Newest entries first. Each entry records what was done, what was learned, and wh
   - **Tier 1:** page ranges, custom and roll paper sizes, printable area and borderless printing, supplies and alerts, and tracing and metrics. Page ranges, roll sizes and printable area come first, as the Documents companion relies on the last two.
   - **Tier 2:** typed settings for what vendor options reach today, holding and releasing jobs, Kerberos, several documents in one job, and a durable outbox.
   - **Tier 3:** items earlier ADRs left for later: common paper sizes built in, which print systems the catalog skipped, IPP notifications, and more orientations and colour modes.
-- **Changes worth making while there are no customers** (owner: "which core features are we missing that would change the interface, but would be worth adding anyway?", then "Yes, plan all three"): three work packages added to [phase-4-plan.md](phase-4-plan.md), proposed, with decisions D11 to D18:
+- **Changes worth making while there are no customers** (owner: "which core features are we missing that would change the interface, but would be worth adding anyway?", then "Yes, plan all three"): three work packages added to [phase-4-plan.md](phase-4-plan.md), with decisions D11 to D18, all accepted as recommended (owner: "Accept all"):
   - **P4-8, options for the PDF rasteriser:** grey as well as BGRA bands, smoothing that can be turned off, and passwords. `IPdfRasterizer` and `IRasterDocument` are frozen for good at 1.0;
   - **P4-9, a layer around every printer:** the catalog wraps printers and jobs, platform features are reached through a member instead of `is IWindowsPrinter`, and options an adapter doesn't say it applies are refused, so none is ignored without a word;
   - **P4-10, typed options before 1.0:** page ranges and collation, custom and roll paper, quality, finishings, output bin and media type. `MediaSize` stays only a size, so its equality never changes.
@@ -47,7 +115,7 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 - **The opening is labels and receipts, not reports.** QuestPDF, PDFsharp/MigraDoc and iText cover general PDFs, and their output prints today through `PrintContent.FromPdf`. None of them makes ZPL or ESC/POS from a page model.
 
 **Next**
-- Owner: decide D11 to D18 in [phase-4-plan.md](phase-4-plan.md). If accepted, P4-8 to P4-10 come before P4-6, and 1.0 moves back by three to four weeks.
+- P4-8 and P4-9, side by side, then P4-10, each with its ADR; then P4-6, whose API review covers them. 1.0 moves back by three to four weeks.
 - Then, as before: the 1.0 sign-off and the stable switch, as in "Current status".
 - After the sign-off: ADR 0053's stage 0, the guide, and stage 1, the ZPL and ESC/POS builders, with an ADR for the builders' API first.
 - Then tier 1 of the core gaps, starting with page ranges, roll sizes and printable area, each with its ADR.

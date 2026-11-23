@@ -44,6 +44,12 @@ internal sealed record PrintArguments
 	/// <summary>Option: a Print Ticket file, sent as the vendor option <c>windows:print-ticket</c>.</summary>
 	private const string TicketOption = "--ticket";
 
+	/// <summary>Option: pages to print, such as <c>1-3,5</c>.</summary>
+	private const string PagesOption = "--pages";
+
+	/// <summary>Option: print quality.</summary>
+	private const string QualityOption = "--quality";
+
 	/// <summary>The vendor option a Print Ticket file is sent as.</summary>
 	private const string PrintTicketKey = "windows:print-ticket";
 
@@ -132,6 +138,8 @@ internal sealed record PrintArguments
 			PrintArguments.ColorOption     => PrintArguments.ApplyColor(parsed, value, index),
 			PrintArguments.VendorOption    => PrintArguments.ApplyVendorOption(parsed, value, index),
 			PrintArguments.TicketOption    => PrintArguments.ApplyTicket(parsed, value, index),
+			PrintArguments.PagesOption     => PrintArguments.ApplyPages(parsed, value, index),
+			PrintArguments.QualityOption   => PrintArguments.ApplyQuality(parsed, value, index),
 			PrintArguments.PaperOption when !string.IsNullOrWhiteSpace(value) => (parsed with { PaperName = value }, index + 2, null),
 			PrintArguments.TrayOption when !string.IsNullOrWhiteSpace(value)  => (parsed with { TrayId = value }, index + 2, null),
 			PrintArguments.PaperOption or PrintArguments.TrayOption =>
@@ -231,10 +239,74 @@ internal sealed record PrintArguments
 	}
 
 	/// <summary>
+	/// Applies the <c>--pages</c> option: ranges such as <c>1-3,5</c>, counted from 1, in order and without
+	/// overlapping.
+	/// </summary>
+	/// <param name="parsed">The arguments parsed so far.</param>
+	/// <param name="value">The option value.</param>
+	/// <param name="index">The position of the option.</param>
+	/// <returns>The updated arguments (or <see langword="null"/> on error), the next position, and any error.</returns>
+	private static (PrintArguments? Parsed, int NextIndex, string? Error) ApplyPages(PrintArguments parsed, string? value, int index)
+	{
+		List<PageRange> ranges = new List<PageRange>();
+
+		foreach (string part in (value ?? string.Empty).Split(','))
+		{
+			string[] bounds = part.Split('-');
+
+			if (bounds.Length is not (1 or 2)
+				|| !int.TryParse(bounds[0], NumberStyles.None, CultureInfo.InvariantCulture, out int first)
+				|| !int.TryParse(bounds[^1], NumberStyles.None, CultureInfo.InvariantCulture, out int last)
+				|| first < 1
+				|| last < first)
+			{
+				return (null, index, PrintArguments.Format(CliMessages.InvalidOptionValue, value, PrintArguments.PagesOption));
+			}
+
+			ranges.Add(new PageRange(first, last));
+		}
+
+		try
+		{
+			return (parsed with { Options = parsed.Options with { PageRanges = ranges } }, index + 2, null);
+		}
+		catch (ArgumentException)
+		{
+			// Ranges out of order or overlapping
+			return (null, index, PrintArguments.Format(CliMessages.InvalidOptionValue, value, PrintArguments.PagesOption));
+		}
+	}
+
+	/// <summary>
+	/// Applies the <c>--quality</c> option.
+	/// </summary>
+	/// <param name="parsed">The arguments parsed so far.</param>
+	/// <param name="value">The option value: draft, normal or high.</param>
+	/// <param name="index">The position of the option.</param>
+	/// <returns>The updated arguments (or <see langword="null"/> on error), the next position, and any error.</returns>
+	private static (PrintArguments? Parsed, int NextIndex, string? Error) ApplyQuality(PrintArguments parsed, string? value, int index)
+	{
+		PrintQuality? quality = value switch
+		{
+			"draft"  => PrintQuality.Draft,
+			"normal" => PrintQuality.Normal,
+			"high"   => PrintQuality.High,
+			_        => null,
+		};
+
+		if (quality is null)
+		{
+			return (null, index, PrintArguments.Format(CliMessages.InvalidOptionValue, value, PrintArguments.QualityOption));
+		}
+
+		return (parsed with { Options = parsed.Options with { Quality = quality.Value } }, index + 2, null);
+	}
+
+	/// <summary>
 	/// Applies an <c>--option KEY=VALUE</c> option, adding to any given before.
 	/// </summary>
 	/// <param name="parsed">The arguments parsed so far.</param>
-	/// <param name="value">The option value, such as <c>ipp:print-quality=5</c>.</param>
+	/// <param name="value">The option value, such as <c>ipp:number-up=2</c>.</param>
 	/// <param name="index">The position of the option.</param>
 	/// <returns>The updated arguments (or <see langword="null"/> on error), the next position, and any error.</returns>
 	private static (PrintArguments? Parsed, int NextIndex, string? Error) ApplyVendorOption(PrintArguments parsed, string? value, int index)

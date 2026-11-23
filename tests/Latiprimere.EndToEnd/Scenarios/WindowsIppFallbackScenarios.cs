@@ -32,7 +32,7 @@ public static class WindowsIppFallbackScenarios
 	{
 		Id = "windows.ipp-route.fallback-no-pdf",
 		Area = ScenarioArea.Submission,
-		Title = "A PDF to a queue whose IPP printer takes neither PDF nor a raster format (the HP ENVY's attributes without Apple raster) goes to the spooler instead (which refuses it for its text-only driver), and the printer gets no job",
+		Title = "A PDF to a queue whose IPP printer takes neither PDF nor a raster format (the HP ENVY's attributes without Apple raster or PCLm) goes to the spooler instead (which refuses it for its text-only driver), and the printer gets no job",
 		Needs = TargetNeeds.WindowsTestPrinters,
 		RunAsync = WindowsIppFallbackScenarios.NoPdfAsync
 	};
@@ -113,9 +113,10 @@ public static class WindowsIppFallbackScenarios
 	/// <returns>A task that completes when the scenario has run.</returns>
 	private static async Task NoPdfAsync(ScenarioContext context)
 	{
-		// Without image/urf: a printer that takes Apple raster gets the PDF as raster (ADR 0036)
+		// Without image/urf or application/PCLm: a printer that takes Apple raster or PCLm gets the PDF as raster
+		// (ADR 0036, ADR 0046)
 		FakePrinterProfile profile = (await FakePrinterProfile.LoadBuiltInAsync(FakePrinterProfile.HpEnvy5640, context.CancellationToken))
-			.Set("document-format-supported", Tag.MimeMediaType, "application/vnd.hp-PCL", "image/jpeg", "application/PCLm", "application/octet-stream");
+			.Set("document-format-supported", Tag.MimeMediaType, "application/vnd.hp-PCL", "image/jpeg", "application/octet-stream");
 
 		await using FakePrinter fake = await FakePrinters.StartAsync(context, new FakePrinterOptions { Profile = profile });
 		await using CatalogFixture fixture = WindowsIppFallbackScenarios.CreateCatalog(WindowsIppFallbackScenarios.PausedPrinterName, fake.PrinterUri);
