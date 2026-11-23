@@ -4,6 +4,24 @@ What changed in each release of Latiprimere, newest first. All the packages shar
 
 Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` sections such as Added, Changed, Fixed, Removed and Known limitations. Work not yet released goes under `## Unreleased`, which the website doesn't show.
 
+## Unreleased
+
+## 11.0.9-preview - 2026-11-21
+
+### Added
+
+- **A software bill of materials in every package,** in CycloneDX format at `sbom/<package>.cdx.json`, listing what the package is built from ([ADR 0051](docs/decisions/0051-security-policy-sbom-and-cra.md)).
+- **A security policy:** [SECURITY.md](SECURITY.md) says how to report a vulnerability privately, through GitHub or to security@latiprimere.com, how quickly reports are answered, and which versions get security updates ([ADR 0051](docs/decisions/0051-security-policy-sbom-and-cra.md)).
+
+### Changed
+
+- **Remembered network printers are limited:** at most 256 printers are kept in `IppNetworkOptions.AddressStorePath`, and one not seen for 90 days is forgotten, so made-up mDNS announcements can't fill the file or stay trusted forever. A forgotten printer is found again by searching. Each entry now records when it was last seen; the file stays at format 1, so earlier versions still read it ([ADR 0038](docs/decisions/0038-remembered-addresses.md)).
+
+### Fixed
+
+- **A very wide PDF page can't get past the rendering size check:** Latiprimere.Rendering.Pdfium now works out the size of a band of pixels without overflowing.
+- **A PDF document that wasn't disposed no longer holds up the finalizer thread** while another thread is using PDFium: it is closed at the next PDFium call instead.
+
 ## 11.0.8-preview - 2026-11-21
 
 ### Added

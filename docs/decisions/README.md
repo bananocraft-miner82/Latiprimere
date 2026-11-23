@@ -57,6 +57,8 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0049](0049-following-printers-and-jobs.md) | Following printers and jobs | Accepted |
 | [0050](0050-commercial-licence-agreement.md) | Commercial Licence agreement, from Common Paper's Software License Agreement | Proposed |
 | [0051](0051-security-policy-sbom-and-cra.md) | Security policy, SBOMs and groundwork for the Cyber Resilience Act | Proposed |
+| [0052](0052-support-branches.md) | Support branches for older .NET lines | Proposed |
+| [0053](0053-document-generation-companion.md) | Document generation as a companion product | Accepted |
 
 ## Template
 

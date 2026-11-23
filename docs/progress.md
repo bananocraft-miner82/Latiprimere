@@ -6,11 +6,51 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 | Item | Value |
 |---|---|
-| Phase | 4: PCLm, images and text, and events, before 1.0 ([phase-4-plan.md](phase-4-plan.md), accepted 2026-11-20). P4-1 to P4-5 done; P4-6, the docs, samples and 1.0 API review, and P4-7, the sign-off's additions, to come. Phase 3 ([phase-3-plan.md](phase-3-plan.md)) is done but for its checks on the HP, the Mac (P3-8) and the stable switch, which wait for the sign-off |
+| Phase | 4: PCLm, images and text, and events, before 1.0 ([phase-4-plan.md](phase-4-plan.md), accepted 2026-11-20). P4-1 to P4-5 done; P4-6, the docs, samples and 1.0 API review, and P4-7, the sign-off's additions, to come. P4-8 to P4-10, changes to the interface that are easy only before 1.0, proposed 2026-11-23 with decisions D11 to D18 for the owner. Phase 3 ([phase-3-plan.md](phase-3-plan.md)) is done but for its checks on the HP, the Mac (P3-8) and the stable switch, which wait for the sign-off |
 | Released | `11.0.7-preview` on nuget.org, 2026-11-20, with the 1.0 API ([ADR 0040](decisions/0040-api-review-1-0.md)). Its post-release pull request is merged into `main`. The next release is `11.0.8-preview`, or the first stable one, 1.0, after the sign-off ([releasing.md](releasing.md#the-first-stable-release-10)) |
 | State | Committed on `feature/release-prep-cleanup`, rebased onto `main` after the 11.0.7-preview post-release merge: Phase 4's P4-1 to P4-5 ([ADR 0045](decisions/0045-pdf-writer.md) to [ADR 0049](decisions/0049-following-printers-and-jobs.md)) and the fixes from their review; before them, the pre-1.0 work found by the review of 2026-11-20: a time limit on a printer that stops taking a job ([ADR 0041](decisions/0041-upload-stall-timeout.md)); IPPS, pinned certificates and passwords for Windows queues, and what printers say each address asks for ([ADR 0042](decisions/0042-ipps-for-windows-queues-and-uri-authentication.md)); why a job is in its state, `PrintJobStatus.StateReasons` ([ADR 0043](decisions/0043-job-state-reasons.md)); the docs on printers anyone can announce; room to grow after 1.0 ([ADR 0044](decisions/0044-room-to-grow-after-1-0.md)); and the stable switch, ready to run. 3,176 tests pass here; not yet through CI. Every ADR is accepted (owner). |
 | Next step | Owner: merge this branch's pull request, and release it as `11.0.8-preview`. Then the sign-off, as [releasing.md](releasing.md#1-the-sign-off) lists it: the HP over IPP, IPPS and its Windows queue (about ten sheets, each only when you say), and the Mac. Then the stable switch. |
 | Blockers | The sign-off waits on the HP being on and on time at a Mac. Owner: delete the leftover branches `post-release/v11.0.4-preview` and `post-release/v11.0.6-preview`, and reserve the `Latiprimere.` ID prefix on nuget.org ([releasing.md](releasing.md#one-time-setup-owner)). |
+
+---
+
+## 2026-11-23: A capability review, and a companion product for documents
+
+**Done** (owner: five capabilities to check, then "Add the relevant items to our plan. Could we perhaps consider the document generation as a viable compatible side-product that could compliment Latiprimere and work well with it?")
+- **The review:** what Latiprimere supports today, against five capabilities:
+  - **discovery, capabilities, paper, queues and submission:** mostly. The gaps: no list of a printer's queued jobs, no printers appearing and going, and no printer installation or queue settings, which is a non-goal;
+  - **a document and layout API:** no, by design ([ADR 0001](decisions/0001-headless-ipp-first-scope.md));
+  - **PDFs:** printed everywhere; made only internally, for images, text and PCLm;
+  - **silent printing:** yes, as everything is headless. Preview and dialogs: the pieces are public (`IPdfRasterizer`, `PrinterCapabilities`), the add-ons are for later;
+  - **label and receipt printers:** yes, as raw data, without helpers to build it and without raw port-9100 connections.
+- **plan.md, "Later":**
+  - a printer's queue of jobs (`IPrinter.GetJobsAsync`);
+  - ZPL and ESC/POS builders;
+  - raw connections over AppSocket, port 9100;
+  - preview of any `PrintContent` without a UI framework;
+  - a new "Companion product: documents" section, and a pointer to it from the non-goals.
+- **[ADR 0053](decisions/0053-document-generation-companion.md), accepted:** document generation as `Latiprimere.Documents.*` packages beside the core, print-first, in stages: a guide to printing other libraries' PDFs, then the ZPL and ESC/POS builders, then a page model with PDF output, embedded fonts, and documents rendered to label and receipt printers.
+  - **The owner's answers** (each as recommended): go ahead after 1.0; print-first, leaving reports to QuestPDF and MigraDoc; named `Latiprimere.Documents.*`; the standard 14 fonts first, embedded fonts after; stages 0 and 1 straight after the sign-off.
+  - **plan.md** lists the stages as a checklist under "Companion product: documents (after 1.0)".
+- **A second review of the core** (owner: "Which other core features do we currently have as gaps and could start planning onto the roadmap?", then "Add all, tiered"): 13 more gaps, in plan.md's "Later" in three tiers.
+  - **Tier 1:** page ranges, custom and roll paper sizes, printable area and borderless printing, supplies and alerts, and tracing and metrics. Page ranges, roll sizes and printable area come first, as the Documents companion relies on the last two.
+  - **Tier 2:** typed settings for what vendor options reach today, holding and releasing jobs, Kerberos, several documents in one job, and a durable outbox.
+  - **Tier 3:** items earlier ADRs left for later: common paper sizes built in, which print systems the catalog skipped, IPP notifications, and more orientations and colour modes.
+- **Changes worth making while there are no customers** (owner: "which core features are we missing that would change the interface, but would be worth adding anyway?", then "Yes, plan all three"): three work packages added to [phase-4-plan.md](phase-4-plan.md), proposed, with decisions D11 to D18:
+  - **P4-8, options for the PDF rasteriser:** grey as well as BGRA bands, smoothing that can be turned off, and passwords. `IPdfRasterizer` and `IRasterDocument` are frozen for good at 1.0;
+  - **P4-9, a layer around every printer:** the catalog wraps printers and jobs, platform features are reached through a member instead of `is IWindowsPrinter`, and options an adapter doesn't say it applies are refused, so none is ignored without a word;
+  - **P4-10, typed options before 1.0:** page ranges and collation, custom and roll paper, quality, finishings, output bin and media type. `MediaSize` stays only a size, so its equality never changes.
+  - **Checked, and fine to add after 1.0:** listing jobs, holding and releasing them, several documents in one job, supplies, printers appearing and going, and "offline", which every print system already reports as `offline-report`.
+
+**Learned**
+- **Phase 4 built most of a document pipeline already,** internal to `Latiprimere.Ipp`: the PDF writer, image placement, text layout and dithering. A companion product could start from that, through shared source, without making it a public API.
+- **The opening is labels and receipts, not reports.** QuestPDF, PDFsharp/MigraDoc and iText cover general PDFs, and their output prints today through `PrintContent.FromPdf`. None of them makes ZPL or ESC/POS from a page model.
+
+**Next**
+- Owner: decide D11 to D18 in [phase-4-plan.md](phase-4-plan.md). If accepted, P4-8 to P4-10 come before P4-6, and 1.0 moves back by three to four weeks.
+- Then, as before: the 1.0 sign-off and the stable switch, as in "Current status".
+- After the sign-off: ADR 0053's stage 0, the guide, and stage 1, the ZPL and ESC/POS builders, with an ADR for the builders' API first.
+- Then tier 1 of the core gaps, starting with page ranges, roll sizes and printable area, each with its ADR.
 
 ---
 
