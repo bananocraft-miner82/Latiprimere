@@ -73,7 +73,7 @@ Printers announce themselves on the local network with DNS-SD, also known as Bon
 - **Discovery stays on the local network.** It doesn't cross routers, and firewalls must let multicast DNS through (UDP port 5353). In containers it often doesn't work at all. Configure those printers by address instead.
 - **To turn discovery off,** set `EnableDiscovery = false`, for example when you only use printers you've configured.
 
-A discovered printer's ID is its announced name, such as `ipp:dnssd:Office Laser`. The ID survives the printer getting a new IP address: a lookup tries the last address seen for that name, then searches the network if it doesn't answer. Renaming the printer changes its ID.
+A discovered printer's ID is its announced name, such as `ipp:dnssd:Office Laser`. The ID survives the printer getting a new IP address: a lookup tries the last address seen for that name, then searches the network if it doesn't answer. Renaming the printer changes its ID. The printer is reached at the IPv4 address it announces, or an IPv6 address that isn't link-local if it announces no IPv4 one, or otherwise at its announced host name, such as `office-laser.local`, which the operating system must be able to look up over mDNS.
 
 Some printers stop answering the search while they sleep. To find them after your application restarts, set `AddressStorePath` to a file where Latiprimere can remember each printer's last address:
 

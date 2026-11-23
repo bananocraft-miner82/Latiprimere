@@ -29,6 +29,10 @@ Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` 
 - **Grey and black jobs use a quarter of the memory:** IPP raster in grey or black, and monochrome jobs on the Windows spooler, are rendered in 8-bit grey instead of 32-bit colour. Grey comes from PDFium, whose weighting of colours differs from before by a few levels at most ([ADR 0054](docs/decisions/0054-rasteriser-options.md)).
 - **Breaking, for classes implementing the rasteriser:** `IPdfRasterizer.Open` takes `PdfOpenOptions? options = null`, and `IRasterDocument.RenderBand` takes `RasterRenderOptions? options = null`. Code calling them compiles as before. The static `RasterBand.BytesPerPixel` is now an instance property, from the band's pixel format; `RasterBand.GetBytesPerPixel(format)` gives it for any format ([ADR 0054](docs/decisions/0054-rasteriser-options.md)).
 
+### Fixed
+
+- **Printers found over mDNS that announce no IPv4 address can be reached.** Latiprimere used only the first part of their announced host name, such as `office-laser` rather than `office-laser.local`, which rarely resolves and which printers that guard against DNS rebinding refuse: ippeveprinter answers 400 Bad Request. The full name is used now, and an announced IPv6 address that isn't link-local before it.
+
 ## 11.0.9-preview - 2026-11-21
 
 ### Added

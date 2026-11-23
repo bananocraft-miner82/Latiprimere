@@ -13,7 +13,7 @@ internal sealed record DnsSdService
 	/// <summary>Gets the service type, such as <c>_ipp._tcp</c>.</summary>
 	public required string ServiceType { get; init; }
 
-	/// <summary>Gets the host name from the SRV record, if any.</summary>
+	/// <summary>Gets the full host name from the SRV record, such as <c>printer.local</c>, if any.</summary>
 	public string? Hostname { get; init; }
 
 	/// <summary>Gets the port from the SRV record.</summary>

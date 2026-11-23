@@ -2,6 +2,7 @@ using Latiprimere.EndToEnd.Support;
 using Latiprimere.FakeIppPrinter;
 using Latiprimere.Testing.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
+using Tmds.MDns;
 
 namespace Latiprimere.EndToEnd.Scenarios;
 
@@ -46,6 +47,8 @@ public static class DiscoveryScenarios
 		string name = context.Targets.MdnsPrinterName!; // Needed, so set
 		string printerId = "ipp:dnssd:" + name;
 
+		await DiscoveryScenarios.NoteAnnouncementsAsync(context, name);
+
 		// Direct IPP as an application registers it: discovery on, no printers configured
 		await using CatalogFixture fixture = new CatalogFixture(services => services.AddLatiprimereIpp());
 
@@ -60,6 +63,63 @@ public static class DiscoveryScenarios
 
 		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(context.CancellationToken);
 		context.Check("its capabilities can be read", capabilities.MediaSizes.Count > 0, $"{capabilities.MediaSizes.Count} paper sizes");
+	}
+
+	/// <summary>
+	/// Notes what the printer's announcements hold, as received on each network interface: the host name and domain,
+	/// the port and the addresses. Latiprimere builds the printer's address from them, so when looking it up fails,
+	/// these say what it had to go on.
+	/// </summary>
+	/// <param name="context">The scenario's context.</param>
+	/// <param name="instanceName">The printer's instance name.</param>
+	/// <returns>A task that completes after a few seconds of listening.</returns>
+	private static async Task NoteAnnouncementsAsync(ScenarioContext context, string instanceName)
+	{
+		List<string> seen = [];
+		Lock gate = new Lock();
+
+		void record(object? sender, ServiceAnnouncementEventArgs e)
+		{
+			ServiceAnnouncement announcement = e.Announcement;
+
+			if (!string.Equals(announcement.Instance, instanceName, StringComparison.OrdinalIgnoreCase))
+			{
+				return;
+			}
+
+			string addresses = announcement.Addresses is { Count: > 0 } ? string.Join(", ", announcement.Addresses) : "none";
+			string line = $"Announced as {announcement.Type} on {announcement.NetworkInterface?.Name ?? "an unknown interface"}: host {announcement.Hostname}, domain {announcement.Domain}, port {announcement.Port}, addresses {addresses}";
+
+			lock (gate)
+			{
+				seen.Add(line);
+			}
+		}
+
+		ServiceBrowser browser = new ServiceBrowser();
+		browser.ServiceAdded += record;
+		browser.ServiceChanged += record;
+		browser.StartBrowse(["_ipp._tcp", "_ipps._tcp"], useSynchronizationContext: false);
+
+		try
+		{
+			await Task.Delay(TimeSpan.FromSeconds(3), context.CancellationToken);
+		}
+		finally
+		{
+			// StopBrowse reports every service as removed, so stop listening first
+			browser.ServiceAdded -= record;
+			browser.ServiceChanged -= record;
+			browser.StopBrowse();
+		}
+
+		lock (gate)
+		{
+			foreach (string line in seen.Count > 0 ? seen : ["Not announced within 3 seconds of listening"])
+			{
+				context.Note(line);
+			}
+		}
 	}
 
 	/// <summary>

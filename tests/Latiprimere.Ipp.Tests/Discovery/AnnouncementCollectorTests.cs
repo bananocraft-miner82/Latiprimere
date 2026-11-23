@@ -111,6 +111,25 @@ public sealed class AnnouncementCollectorTests
 		Assert.False(collector.WantedServiceFound.IsCompleted);
 	}
 
+	[Theory]
+	[InlineData("printer", "local", "printer.local")]
+	[InlineData("printer", "local.", "printer.local")]
+	[InlineData("printer", "office.example.", "printer.office.example")]
+	[InlineData("printer", "", "printer")]
+	[InlineData("printer", null, "printer")]
+	[InlineData(null, "local", null)]
+	[InlineData(" ", "local", null)]
+	public void GivenHostnameSplitFromItsDomainWhenJoinedThenGivesTheFullName(string? hostname, string? domain, string? expected)
+	{
+		// Arrange — Tmds.MDns gives the SRV target's first label and the rest apart (provided by InlineData above)
+
+		// Act
+		string? joined = AnnouncementCollector.JoinHostname(hostname, domain);
+
+		// Assert — the name ippeveprinter and other printers accept in the Host header
+		Assert.Equal(expected, joined);
+	}
+
 	/// <summary>
 	/// Recognises the service named Office.
 	/// </summary>
