@@ -264,10 +264,90 @@ public sealed class IppNetworkOptions
 	/// <para>
 	/// Once a certificate is pinned, or <see cref="ServerCertificateValidationCallback"/> is set, a printer found on
 	/// the network that announces both addresses is reached over IPPS, and over plain IPP only if its certificate
-	/// isn't trusted.
+	/// isn't trusted and it has never been reached over IPPS before. Set <see cref="RequireEncryption"/> to never
+	/// reach one over plain IPP.
+	/// </para>
+	/// <para>
+	/// A pinned certificate is trusted at any address. Printers of one model sometimes share a certificate made at
+	/// the factory, which would then be trusted on every one of them; to trust a certificate only at one printer's
+	/// address, pin it in <see cref="PrinterCertificateFingerprints"/> instead.
 	/// </para>
 	/// </remarks>
 	public IList<string> TrustedCertificateFingerprints { get; } = new List<string>();
+
+	/// <summary>
+	/// Gets the SHA-256 fingerprints of printer certificates to trust over IPPS only at one printer's address, by
+	/// printer URI, such as <c>ipps://192.168.1.20/ipp/print</c>. They are matched by the URI's host, and written as
+	/// in <see cref="TrustedCertificateFingerprints"/>.
+	/// </summary>
+	/// <remarks>
+	/// A certificate pinned here is trusted only at that host, whatever name it carries, so the same certificate
+	/// presented anywhere else is refused. A printer found on the network is reached at the address it announces, so
+	/// pin it by that address; if it gets a new one, its certificate is refused there until it is pinned again.
+	/// </remarks>
+	public IDictionary<Uri, string> PrinterCertificateFingerprints { get; } = new Dictionary<Uri, string>();
+
+	/// <summary>
+	/// Gets or sets a value indicating whether every request goes over an encrypted connection (IPPS), never plain
+	/// IPP. Defaults to <see langword="false"/>.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// When <see langword="true"/>, a printer found on the network is reached only at its IPPS address: one that
+	/// announces none, or whose certificate isn't trusted, is refused with a <see cref="PrintException"/> rather than
+	/// reached over plain IPP, where anyone able to watch the network could read the documents. Looking up an
+	/// <c>ipp://</c> URI is refused the same way, without connecting, and an <c>ipp://</c> URI in
+	/// <see cref="PrinterUris"/> throws <see cref="ArgumentException"/> when the print system is created.
+	/// </para>
+	/// <para>
+	/// Without it, a printer found on the network is still never reached over plain IPP once it has been reached over
+	/// IPPS with a trusted certificate, while a certificate is pinned or the callback is set, so a device that
+	/// answers in its place, or blocks its IPPS port, can't make it fall back; unless
+	/// <see cref="AllowPlainIppAfterIpps"/> is set.
+	/// </para>
+	/// </remarks>
+	public bool RequireEncryption { get; set; }
+
+	/// <summary>
+	/// Gets or sets a value indicating whether a printer found on the network may be reached over plain IPP after it
+	/// has been reached over IPPS, when its IPPS address stops working. Defaults to <see langword="false"/>.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// By default, once a printer found on the network has been reached over IPPS with a trusted certificate, while a
+	/// certificate is pinned or <see cref="ServerCertificateValidationCallback"/> is set, it is refused with a
+	/// <see cref="PrintException"/> rather than reached over plain IPP, if its IPPS address stops answering, its
+	/// certificate is no longer trusted, or its name is announced with only a plain address. Any of those could be a
+	/// device on the network forcing its jobs onto plain IPP, where they can be read. A printer that has never been
+	/// reached over IPPS falls back either way.
+	/// </para>
+	/// <para>
+	/// Set it to <see langword="true"/> to fall back as before, as for printers whose certificates change often and
+	/// whose documents needn't be kept private. The fallback is logged as a warning. It has no effect while
+	/// <see cref="RequireEncryption"/> is set, which never allows plain IPP. Whether each printer was reached over IPPS
+	/// is remembered either way, so turning it off again protects them at once.
+	/// </para>
+	/// </remarks>
+	public bool AllowPlainIppAfterIpps { get; set; }
+
+	/// <summary>
+	/// Gets or sets a value indicating whether a printer found on the network that announced a UUID may be used at its
+	/// remembered address when the printer there reports no UUID at all. Defaults to <see langword="false"/>.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Looking a printer up by name tries the address it was last seen at first, and uses it only if the printer there
+	/// is the same: it must report, as <c>printer-uuid</c>, the UUID it announced. By default, one that reports no UUID
+	/// isn't taken on trust, as another device at the address could pass by leaving it out; the network is searched
+	/// for the name instead, which takes a little longer.
+	/// </para>
+	/// <para>
+	/// Set it to <see langword="true"/> to take such a printer on trust, as before, for older printers that announce a
+	/// UUID but don't report <c>printer-uuid</c> and that would otherwise be searched for at every lookup. A printer
+	/// that reports a different UUID is never used there, and one that announced none is always taken on trust.
+	/// </para>
+	/// </remarks>
+	public bool AllowRememberedAddressWithoutUuid { get; set; }
 
 	/// <summary>
 	/// Gets or sets the check of a printer's certificate that neither the system trusts nor
@@ -296,7 +376,7 @@ public sealed class IppNetworkOptions
 	/// public authority issued, so a printer found on the network must have its certificate pinned in
 	/// <see cref="TrustedCertificateFingerprints"/> or accepted by <see cref="ServerCertificateValidationCallback"/>.
 	/// Until then its IPPS address is refused, and it is reached over plain IPP, without them, if it announces that
-	/// too. To keep a password to one printer, use
+	/// too and <see cref="RequireEncryption"/> isn't set. To keep a password to one printer, use
 	/// <see cref="PrinterCredentials"/>.
 	/// </para>
 	/// </remarks>

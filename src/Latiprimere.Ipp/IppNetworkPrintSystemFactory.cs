@@ -22,8 +22,11 @@ public static class IppNetworkPrintSystemFactory
 	/// is no longer needed.
 	/// </returns>
 	/// <exception cref="ArgumentException">A fingerprint in <see cref="IppNetworkOptions.TrustedCertificateFingerprints"/>
-	/// isn't 32 bytes in hexadecimal; a credential has no user name, or one containing a colon; or a URI in
-	/// <see cref="IppNetworkOptions.PrinterCredentials"/> isn't an absolute ipp or ipps URI.</exception>
+	/// or <see cref="IppNetworkOptions.PrinterCertificateFingerprints"/> isn't 32 bytes in hexadecimal; a credential
+	/// has no user name, or one containing a colon; a URI in <see cref="IppNetworkOptions.PrinterCredentials"/> or
+	/// <see cref="IppNetworkOptions.PrinterCertificateFingerprints"/> isn't an absolute ipp or ipps URI; or
+	/// <see cref="IppNetworkOptions.RequireEncryption"/> is set and <see cref="IppNetworkOptions.PrinterUris"/> has an
+	/// ipp URI.</exception>
 	[SuppressMessage
 	(
 		"ApiDesign",
@@ -49,8 +52,11 @@ public static class IppNetworkPrintSystemFactory
 	/// is no longer needed.
 	/// </returns>
 	/// <exception cref="ArgumentException">A fingerprint in <see cref="IppNetworkOptions.TrustedCertificateFingerprints"/>
-	/// isn't 32 bytes in hexadecimal; a credential has no user name, or one containing a colon; or a URI in
-	/// <see cref="IppNetworkOptions.PrinterCredentials"/> isn't an absolute ipp or ipps URI.</exception>
+	/// or <see cref="IppNetworkOptions.PrinterCertificateFingerprints"/> isn't 32 bytes in hexadecimal; a credential
+	/// has no user name, or one containing a colon; a URI in <see cref="IppNetworkOptions.PrinterCredentials"/> or
+	/// <see cref="IppNetworkOptions.PrinterCertificateFingerprints"/> isn't an absolute ipp or ipps URI; or
+	/// <see cref="IppNetworkOptions.RequireEncryption"/> is set and <see cref="IppNetworkOptions.PrinterUris"/> has an
+	/// ipp URI.</exception>
 	public static IPrintSystem Create(IPdfRasterizer? pdfRasterizer, IppNetworkOptions? options)
 	{
 		return IppNetworkPrintSystemFactory.Create(pdfRasterizer, options, loggerFactory: null);
@@ -74,8 +80,11 @@ public static class IppNetworkPrintSystemFactory
 	/// is no longer needed.
 	/// </returns>
 	/// <exception cref="ArgumentException">A fingerprint in <see cref="IppNetworkOptions.TrustedCertificateFingerprints"/>
-	/// isn't 32 bytes in hexadecimal; a credential has no user name, or one containing a colon; or a URI in
-	/// <see cref="IppNetworkOptions.PrinterCredentials"/> isn't an absolute ipp or ipps URI.</exception>
+	/// or <see cref="IppNetworkOptions.PrinterCertificateFingerprints"/> isn't 32 bytes in hexadecimal; a credential
+	/// has no user name, or one containing a colon; a URI in <see cref="IppNetworkOptions.PrinterCredentials"/> or
+	/// <see cref="IppNetworkOptions.PrinterCertificateFingerprints"/> isn't an absolute ipp or ipps URI; or
+	/// <see cref="IppNetworkOptions.RequireEncryption"/> is set and <see cref="IppNetworkOptions.PrinterUris"/> has an
+	/// ipp URI.</exception>
 	public static IPrintSystem Create(IPdfRasterizer? pdfRasterizer, IppNetworkOptions? options, ILoggerFactory? loggerFactory)
 	{
 		options ??= new IppNetworkOptions();
@@ -106,9 +115,10 @@ public static class IppNetworkPrintSystemFactory
 			Logger             = IppLog.CreateLogger(loggerFactory)
 		};
 
+		// Required encryption needs printers' IPPS addresses even when the system's trust is all there is (ADR 0058)
 		return new IppNetworkPrintSystem(context, new MdnsIppPrinterDiscovery(), options, client)
 		{
-			PrefersIpps = trust.TrustsBeyondSystem
+			PrefersIpps = trust.TrustsBeyondSystem || options.RequireEncryption
 		};
 	}
 
@@ -156,7 +166,16 @@ public static class IppNetworkPrintSystemFactory
 			IppNetworkPrintSystemFactory.ValidateCredentials(printer.Value);
 		}
 
-		return IppConnectionSecurity.CreateForPrinters(options.Credentials, options.PrinterCredentials, trust);
+		// A plain address configured alongside required encryption could only ever be refused, so say so now
+		if (options.RequireEncryption && options.PrinterUris.FirstOrDefault(uri => uri is { IsAbsoluteUri: true, Scheme: "ipp" }) is Uri plain)
+		{
+			throw new ArgumentException(ExceptionMessages.FormatIppPlainUriConfigured(plain), nameof(options));
+		}
+
+		return IppConnectionSecurity.CreateForPrinters(options.Credentials, options.PrinterCredentials, trust) with
+		{
+			RequiresTls = options.RequireEncryption
+		};
 	}
 
 	/// <summary>
@@ -176,6 +195,7 @@ public static class IppNetworkPrintSystemFactory
 		return IppCertificateTrust.CreateForPrinters
 		(
 			options.TrustedCertificateFingerprints,
+			options.PrinterCertificateFingerprints,
 			options.ServerCertificateValidationCallback,
 			options.Credentials,
 			options.PrinterUris.Concat(options.PrinterCredentials.Keys)

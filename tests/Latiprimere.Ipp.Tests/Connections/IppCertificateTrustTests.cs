@@ -192,6 +192,52 @@ public sealed class IppCertificateTrustTests
 		Assert.True(trust.TrustsBeyondSystem);
 	}
 
+	[Theory]
+	[InlineData("192.168.1.20", true)]
+	[InlineData("[fd00::20]", true)]
+	[InlineData("192.168.1.21", false)]
+	[InlineData(null, false)]
+	public void GivenCertificatePinnedAtOnePrintersHostWhenValidatedThenTrustedOnlyThere(string? host, bool expected)
+	{
+		// Arrange — one printer's certificate, pinned by its addresses; the same certificate presented anywhere else
+		// (provided by InlineData above), as printers of a model sharing one made at the factory would
+		using X509Certificate2 certificate = IppCertificateTrustTests.CreateCertificate();
+		string fingerprint = IppCertificateTrust.GetFingerprint(certificate);
+
+		IppCertificateTrust trust = new IppCertificateTrust
+		(
+			[],
+			[
+				new KeyValuePair<Uri, string>(new Uri("ipps://192.168.1.20/ipp/print"), fingerprint),
+				new KeyValuePair<Uri, string>(new Uri("ipps://[fd00::20]:443/ipp/print"), fingerprint.ToLowerInvariant())
+			],
+			callback: null,
+			systemTrustHosts: null
+		);
+
+		// Act
+		bool trusted = trust.Validate(new object(), host, certificate, null, SslPolicyErrors.RemoteCertificateChainErrors);
+
+		// Assert
+		Assert.Equal(expected, trusted);
+		Assert.True(trust.TrustsBeyondSystem);
+	}
+
+	[Theory]
+	[InlineData("http://192.168.1.20/ipp/print", "3A7F")]
+	[InlineData("ipps://192.168.1.20/ipp/print", "3A:7F:00")]
+	public void GivenPrinterFingerprintWithABadUriOrFingerprintWhenCreatedThenThrowsArgumentException(string uri, string fingerprint)
+	{
+		// Arrange — a scheme that isn't IPP's, or a fingerprint that isn't SHA-256 (provided by InlineData above)
+		KeyValuePair<Uri, string>[] printers = [new KeyValuePair<Uri, string>(new Uri(uri), fingerprint)];
+
+		// Act
+		Action create = () => _ = new IppCertificateTrust([], printers, callback: null, systemTrustHosts: null);
+
+		// Assert
+		Assert.Throws<ArgumentException>(create);
+	}
+
 	[Fact]
 	public void GivenNothingBeyondTheSystemWhenAskedThenItDoesntTrustBeyondIt()
 	{

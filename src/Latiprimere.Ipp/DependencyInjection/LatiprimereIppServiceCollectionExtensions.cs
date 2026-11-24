@@ -23,8 +23,11 @@ public static class LatiprimereIppServiceCollectionExtensions
 	/// <returns>The same service collection, for chaining.</returns>
 	/// <exception cref="ArgumentNullException"><paramref name="services"/> is <see langword="null"/>.</exception>
 	/// <exception cref="ArgumentException">A fingerprint in <see cref="IppNetworkOptions.TrustedCertificateFingerprints"/>
-	/// isn't 32 bytes in hexadecimal; a credential has no user name, or one containing a colon; or a URI in
-	/// <see cref="IppNetworkOptions.PrinterCredentials"/> isn't an absolute ipp or ipps URI.</exception>
+	/// or <see cref="IppNetworkOptions.PrinterCertificateFingerprints"/> isn't 32 bytes in hexadecimal; a credential
+	/// has no user name, or one containing a colon; a URI in <see cref="IppNetworkOptions.PrinterCredentials"/> or
+	/// <see cref="IppNetworkOptions.PrinterCertificateFingerprints"/> isn't an absolute ipp or ipps URI; or
+	/// <see cref="IppNetworkOptions.RequireEncryption"/> is set and <see cref="IppNetworkOptions.PrinterUris"/> has an
+	/// ipp URI.</exception>
 	public static IServiceCollection AddLatiprimereIpp(this IServiceCollection services, Action<IppNetworkOptions>? configure = null)
 	{
 		ArgumentNullException.ThrowIfNull(services);

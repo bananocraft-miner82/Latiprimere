@@ -212,7 +212,8 @@ internal sealed class HappyEyeballsConnector
 	/// <param name="host">The host name or address.</param>
 	/// <param name="cancellationToken">A token to cancel the lookup.</param>
 	/// <returns>The addresses to try, in order; never empty.</returns>
-	/// <exception cref="SocketException">The name has no addresses, or could not be resolved.</exception>
+	/// <exception cref="SocketException">The name has no addresses, a <c>.local</c> name has none a printer may have,
+	/// or the name could not be resolved.</exception>
 	private async Task<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
 	{
 		if (IPAddress.TryParse(host, out IPAddress? address))
@@ -221,6 +222,13 @@ internal sealed class HappyEyeballsConnector
 		}
 
 		IPAddress[] addresses = await this.resolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false);
+
+		// Anyone on the network can answer for a .local name, with any address, so it is held to the addresses a
+		// printer may have, as an announced address is (ADR 0058)
+		if (PrinterAddressRules.IsMulticastDnsName(host))
+		{
+			addresses = addresses.Where(PrinterAddressRules.CanBePrinter).ToArray();
+		}
 
 		if (addresses.Length == 0)
 		{

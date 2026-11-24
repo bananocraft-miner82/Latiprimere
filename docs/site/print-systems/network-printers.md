@@ -92,13 +92,15 @@ Discovery takes printers at their word. Multicast DNS has no way to check who's 
 
 Latiprimere guards what it can:
 
-- **A remembered address is used only while the printer there reports the UUID it announced,** which keeps a job from going to another printer that took over the address. A device that pretends to be the printer can report any UUID it likes, so this doesn't stop it.
+- **A remembered address is used only while the printer there reports the UUID it announced,** which keeps a job from going to another printer that took over the address. A printer there that reports no UUID is searched for instead; set `AllowRememberedAddressWithoutUuid` for older printers that announce a UUID but don't report one. A device that pretends to be the printer can report any UUID it likes, so this doesn't stop it.
 - **A printer's IPPS address is used only if it was announced by the same host as its IPP one,** and not with another UUID.
 - **A shared password goes to a printer found on the network only once its certificate is pinned:** see [who gets the shared password](/docs/print-systems/secure-printers/#who-gets-the-shared-password).
+- **A printer reached over IPPS once is never reached over plain IPP again,** while a certificate is pinned, so a device can't force its jobs onto plain IPP by blocking its IPPS port. See [printers found on the network](/docs/print-systems/secure-printers/#printers-found-on-the-network).
+- **Announcements of addresses no printer has are skipped:** this computer's own loopback address, `localhost`, unspecified, multicast and broadcast addresses, and the cloud metadata services at `169.254.169.254` and `fd00:ec2::254`. A `.local` name, which anyone can answer for, is held to the same rules when it is looked up. So an announcement can't point Latiprimere at services on the computer it runs on.
 
 None of that stops a device that announces a printer from receiving the jobs sent to it by name. When that matters, as for payslips or medical records:
 
-- **Configure the printer by its `ipps://` address in `PrinterUris`, pin its certificate, and print to it by that address,** as `ipp:ipps://…`. A pinned certificate is the one thing another device can't present. Looked up by name instead, a printer whose IPPS certificate isn't trusted is reached over plain IPP, so pinning protects only the address.
+- **Configure the printer by its `ipps://` address in `PrinterUris`, pin its certificate, and print to it by that address,** as `ipp:ipps://…`. A pinned certificate is the one thing another device can't present. Looked up by name instead, a printer never reached over IPPS before whose certificate isn't trusted is reached over plain IPP, unless you set `RequireEncryption`.
 - **Turn discovery off** with `EnableDiscovery = false` once your printers are configured, so they aren't listed alongside whatever else announces itself. Looking up an `ipp:dnssd:` ID still searches the network, so keep those IDs out of printer IDs you store.
 - **Keep untrusted devices off the network your printers are on,** as for any service found by multicast DNS.
 

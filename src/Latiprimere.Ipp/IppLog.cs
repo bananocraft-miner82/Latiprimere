@@ -66,13 +66,14 @@ internal static partial class IppLog
 
 	/// <summary>
 	/// Logs that a printer's IPPS address couldn't be used, for an untrusted certificate or because nothing answered
-	/// there, so it is reached over plain IPP (ADR 0037).
+	/// there, so it is reached over plain IPP (ADR 0037). A warning: its documents then travel unencrypted, which a
+	/// device answering in the printer's place could also cause (ADR 0058).
 	/// </summary>
 	/// <param name="logger">The logger.</param>
 	/// <param name="secureUri">The IPPS address.</param>
 	/// <param name="printerUri">The plain IPP address used instead.</param>
 	/// <param name="exception">Why.</param>
-	[LoggerMessage(Level = LogLevel.Information, Message = "The encrypted connection to {SecureUri} couldn't be opened, because its certificate isn't trusted or nothing answered there, so {PrinterUri} is used instead.")]
+	[LoggerMessage(Level = LogLevel.Warning, Message = "The encrypted connection to {SecureUri} couldn't be opened, because its certificate isn't trusted or nothing answered there, so {PrinterUri} is used instead, without encryption. Set IppNetworkOptions.RequireEncryption to refuse it instead.")]
 	internal static partial void SecureAddressUnusable(ILogger logger, Uri secureUri, Uri printerUri, Exception exception);
 
 	/// <summary>

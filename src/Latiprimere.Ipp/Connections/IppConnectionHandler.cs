@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using Latiprimere.Ipp.Resources;
 
 namespace Latiprimere.Ipp.Connections;
 
@@ -52,6 +53,13 @@ internal sealed class IppConnectionHandler : DelegatingHandler
 		if (this.security.UseTls && request.RequestUri is not null && request.RequestUri.Scheme == Uri.UriSchemeHttp)
 		{
 			request.RequestUri = IppConnectionHandler.ToHttps(request.RequestUri);
+		}
+
+		// The last check before anything is sent: lookups already refuse plain addresses when encryption is required,
+		// so this catches only a path that missed it (ADR 0058)
+		if (this.security.RequiresTls && request.RequestUri?.Scheme != Uri.UriSchemeHttps)
+		{
+			throw new PrintException(ExceptionMessages.FormatIppPlainRequestRefused(request.RequestUri?.ToString() ?? string.Empty));
 		}
 
 		// The printer's own credentials, or those for all; for direct IPP, only over TLS (ADR 0037)

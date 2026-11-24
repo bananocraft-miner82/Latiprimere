@@ -98,4 +98,5 @@ Printing through the Windows spooler and its drivers.
 Rendering PDFs with PDFium, for Windows drivers and for network printers that can't take PDF.
 
 - [LatiprimerePdfiumServiceCollectionExtensions](/docs/reference/latiprimere-rendering-pdfium/latiprimerepdfiumservicecollectionextensions/): Registers the PDFium rasteriser with a dependency injection container.
+- [PdfiumOptions](/docs/reference/latiprimere-rendering-pdfium/pdfiumoptions/): Limits on the PDFs [PdfiumRasterizer](/docs/reference/latiprimere-rendering-pdfium/pdfiumrasterizer/) opens and renders, for applications that print PDFs from anyone, such as a web application's users.
 - [PdfiumRasterizer](/docs/reference/latiprimere-rendering-pdfium/pdfiumrasterizer/): Rasterises PDF documents with PDFium.

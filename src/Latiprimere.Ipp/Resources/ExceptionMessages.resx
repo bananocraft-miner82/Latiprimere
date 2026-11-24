@@ -121,6 +121,26 @@
 		<value>The printer at '{0}' presented a certificate the system trusts, with SHA-256 fingerprint {1}, but the password in IppNetworkOptions.Credentials goes only to printers configured in PrinterUris or PrinterCredentials, or whose certificate is pinned or accepted by ServerCertificateValidationCallback. If that is the fingerprint the printer's own web page shows, add it to IppNetworkOptions.TrustedCertificateFingerprints, or configure the printer by its URI.</value>
 		<comment>{0} is the printer URI, {1} the certificate's SHA-256 fingerprint as colon-separated hexadecimal pairs.</comment>
 	</data>
+	<data name="IppPlainRequestRefused" xml:space="preserve">
+		<value>The request to '{0}' wasn't sent, as it would travel without encryption and IppNetworkOptions.RequireEncryption is set.</value>
+		<comment>{0} is the HTTP request URI. Raised by the last check before a request is sent, which lookups should make unreachable.</comment>
+	</data>
+	<data name="IppPlainUriRefused" xml:space="preserve">
+		<value>The printer at '{0}' is reached over plain IPP, without encryption, which IppNetworkOptions.RequireEncryption refuses. Print to its ipps:// address instead.</value>
+		<comment>{0} is the printer URI, an ipp:// one, looked up by its ipp: identifier.</comment>
+	</data>
+	<data name="IppPlainUriConfigured" xml:space="preserve">
+		<value>'{0}' in IppNetworkOptions.PrinterUris is a plain IPP address, which IppNetworkOptions.RequireEncryption refuses. Give the printer's ipps:// address instead.</value>
+		<comment>{0} is the configured URI.</comment>
+	</data>
+	<data name="IppAnnouncedWithoutIpps" xml:space="preserve">
+		<value>The printer '{0}' announces no encrypted (IPPS) address, only '{1}', which IppNetworkOptions.RequireEncryption refuses.</value>
+		<comment>{0} is the announced printer name, {1} its plain ipp:// URI.</comment>
+	</data>
+	<data name="IppNoLongerAnnouncedWithIpps" xml:space="preserve">
+		<value>The printer '{0}' was reached over an encrypted (IPPS) connection before, but now announces only '{1}', without encryption, so it is refused: another device may be answering in its place. If the printer itself changed, turn its IPPS back on.</value>
+		<comment>{0} is the announced printer name, {1} its plain ipp:// URI.</comment>
+	</data>
 	<data name="IppRequestWithoutPrinterUri" xml:space="preserve">
 		<value>The IPP request has no printer-uri to send it to.</value>
 	</data>
@@ -137,6 +157,10 @@
 	<data name="IppPrinterCredentialsUriInvalid" xml:space="preserve">
 		<value>'{0}' in IppNetworkOptions.PrinterCredentials isn't an absolute ipp or ipps URI.</value>
 		<comment>{0} is the URI given.</comment>
+	</data>
+	<data name="IppPrinterFingerprintUriInvalid" xml:space="preserve">
+		<value>'{0}' in PrinterCertificateFingerprints isn't an absolute ipp or ipps URI.</value>
+		<comment>{0} is the URI given, in IppNetworkOptions.PrinterCertificateFingerprints or WindowsOptions.IppPrinterCertificateFingerprints.</comment>
 	</data>
 	<data name="IppCredentialsNeedIpps" xml:space="preserve">
 		<value>The printer at '{0}' asks for a user name and password, which Latiprimere sends only over an encrypted connection. Print to its ipps:// address instead.</value>

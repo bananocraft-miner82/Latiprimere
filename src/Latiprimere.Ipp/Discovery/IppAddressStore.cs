@@ -140,7 +140,8 @@ internal sealed class IppAddressStore
 
 	/// <summary>
 	/// Turns a stored entry back into a printer, if it makes sense: a name, and absolute <c>ipp</c> or <c>ipps</c>
-	/// URIs.
+	/// URIs. Their hosts aren't held to the address rules for announcements (ADR 0058): the file is the application's
+	/// own, as one it seeds with a printer on this machine shows.
 	/// </summary>
 	/// <param name="stored">The entry.</param>
 	/// <returns>The printer, or <see langword="null"/> to leave the entry out.</returns>
@@ -156,13 +157,14 @@ internal sealed class IppAddressStore
 
 		return new DiscoveredIppPrinter
 		{
-			InstanceName = stored.Name,
-			PrinterUri   = printerUri,
-			SecureUri    = secureUri,
-			Uuid         = DnsSdServiceMapper.NormalizeUuid(stored.Uuid),
-			MakeAndModel = stored.MakeAndModel,
-			Location     = stored.Location,
-			LastSeen     = stored.LastSeen
+			InstanceName    = stored.Name,
+			PrinterUri      = printerUri,
+			SecureUri       = secureUri,
+			Uuid            = DnsSdServiceMapper.NormalizeUuid(stored.Uuid),
+			MakeAndModel    = stored.MakeAndModel,
+			Location        = stored.Location,
+			LastSeen        = stored.LastSeen,
+			ReachedOverIpps = stored.ReachedOverIpps == true
 		};
 	}
 
@@ -175,13 +177,14 @@ internal sealed class IppAddressStore
 	{
 		return new StoredPrinter
 		{
-			Name         = printer.InstanceName,
-			PrinterUri   = printer.PrinterUri.AbsoluteUri,
-			SecureUri    = printer.SecureUri?.AbsoluteUri,
-			Uuid         = printer.Uuid,
-			MakeAndModel = printer.MakeAndModel,
-			Location     = printer.Location,
-			LastSeen     = printer.LastSeen
+			Name            = printer.InstanceName,
+			PrinterUri      = printer.PrinterUri.AbsoluteUri,
+			SecureUri       = printer.SecureUri?.AbsoluteUri,
+			Uuid            = printer.Uuid,
+			MakeAndModel    = printer.MakeAndModel,
+			Location        = printer.Location,
+			LastSeen        = printer.LastSeen,
+			ReachedOverIpps = printer.ReachedOverIpps ? true : null
 		};
 	}
 

@@ -93,6 +93,17 @@ public sealed class WindowsOptions
 	public IList<string> IppTrustedCertificateFingerprints { get; } = new List<string>();
 
 	/// <summary>
+	/// Gets the SHA-256 fingerprints of printer certificates to trust when <see cref="PrintPdfOverIpp"/> sends a job
+	/// over IPPS, only at one printer's address, by printer URI, such as <c>ipps://192.168.1.20/ipp/print</c>. They
+	/// are matched by the URI's host, and work as <c>IppNetworkOptions.PrinterCertificateFingerprints</c> do.
+	/// </summary>
+	/// <remarks>
+	/// A certificate in <see cref="IppTrustedCertificateFingerprints"/> is trusted at any address, which matters when
+	/// printers of one model share a certificate made at the factory. One pinned here is refused anywhere else.
+	/// </remarks>
+	public IDictionary<Uri, string> IppPrinterCertificateFingerprints { get; } = new Dictionary<Uri, string>();
+
+	/// <summary>
 	/// Gets or sets the check, for <see cref="PrintPdfOverIpp"/>, of a printer's certificate that neither the system
 	/// trusts nor <see cref="IppTrustedCertificateFingerprints"/> pins; or <see langword="null"/>, the default, to
 	/// refuse it.
