@@ -112,6 +112,65 @@ public sealed class PdfiumRasterizerTests
 	}
 
 	[Fact]
+	public void GivenAMaximumSizeInTheOptionsWhenALargerPdfIsOpenedThenThrowsPrintExceptionWithoutReadingIt()
+	{
+		// Arrange — the application's own limit, one byte short of the document
+		using FileStream content = TestDocuments.Open(TestDocuments.MixedOnePage);
+		PdfiumRasterizer rasterizer = new PdfiumRasterizer(new PdfiumOptions { MaxDocumentBytes = (int)content.Length - 1 });
+
+		// Act
+		Func<IRasterDocument> open = () => rasterizer.Open(content);
+
+		// Assert
+		PrintException exception = Assert.Throws<PrintException>(open);
+		Assert.Contains("larger than", exception.Message, StringComparison.Ordinal);
+		Assert.Equal(0, content.Position);
+	}
+
+	[Fact]
+	public void GivenAMaximumSizeInTheOptionsWhenAPdfWithinItIsOpenedThenItOpens()
+	{
+		// Arrange
+		using FileStream content = TestDocuments.Open(TestDocuments.MixedOnePage);
+		PdfiumRasterizer rasterizer = new PdfiumRasterizer(new PdfiumOptions { MaxDocumentBytes = (int)content.Length });
+
+		// Act
+		using IRasterDocument document = rasterizer.Open(content);
+
+		// Assert
+		Assert.Equal(1, document.PageCount);
+	}
+
+	[Fact]
+	public void GivenOptionsChangedAfterTheRasteriserIsMadeWhenAPdfIsOpenedThenTheOriginalLimitHolds()
+	{
+		// Arrange
+		using FileStream content = TestDocuments.Open(TestDocuments.MixedOnePage);
+		PdfiumOptions options = new PdfiumOptions();
+		PdfiumRasterizer rasterizer = new PdfiumRasterizer(options);
+
+		// Act
+		options.MaxDocumentBytes = 1;
+		using IRasterDocument document = rasterizer.Open(content);
+
+		// Assert
+		Assert.Equal(1, document.PageCount);
+	}
+
+	[Fact]
+	public void GivenNullOptionsWhenRasteriserIsMadeThenThrowsArgumentNullException()
+	{
+		// Arrange
+		PdfiumOptions? options = null;
+
+		// Act
+		Action create = () => _ = new PdfiumRasterizer(options!);
+
+		// Assert
+		Assert.Throws<ArgumentNullException>(create);
+	}
+
+	[Fact]
 	public void GivenSeekableStreamOverTheLimitWhenOpenThenThrowsPrintExceptionWithoutReadingIt()
 	{
 		// Arrange

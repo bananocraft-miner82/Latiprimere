@@ -1,4 +1,5 @@
 using Latiprimere.Rendering.Pdfium.Interop;
+using Latiprimere.Rendering.Pdfium.Tests.Builders;
 using Latiprimere.Testing.Fixtures;
 using Xunit;
 
@@ -359,6 +360,45 @@ public sealed class PdfiumDocumentTests
 	/// Opens the one-page mixed-content test document.
 	/// </summary>
 	/// <returns>The document. The caller disposes it.</returns>
+	[Fact]
+	public void GivenPageThatOutlastsTheRenderTimeoutWhenRenderBandThenThrowsPrintExceptionAndTheDocumentStaysUsable()
+	{
+		// Arrange — thousands of shapes, and a limit that has run out before the first check
+		using MemoryStream content = new MemoryStream(BusyPagePdf.Create());
+		using IRasterDocument document = PdfiumRasterizer.Open(content, int.MaxValue, renderTimeout: TimeSpan.FromTicks(1));
+		RasterBand band = RasterBand.Create(PdfiumDocumentTests.PageWidth, PdfiumDocumentTests.PageHeight, 0, PdfiumDocumentTests.PageHeight);
+		byte[] pixels = new byte[band.ByteCount];
+
+		// Act
+		Exception? first = Record.Exception(() => document.RenderBand(0, band, pixels));
+		Exception? second = Record.Exception(() => document.RenderBand(0, band, pixels));
+
+		// Assert — abandoned each time, with the page and the setting named; the page can still be rendered again
+		PrintException exception = Assert.IsType<PrintException>(first);
+		Assert.Contains("Page 1", exception.Message, StringComparison.Ordinal);
+		Assert.Contains("PdfiumOptions.RenderTimeout", exception.Message, StringComparison.Ordinal);
+		Assert.IsType<PrintException>(second);
+		Assert.Equal(PdfiumDocumentTests.PageWidth, (int)document.GetPageSize(0).WidthPoints);
+	}
+
+	[Fact]
+	public void GivenBusyPageWithinTheRenderTimeoutWhenRenderBandThenDrawsItAll()
+	{
+		// Arrange — the default limit, which the page is well within
+		using MemoryStream content = new MemoryStream(BusyPagePdf.Create());
+		using IRasterDocument document = new PdfiumRasterizer().Open(content);
+		RasterBand band = RasterBand.Create(PdfiumDocumentTests.PageWidth, PdfiumDocumentTests.PageHeight, 0, PdfiumDocumentTests.PageHeight);
+		byte[] pixels = new byte[band.ByteCount];
+
+		// Act
+		document.RenderBand(0, band, pixels);
+
+		// Assert — the first square (x 20-23 from the left, 20-23 up from the bottom) and the last are drawn black
+		Assert.Equal((0, 0, 0), PdfiumDocumentTests.ReadPixel(pixels, band, 21, PdfiumDocumentTests.PageHeight - 22));
+		Assert.Equal((0, 0, 0), PdfiumDocumentTests.ReadPixel(pixels, band, 516, PdfiumDocumentTests.PageHeight - 267));
+		Assert.Equal((255, 255, 255), PdfiumDocumentTests.ReadPixel(pixels, band, 5, 5));
+	}
+
 	private static IRasterDocument OpenOnePage()
 	{
 		using FileStream content = TestDocuments.Open(TestDocuments.MixedOnePage);

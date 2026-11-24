@@ -9,18 +9,49 @@ namespace Latiprimere.Rendering.Pdfium;
 /// Rasterises PDF documents with PDFium.
 /// </summary>
 /// <remarks>
+/// <para>
 /// PDFium is not thread-safe, so all PDFium work in the process is serialised: documents can be used from several
 /// threads, but only one renders at a time.
+/// </para>
+/// <para>
+/// PDFium parses each PDF in native code. For PDFs from anyone, limit what one can take with
+/// <see cref="PdfiumOptions"/>: its size, and how long a page may render for.
+/// </para>
 /// </remarks>
 public sealed unsafe class PdfiumRasterizer : IPdfRasterizer
 {
-	private const int MaxDocumentBytes = int.MaxValue;   // The documents' length is kept as an int; 2 GB is plenty
-	private const int InitialBufferBytes = 64 * 1024;   // For streams whose length isn't known
+	private const int InitialBufferBytes = 64 * 1024; // For streams whose length isn't known
+
+	private readonly int maxDocumentBytes;  // The longest document opened
+	private readonly TimeSpan renderTimeout; // The longest a band may render for, or infinite
+
+	/// <summary>
+	/// Initialises a new instance of the <see cref="PdfiumRasterizer"/> class with the default limits.
+	/// </summary>
+	public PdfiumRasterizer()
+		: this(new PdfiumOptions())
+	{
+	}
+
+	/// <summary>
+	/// Initialises a new instance of the <see cref="PdfiumRasterizer"/> class with the given limits.
+	/// </summary>
+	/// <param name="options">The limits; copied, so later changes have no effect.</param>
+	/// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
+	public PdfiumRasterizer(PdfiumOptions options)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+
+		this.maxDocumentBytes = options.MaxDocumentBytes;
+		this.renderTimeout = options.RenderTimeout;
+	}
 
 	/// <inheritdoc/>
+	/// <exception cref="PrintException">The document is longer than <see cref="PdfiumOptions.MaxDocumentBytes"/>, or
+	/// PDFium can't open it.</exception>
 	public IRasterDocument Open(Stream content, PdfOpenOptions? options = null)
 	{
-		return PdfiumRasterizer.Open(content, PdfiumRasterizer.MaxDocumentBytes, options?.Password);
+		return PdfiumRasterizer.Open(content, this.maxDocumentBytes, options?.Password, this.renderTimeout);
 	}
 
 	/// <summary>
@@ -29,10 +60,12 @@ public sealed unsafe class PdfiumRasterizer : IPdfRasterizer
 	/// <param name="content">The PDF document, read from its current position.</param>
 	/// <param name="maxDocumentBytes">The longest document accepted, in bytes.</param>
 	/// <param name="password">The document's password, or <see langword="null"/>.</param>
+	/// <param name="renderTimeout">The longest a band may render for, or <see langword="null"/> for the
+	/// default.</param>
 	/// <returns>The open document. The caller disposes it.</returns>
 	/// <exception cref="PrintException">The document is too large, or PDFium can't open it.</exception>
 	/// <remarks>Tests pass a small limit, as reaching 2 GB isn't practical.</remarks>
-	internal static IRasterDocument Open(Stream content, int maxDocumentBytes, string? password = null)
+	internal static IRasterDocument Open(Stream content, int maxDocumentBytes, string? password = null, TimeSpan? renderTimeout = null)
 	{
 		ArgumentNullException.ThrowIfNull(content);
 
@@ -52,7 +85,10 @@ public sealed unsafe class PdfiumRasterizer : IPdfRasterizer
 					throw PdfiumRasterizer.CreateLoadException(PdfiumNative.GetLastError(), password is not null);
 				}
 
-				return new PdfiumDocument(document, data, PdfiumNative.GetPageCount(document));
+				return new PdfiumDocument(document, data, PdfiumNative.GetPageCount(document))
+				{
+					RenderTimeout = renderTimeout ?? PdfiumOptions.DefaultRenderTimeout
+				};
 			}
 		}
 		catch

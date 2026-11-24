@@ -35,9 +35,11 @@ public static class WindowsPrintSystemFactory
 	/// </returns>
 	/// <exception cref="ArgumentException">With <see cref="WindowsOptions.PrintPdfOverIpp"/> on: a URI in
 	/// <see cref="WindowsOptions.IppPrinterUris"/> isn't an absolute <c>ipp</c>, <c>ipps</c>, <c>http</c> or <c>https</c>
-	/// URI; a fingerprint in <see cref="WindowsOptions.IppTrustedCertificateFingerprints"/> isn't 32 bytes in
-	/// hexadecimal; a credential has no user name, or one containing a colon; or a URI in
-	/// <see cref="WindowsOptions.IppPrinterCredentials"/> isn't an absolute <c>ipp</c> or <c>ipps</c> URI.</exception>
+	/// URI; a fingerprint in <see cref="WindowsOptions.IppTrustedCertificateFingerprints"/> or
+	/// <see cref="WindowsOptions.IppPrinterCertificateFingerprints"/> isn't 32 bytes in hexadecimal; a credential has
+	/// no user name, or one containing a colon; or a URI in <see cref="WindowsOptions.IppPrinterCredentials"/> or
+	/// <see cref="WindowsOptions.IppPrinterCertificateFingerprints"/> isn't an absolute <c>ipp</c> or <c>ipps</c>
+	/// URI.</exception>
 	[SuppressMessage
 	(
 		"ApiDesign",
@@ -68,9 +70,11 @@ public static class WindowsPrintSystemFactory
 	/// </returns>
 	/// <exception cref="ArgumentException">With <see cref="WindowsOptions.PrintPdfOverIpp"/> on: a URI in
 	/// <see cref="WindowsOptions.IppPrinterUris"/> isn't an absolute <c>ipp</c>, <c>ipps</c>, <c>http</c> or <c>https</c>
-	/// URI; a fingerprint in <see cref="WindowsOptions.IppTrustedCertificateFingerprints"/> isn't 32 bytes in
-	/// hexadecimal; a credential has no user name, or one containing a colon; or a URI in
-	/// <see cref="WindowsOptions.IppPrinterCredentials"/> isn't an absolute <c>ipp</c> or <c>ipps</c> URI.</exception>
+	/// URI; a fingerprint in <see cref="WindowsOptions.IppTrustedCertificateFingerprints"/> or
+	/// <see cref="WindowsOptions.IppPrinterCertificateFingerprints"/> isn't 32 bytes in hexadecimal; a credential has
+	/// no user name, or one containing a colon; or a URI in <see cref="WindowsOptions.IppPrinterCredentials"/> or
+	/// <see cref="WindowsOptions.IppPrinterCertificateFingerprints"/> isn't an absolute <c>ipp</c> or <c>ipps</c>
+	/// URI.</exception>
 	public static IPrintSystem Create(IPdfRasterizer? pdfRasterizer, WindowsOptions? options, ILoggerFactory? loggerFactory)
 	{
 		options ??= new WindowsOptions();
@@ -121,7 +125,7 @@ public static class WindowsPrintSystemFactory
 			WindowsPrintSystemFactory.ValidateIppCredentials(options);
 
 			// Each pinned fingerprint is checked as the trust is made
-			_ = new IppCertificateTrust(options.IppTrustedCertificateFingerprints, callback: null);
+			_ = new IppCertificateTrust(options.IppTrustedCertificateFingerprints, options.IppPrinterCertificateFingerprints, callback: null, systemTrustHosts: null);
 		}
 	}
 
@@ -162,6 +166,7 @@ public static class WindowsPrintSystemFactory
 		IppCertificateTrust trust = IppCertificateTrust.CreateForPrinters
 		(
 			options.IppTrustedCertificateFingerprints,
+			options.IppPrinterCertificateFingerprints,
 			options.IppServerCertificateValidationCallback,
 			options.IppCredentials,
 			options.IppPrinterUris.Values.Concat(options.IppPrinterCredentials.Keys)

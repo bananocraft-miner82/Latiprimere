@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using Latiprimere.Rendering.Pdfium.Interop;
 using Latiprimere.Rendering.Pdfium.Resources;
@@ -43,6 +45,12 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 	/// <inheritdoc/>
 	public int PageCount { get; }
 
+	/// <summary>
+	/// Gets the longest a band may take to render before it is abandoned, or <see cref="Timeout.InfiniteTimeSpan"/>
+	/// for no limit (<see cref="PdfiumOptions.RenderTimeout"/>, ADR 0058).
+	/// </summary>
+	internal TimeSpan RenderTimeout { get; init; } = PdfiumOptions.DefaultRenderTimeout;
+
 	/// <inheritdoc/>
 	public PageSize GetPageSize(int pageIndex)
 	{
@@ -83,7 +91,7 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 				// Again under the lock: Dispose on another thread may have closed the document since the first check
 				ObjectDisposedException.ThrowIf(this.isDisposed, this);
 				IntPtr page = this.LoadPage(pageIndex);
-				PdfiumDocument.RenderInto(page, band, firstRow, options ?? RasterRenderOptions.Default);
+				PdfiumDocument.RenderInto(page, pageIndex, band, firstRow, options ?? RasterRenderOptions.Default, this.RenderTimeout);
 			}
 		}
 	}
@@ -132,11 +140,22 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 	/// Renders a band of a loaded page into the caller's pixels. Call while holding the PDFium lock.
 	/// </summary>
 	/// <param name="page">The loaded page.</param>
+	/// <param name="pageIndex">The page's index, for the message if it takes too long.</param>
 	/// <param name="band">The band.</param>
 	/// <param name="firstRow">The first byte of the pixel buffer.</param>
 	/// <param name="options">How to render.</param>
-	/// <exception cref="PrintException">PDFium could not create the bitmap.</exception>
-	private static void RenderInto(IntPtr page, RasterBand band, byte* firstRow, RasterRenderOptions options)
+	/// <param name="timeout">The longest the band may take, or <see cref="Timeout.InfiniteTimeSpan"/>.</param>
+	/// <exception cref="PrintException">PDFium could not create the bitmap, or the band took longer than
+	/// <paramref name="timeout"/>.</exception>
+	private static void RenderInto
+	(
+		IntPtr              page,
+		int                 pageIndex,
+		RasterBand          band,
+		byte*               firstRow,
+		RasterRenderOptions options,
+		TimeSpan            timeout
+	)
 	{
 		// PDFium turns colours to grey itself when it draws into a grey bitmap
 		int format = band.PixelFormat == RasterPixelFormat.Gray8
@@ -157,15 +176,55 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 			_ = PdfiumNative.FillRect(bitmap, 0, 0, band.PageWidth, band.Height, PdfiumConstants.White);
 
 			// PDFium turns the page itself, in quarter turns clockwise, into the band's (turned) page size
-			PdfiumNative.RenderPageBitmap
-			(
-				bitmap, page, 0, -band.Top, band.PageWidth, band.PageHeight, (int)band.Rotation,
-				PdfiumDocument.GetRenderFlags(options)
-			);
+			PdfiumDocument.RenderWithDeadline(page, pageIndex, bitmap, band, PdfiumDocument.GetRenderFlags(options), timeout);
 		}
 		finally
 		{
 			PdfiumNative.DestroyBitmap(bitmap);
+		}
+	}
+
+	/// <summary>
+	/// Renders a band progressively, pausing once the timeout has run out, so a page built to keep the renderer busy
+	/// is abandoned rather than holding the PDFium lock, and so every other document, for good (ADR 0058). Call while
+	/// holding the PDFium lock.
+	/// </summary>
+	/// <param name="page">The loaded page.</param>
+	/// <param name="pageIndex">The page's index, for the message.</param>
+	/// <param name="bitmap">The bitmap over the caller's pixels.</param>
+	/// <param name="band">The band.</param>
+	/// <param name="flags">The FPDF_* render flags.</param>
+	/// <param name="timeout">The longest the band may take, or <see cref="Timeout.InfiniteTimeSpan"/>.</param>
+	/// <exception cref="PrintException">The band took longer than <paramref name="timeout"/>.</exception>
+	private static void RenderWithDeadline(IntPtr page, int pageIndex, IntPtr bitmap, RasterBand band, int flags, TimeSpan timeout)
+	{
+		// A local, so it stays put while PDFium holds a pointer to it
+		long deadline = timeout == Timeout.InfiniteTimeSpan
+			? long.MaxValue
+			: Stopwatch.GetTimestamp() + (long)(timeout.TotalSeconds * Stopwatch.Frequency);
+
+		PdfiumPause pause = PdfiumPause.Create(&deadline);
+
+		try
+		{
+			int status = PdfiumNative.RenderPageBitmapStart
+			(
+				bitmap, page, 0, -band.Top, band.PageWidth, band.PageHeight, (int)band.Rotation, flags, &pause
+			);
+
+			// It pauses only once the deadline has passed, so a pause means the time is up. A failure leaves the
+			// bitmap as drawn so far, as FPDF_RenderPageBitmap, which says nothing, did.
+			if (status == PdfiumConstants.RenderToBeContinued)
+			{
+				string seconds = timeout.TotalSeconds.ToString("0.###", CultureInfo.CurrentCulture);
+
+				throw new PrintException(ExceptionMessages.FormatPageRenderTimedOut(pageIndex + 1, seconds));
+			}
+		}
+		finally
+		{
+			// Frees the progressive state, finished or not, so the page can be rendered again
+			PdfiumNative.RenderPageClose(page);
 		}
 	}
 

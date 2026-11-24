@@ -168,6 +168,8 @@ The logging methods are `[LoggerMessage]` methods; the full class, with its cons
 
 - **Printer IDs come from requests,** so leave `AllowAnyPrinterUri` (network printers) and `AllowAnyPrinterName` (Windows) off, as they are by default. Then an ID can only reach printers the catalog already knows, and a made-up address can't make your server connect anywhere else. See [Network printers over IPP](/docs/print-systems/network-printers/).
 - **Check what you accept:** the endpoint refuses anything that isn't a PDF, and documents over 20 MB.
+- **Limit what PDFium takes on.** PDFs are rendered in native code, one at a time in the process, so one built to keep the renderer busy would hold up the rest. By default a band of a page that renders for more than 2 minutes is abandoned with a `PrintException`. To match your own limits, register PDFium with them: `AddLatiprimerePdfium(options => { options.MaxDocumentBytes = 20 * 1024 * 1024; options.RenderTimeout = TimeSpan.FromSeconds(30); })`.
+- **Keep documents encrypted on the network:** set `RequireEncryption` and pin your printers' certificates, so no job goes over plain IPP. See [Secure network printers](/docs/print-systems/secure-printers/#printers-found-on-the-network).
 - **Require sign-in.** The example is open to anyone who can reach it. In a real app, add authentication and call `RequireAuthorization()` on the endpoints.
 
 ## Things to decide for your app

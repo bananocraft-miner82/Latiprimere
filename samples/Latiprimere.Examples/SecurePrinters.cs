@@ -42,6 +42,29 @@ internal static class SecurePrinters
 	}
 
 	/// <summary>
+	/// Registers network printers reached only over IPPS: one found on the network that announces no IPPS address, or
+	/// whose certificate isn't trusted, is refused rather than reached over plain IPP.
+	/// </summary>
+	/// <param name="fingerprint">The SHA-256 fingerprint of a printer's certificate, checked against the one its web
+	/// page shows.</param>
+	/// <returns>The service provider, which the caller disposes.</returns>
+	public static ServiceProvider BuildEncryptedOnlyServiceProvider(string fingerprint)
+	{
+		ServiceCollection services = new ServiceCollection();
+
+		services.AddLatiprimere();
+		services.AddLatiprimerePdfium();
+		services.AddLatiprimereIpp(options =>
+		{
+			// Only over IPPS: a printer that announces no IPPS address, or whose certificate isn't trusted, is refused
+			options.RequireEncryption = true;
+			options.TrustedCertificateFingerprints.Add(fingerprint);
+		});
+
+		return services.BuildServiceProvider();
+	}
+
+	/// <summary>
 	/// Looks a printer up, and if its certificate isn't trusted, shows the fingerprint to check before pinning it.
 	/// </summary>
 	/// <param name="catalog">The catalog.</param>

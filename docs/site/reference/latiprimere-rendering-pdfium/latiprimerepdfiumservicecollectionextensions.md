@@ -35,3 +35,23 @@ The same service collection, for chaining.
 **Exceptions**
 
 - [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `services` is `null`.
+
+```csharp
+public static IServiceCollection AddLatiprimerePdfium(this IServiceCollection services, Action<PdfiumOptions> configure)
+```
+
+Registers PDFium as the PDF rasteriser, with limits on the PDFs it opens and renders, for applications that print PDFs from anyone.
+
+**Parameters**
+
+- `services`: The service collection to add to.
+- `configure`: Sets the limits, such as [PdfiumOptions.MaxDocumentBytes](/docs/reference/latiprimere-rendering-pdfium/pdfiumoptions/#maxdocumentbytes). Called once, now.
+
+**Returns**
+
+The same service collection, for chaining.
+
+**Exceptions**
+
+- [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `services` or `configure` is `null`.
+- [ArgumentOutOfRangeException](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception): `configure` sets a limit out of range.

@@ -241,6 +241,49 @@ public sealed class HappyEyeballsConnectorTests
 		Assert.Equal(SocketError.HostNotFound, exception.SocketErrorCode);
 	}
 
+	[Fact]
+	public async Task GivenLocalNameAnsweredWithLoopbackAndAPrintersAddressWhenConnectThenOnlyThePrintersIsTried()
+	{
+		// Arrange — anyone on the network can answer for a .local name, with this machine's own address among others
+		FakeHostResolver resolver = new FakeHostResolver(IPAddress.Loopback, IPAddress.IPv6Loopback, HappyEyeballsConnectorTests.Ipv4First);
+		FakeTcpConnector tcp = new FakeTcpConnector()
+			.AnswerAfter(IPAddress.Loopback, TimeSpan.Zero)
+			.AnswerAfter(IPAddress.IPv6Loopback, TimeSpan.Zero)
+			.AnswerAfter(HappyEyeballsConnectorTests.Ipv4First, TimeSpan.Zero);
+		HappyEyeballsConnector connector = new HappyEyeballsConnector(resolver, tcp, HappyEyeballsConnectorTests.Long, TimeProvider.System);
+
+		// Act
+		Stream stream = await connector.ConnectAsync(new DnsEndPoint("office-laser.local", 631), TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(HappyEyeballsConnectorTests.Ipv4First, Assert.IsType<FakeConnectionStream>(stream).Address);
+		Assert.Equal(new[] { HappyEyeballsConnectorTests.Ipv4First }, tcp.Attempts);
+	}
+
+	[Theory]
+	[InlineData("office-laser.local", true)]
+	[InlineData("office-laser.local.", true)]
+	[InlineData("printer.example", false)]
+	public async Task GivenNameAnsweredOnlyWithACloudMetadataAddressWhenConnectThenOnlyALocalNameIsRefused(string host, bool refused)
+	{
+		// Arrange — a .local name, which anyone can answer for, or one the application's DNS gives (provided by
+		// InlineData above)
+		IPAddress metadata = IPAddress.Parse("169.254.169.254");
+		FakeHostResolver resolver = new FakeHostResolver(metadata);
+		FakeTcpConnector tcp = new FakeTcpConnector().AnswerAfter(metadata, TimeSpan.Zero);
+		HappyEyeballsConnector connector = new HappyEyeballsConnector(resolver, tcp, HappyEyeballsConnectorTests.Long, TimeProvider.System);
+
+		// Act
+		Exception? exception = await Record.ExceptionAsync
+		(
+			async () => await connector.ConnectAsync(new DnsEndPoint(host, 631), TestContext.Current.CancellationToken)
+		);
+
+		// Assert
+		Assert.Equal(refused, exception is SocketException { SocketErrorCode: SocketError.HostNotFound });
+		Assert.Equal(refused ? 0 : 1, tcp.Attempts.Count);
+	}
+
 	/// <summary>
 	/// Creates a connector whose host resolves to two IPv6 and two IPv4 addresses.
 	/// </summary>

@@ -96,6 +96,33 @@ public sealed class IppAddressStoreTests : IDisposable
 	}
 
 	[Fact]
+	public void GivenEntriesOnThisMachineWhenLoadedThenTheyAreKeptAsTheApplicationsOwn()
+	{
+		// Arrange — printers on loopback and localhost, as an application or a test harness seeds the file, beside one
+		// that was reached over IPPS. Announcements are held to the address rules before they are stored, not the file.
+		string path = this.WriteFile
+		(
+			"""
+			{
+			  "version": 1,
+			  "printers": [
+			    { "name": "Loopback", "printerUri": "ipp://127.0.0.1:631/ipp/print" },
+			    { "name": "Local", "printerUri": "ipp://localhost:631/ipp/print", "secureUri": "ipps://[::1]:443/ipp/print" },
+			    { "name": "Secure", "printerUri": "ipp://192.168.1.4/ipp/print", "reachedOverIpps": true }
+			  ]
+			}
+			"""
+		);
+
+		// Act
+		IReadOnlyList<DiscoveredIppPrinter> loaded = new IppAddressStore(path, NullLogger.Instance).Load();
+
+		// Assert
+		Assert.Equal(new[] { "Loopback", "Local", "Secure" }, loaded.Select(printer => printer.InstanceName));
+		Assert.Equal(new[] { false, false, true }, loaded.Select(printer => printer.ReachedOverIpps));
+	}
+
+	[Fact]
 	public void GivenNullEntriesWhenLoadedThenTheyAreSkippedAndNothingThrows()
 	{
 		// Arrange — JSON's null where an entry belongs, around a good one

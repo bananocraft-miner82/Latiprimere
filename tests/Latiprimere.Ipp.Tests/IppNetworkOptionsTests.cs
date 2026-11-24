@@ -5,6 +5,21 @@ namespace Latiprimere.Ipp.Tests;
 public sealed class IppNetworkOptionsTests
 {
 	[Fact]
+	public void GivenNewOptionsWhenReadThenTheSecurityChoicesAreTheSafeOnes()
+	{
+		// Arrange
+		IppNetworkOptions options = new IppNetworkOptions();
+
+		// Act
+		bool[] allowances = [options.RequireEncryption, options.AllowPlainIppAfterIpps, options.AllowRememberedAddressWithoutUuid];
+
+		// Assert — encryption isn't required, but a printer reached over IPPS doesn't fall back, and a remembered
+		// address must report its printer's UUID
+		Assert.Equal(new[] { false, false, false }, allowances);
+		Assert.Empty(options.PrinterCertificateFingerprints);
+	}
+
+	[Fact]
 	public void GivenNewOptionsWhenReadThenBusyRetryDurationIsTwoMinutes()
 	{
 		// Arrange

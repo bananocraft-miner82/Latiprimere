@@ -23,6 +23,13 @@ internal sealed record StoredPrinter
 	/// </summary>
 	public DateTimeOffset? LastSeen { get; init; }
 
+	/// <summary>
+	/// Gets <see langword="true"/> once it has been reached over IPPS with a trusted certificate, so it is never
+	/// reached over plain IPP again (ADR 0058); otherwise <see langword="null"/>, which isn't written. Added within
+	/// format 1, as <see cref="LastSeen"/> was.
+	/// </summary>
+	public bool? ReachedOverIpps { get; init; }
+
 	/// <summary>Gets its make and model, or <see langword="null"/>.</summary>
 	public string? MakeAndModel { get; init; }
 

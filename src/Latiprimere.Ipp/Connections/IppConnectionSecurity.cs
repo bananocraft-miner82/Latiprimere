@@ -43,6 +43,24 @@ internal sealed record IppConnectionSecurity
 	public bool SendsCredentialsOnlyOverTls { get; init; }
 
 	/// <summary>
+	/// Gets a value indicating whether every request must travel over TLS, so one that wouldn't is refused before it
+	/// is sent (<c>IppNetworkOptions.RequireEncryption</c>, ADR 0058).
+	/// </summary>
+	public bool RequiresTls { get; init; }
+
+	/// <summary>
+	/// Gets a value indicating whether requests need <see cref="IppConnectionHandler"/>: for TLS, credentials, or the
+	/// check that they are encrypted.
+	/// </summary>
+	public bool NeedsHandler
+	{
+		get
+		{
+			return this.UseTls || this.RequiresTls || this.HasCredentials;
+		}
+	}
+
+	/// <summary>
 	/// Gets a value indicating whether any credentials are configured.
 	/// </summary>
 	public bool HasCredentials

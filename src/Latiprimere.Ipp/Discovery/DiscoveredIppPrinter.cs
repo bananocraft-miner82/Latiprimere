@@ -37,4 +37,12 @@ internal sealed record DiscoveredIppPrinter
 	/// <see langword="null"/> for an announcement not yet remembered, or one remembered before this was kept.
 	/// </summary>
 	public DateTimeOffset? LastSeen { get; init; }
+
+	/// <summary>
+	/// Gets a value indicating whether the print system has reached the printer over IPPS, with a trusted
+	/// certificate, under this name. While anything beyond the system's trust is configured, such a printer is never
+	/// reached over plain IPP again, so a device that answers in its place, or blocks its IPPS port, can't make it
+	/// fall back (ADR 0058).
+	/// </summary>
+	public bool ReachedOverIpps { get; init; }
 }

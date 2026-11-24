@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using Latiprimere.Ipp.Connections;
 
 namespace Latiprimere.Ipp.Discovery;
 
@@ -167,27 +168,48 @@ internal static class DnsSdServiceMapper
 	/// <returns>The host, with an IPv6 address in brackets as a URI has it; or <see langword="null"/> if there is
 	/// none.</returns>
 	/// <remarks>
+	/// <para>
 	/// IPv6 link-local addresses are avoided because they need a scope identifier that is only valid on this machine.
 	/// An IPv6 address comes into play when the announcement reached this machine over IPv6 only: Avahi, for one,
 	/// doesn't put IPv4 addresses in its answers over IPv6.
+	/// </para>
+	/// <para>
+	/// Addresses no printer on the network has, such as loopback or a cloud metadata service's, are never used, nor
+	/// is the name <c>localhost</c> (<see cref="Connections.PrinterAddressRules"/>, ADR 0058). An announcement that
+	/// gives only such addresses gives no host, rather than its name, which could resolve to the same.
+	/// </para>
 	/// </remarks>
 	private static string? ChooseHost(DnsSdService service)
 	{
-		IPAddress? ipv4 = service.Addresses.FirstOrDefault(address => address.AddressFamily == AddressFamily.InterNetwork);
+		IPAddress? ipv4 = service.Addresses.FirstOrDefault
+		(
+			address => address.AddressFamily == AddressFamily.InterNetwork && PrinterAddressRules.CanBePrinter(address)
+		);
 
 		if (ipv4 is not null)
 		{
 			return ipv4.ToString();
 		}
 
-		IPAddress? ipv6 = service.Addresses.FirstOrDefault(DnsSdServiceMapper.IsRoutableIpv6);
+		IPAddress? ipv6 = service.Addresses.FirstOrDefault
+		(
+			address => DnsSdServiceMapper.IsRoutableIpv6(address) && PrinterAddressRules.CanBePrinter(address)
+		);
 
 		if (ipv6 is not null)
 		{
 			return $"[{ipv6}]";
 		}
 
-		return string.IsNullOrWhiteSpace(service.Hostname) ? null : service.Hostname.TrimEnd('.');
+		// An announcement that named an address no printer has is refused outright
+		if (service.Addresses.Any(address => !PrinterAddressRules.CanBePrinter(address)))
+		{
+			return null;
+		}
+
+		string? hostname = string.IsNullOrWhiteSpace(service.Hostname) ? null : service.Hostname.TrimEnd('.');
+
+		return hostname is not null && PrinterAddressRules.CanBePrinterHost(hostname) ? hostname : null;
 	}
 
 	/// <summary>

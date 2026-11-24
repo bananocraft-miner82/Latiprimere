@@ -16,11 +16,29 @@ Rasterises PDF documents with PDFium.
 
 PDFium is not thread-safe, so all PDFium work in the process is serialised: documents can be used from several threads, but only one renders at a time.
 
+PDFium parses each PDF in native code. For PDFs from anyone, limit what one can take with [PdfiumOptions](/docs/reference/latiprimere-rendering-pdfium/pdfiumoptions/): its size, and how long a page may render for.
+
 ## Constructors
 
 ```csharp
 public PdfiumRasterizer()
 ```
+
+Initialises a new instance of the [PdfiumRasterizer](/docs/reference/latiprimere-rendering-pdfium/pdfiumrasterizer/) class with the default limits.
+
+```csharp
+public PdfiumRasterizer(PdfiumOptions options)
+```
+
+Initialises a new instance of the [PdfiumRasterizer](/docs/reference/latiprimere-rendering-pdfium/pdfiumrasterizer/) class with the given limits.
+
+**Parameters**
+
+- `options`: The limits; copied, so later changes have no effect.
+
+**Exceptions**
+
+- [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `options` is `null`.
 
 ## Methods
 
@@ -44,4 +62,4 @@ The opened document. Dispose it when finished.
 **Exceptions**
 
 - [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `content` is `null`.
-- [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The content is not a PDF the rasteriser can read, or is password-protected and the password is missing or wrong.
+- [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The document is longer than [PdfiumOptions.MaxDocumentBytes](/docs/reference/latiprimere-rendering-pdfium/pdfiumoptions/#maxdocumentbytes), or PDFium can't open it.

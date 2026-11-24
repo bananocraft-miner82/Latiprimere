@@ -1,1 +1,8 @@
 #nullable enable
+Latiprimere.Ipp.IppNetworkOptions.PrinterCertificateFingerprints.get -> System.Collections.Generic.IDictionary<System.Uri!, string!>!
+Latiprimere.Ipp.IppNetworkOptions.RequireEncryption.get -> bool
+Latiprimere.Ipp.IppNetworkOptions.RequireEncryption.set -> void
+Latiprimere.Ipp.IppNetworkOptions.AllowPlainIppAfterIpps.get -> bool
+Latiprimere.Ipp.IppNetworkOptions.AllowPlainIppAfterIpps.set -> void
+Latiprimere.Ipp.IppNetworkOptions.AllowRememberedAddressWithoutUuid.get -> bool
+Latiprimere.Ipp.IppNetworkOptions.AllowRememberedAddressWithoutUuid.set -> void

@@ -122,6 +122,39 @@ public sealed class IppConnectionHandlerTests
 		Assert.Equal(expectedUser, user);
 	}
 
+	[Fact]
+	public async Task GivenEncryptionRequiredWhenPlainRequestSentThenThrowsPrintExceptionWithoutSendingIt()
+	{
+		// Arrange
+		StubHttpMessageHandler stub = IppConnectionHandlerTests.CreateStub();
+		using HttpClient client = IppConnectionHandlerTests.CreateClient(new IppConnectionSecurity { RequiresTls = true }, stub);
+
+		// Act
+		Exception? exception = await Record.ExceptionAsync(() => IppConnectionHandlerTests.PostAsync(client, "http://192.168.1.20:631/ipp/print"));
+
+		// Assert
+		Assert.IsType<PrintException>(exception);
+		Assert.Contains("RequireEncryption", exception.Message, StringComparison.Ordinal);
+		Assert.Null(stub.LastRequestUri);
+	}
+
+	[Theory]
+	[InlineData(false, "https://192.168.1.20:443/ipp/print")]
+	[InlineData(true, "http://192.168.1.20:631/ipp/print")]
+	public async Task GivenEncryptionRequiredWhenRequestGoesOverHttpsThenItIsSent(bool useTls, string uri)
+	{
+		// Arrange — an https request, or a plain one the handler turns into https (provided by InlineData above)
+		StubHttpMessageHandler stub = IppConnectionHandlerTests.CreateStub();
+		IppConnectionSecurity security = new IppConnectionSecurity { RequiresTls = true, UseTls = useTls };
+		using HttpClient client = IppConnectionHandlerTests.CreateClient(security, stub);
+
+		// Act
+		await IppConnectionHandlerTests.PostAsync(client, uri);
+
+		// Assert
+		Assert.Equal(Uri.UriSchemeHttps, stub.LastRequestUri?.Scheme);
+	}
+
 	/// <summary>
 	/// Creates a handler that answers every request with an empty 200 response.
 	/// </summary>
