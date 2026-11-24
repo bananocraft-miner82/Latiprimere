@@ -4,7 +4,7 @@ What changed in each release of Latiprimere, newest first. All the packages shar
 
 Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` sections such as Added, Changed, Fixed, Removed and Known limitations. Work not yet released goes under `## Unreleased`, which the website doesn't show.
 
-## Unreleased
+## 11.0.11-preview - 2026-11-24
 
 ### Added
 

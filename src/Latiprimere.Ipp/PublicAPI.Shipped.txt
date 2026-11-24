@@ -4,6 +4,10 @@ Latiprimere.Ipp.IppNetworkOptions.AddressStorePath.get -> string?
 Latiprimere.Ipp.IppNetworkOptions.AddressStorePath.set -> void
 Latiprimere.Ipp.IppNetworkOptions.AllowAnyPrinterUri.get -> bool
 Latiprimere.Ipp.IppNetworkOptions.AllowAnyPrinterUri.set -> void
+Latiprimere.Ipp.IppNetworkOptions.AllowPlainIppAfterIpps.get -> bool
+Latiprimere.Ipp.IppNetworkOptions.AllowPlainIppAfterIpps.set -> void
+Latiprimere.Ipp.IppNetworkOptions.AllowRememberedAddressWithoutUuid.get -> bool
+Latiprimere.Ipp.IppNetworkOptions.AllowRememberedAddressWithoutUuid.set -> void
 Latiprimere.Ipp.IppNetworkOptions.BusyRetryDuration.get -> System.TimeSpan
 Latiprimere.Ipp.IppNetworkOptions.BusyRetryDuration.set -> void
 Latiprimere.Ipp.IppNetworkOptions.ConnectTimeout.get -> System.TimeSpan
@@ -17,9 +21,12 @@ Latiprimere.Ipp.IppNetworkOptions.EnableDiscovery.set -> void
 Latiprimere.Ipp.IppNetworkOptions.IppNetworkOptions() -> void
 Latiprimere.Ipp.IppNetworkOptions.MaxRenderDpi.get -> int?
 Latiprimere.Ipp.IppNetworkOptions.MaxRenderDpi.set -> void
+Latiprimere.Ipp.IppNetworkOptions.PrinterCertificateFingerprints.get -> System.Collections.Generic.IDictionary<System.Uri!, string!>!
 Latiprimere.Ipp.IppNetworkOptions.PrinterCredentials.get -> System.Collections.Generic.IDictionary<System.Uri!, System.Net.NetworkCredential!>!
 Latiprimere.Ipp.IppNetworkOptions.PrinterUris.get -> System.Collections.Generic.IList<System.Uri!>!
 Latiprimere.Ipp.IppNetworkOptions.RasterFormats.get -> System.Collections.Generic.IList<Latiprimere.Ipp.IppRasterFormat>!
+Latiprimere.Ipp.IppNetworkOptions.RequireEncryption.get -> bool
+Latiprimere.Ipp.IppNetworkOptions.RequireEncryption.set -> void
 Latiprimere.Ipp.IppNetworkOptions.ServerCertificateValidationCallback.get -> System.Net.Security.RemoteCertificateValidationCallback?
 Latiprimere.Ipp.IppNetworkOptions.ServerCertificateValidationCallback.set -> void
 Latiprimere.Ipp.IppNetworkOptions.TrustedCertificateFingerprints.get -> System.Collections.Generic.IList<string!>!
