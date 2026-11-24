@@ -14,8 +14,21 @@ Latiprimere.DuplexMode.LongEdge = 2 -> Latiprimere.DuplexMode
 Latiprimere.DuplexMode.OneSided = 1 -> Latiprimere.DuplexMode
 Latiprimere.DuplexMode.PrinterDefault = 0 -> Latiprimere.DuplexMode
 Latiprimere.DuplexMode.ShortEdge = 3 -> Latiprimere.DuplexMode
+Latiprimere.Finishing
+Latiprimere.Finishing.Fold = 11 -> Latiprimere.Finishing
+Latiprimere.Finishing.Punch = 8 -> Latiprimere.Finishing
+Latiprimere.Finishing.PunchDualLeft = 9 -> Latiprimere.Finishing
+Latiprimere.Finishing.PunchDualTop = 10 -> Latiprimere.Finishing
+Latiprimere.Finishing.Staple = 1 -> Latiprimere.Finishing
+Latiprimere.Finishing.StapleBottomLeft = 3 -> Latiprimere.Finishing
+Latiprimere.Finishing.StapleBottomRight = 5 -> Latiprimere.Finishing
+Latiprimere.Finishing.StapleDualLeft = 6 -> Latiprimere.Finishing
+Latiprimere.Finishing.StapleDualTop = 7 -> Latiprimere.Finishing
+Latiprimere.Finishing.StapleTopLeft = 2 -> Latiprimere.Finishing
+Latiprimere.Finishing.StapleTopRight = 4 -> Latiprimere.Finishing
 Latiprimere.IPrintJob
 Latiprimere.IPrintJob.CancelAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Latiprimere.IPrintJob.GetFeature<T>() -> T?
 Latiprimere.IPrintJob.GetStatusAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.PrintJobStatus!>!
 Latiprimere.IPrintJob.Id.get -> string!
 Latiprimere.IPrintJob.PrinterId.get -> string!
@@ -27,7 +40,9 @@ Latiprimere.IPrintSystem.GetPrintersAsync(System.Threading.CancellationToken can
 Latiprimere.IPrintSystem.IsSupported.get -> bool
 Latiprimere.IPrintSystem.Name.get -> string!
 Latiprimere.IPrinter
+Latiprimere.IPrinter.AppliedOptions.get -> Latiprimere.PrintOptionKinds
 Latiprimere.IPrinter.GetCapabilitiesAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.PrinterCapabilities!>!
+Latiprimere.IPrinter.GetFeature<T>() -> T?
 Latiprimere.IPrinter.GetJobAsync(string! jobId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrintJob?>!
 Latiprimere.IPrinter.GetStatusAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.PrinterStatus!>!
 Latiprimere.IPrinter.Info.get -> Latiprimere.PrinterInfo!
@@ -57,10 +72,47 @@ Latiprimere.MediaSize.Name.get -> string!
 Latiprimere.MediaSize.Name.init -> void
 Latiprimere.MediaSize.WidthMillimeters.get -> double
 Latiprimere.MediaSize.WidthMillimeters.init -> void
+Latiprimere.MediaSizeRange
+Latiprimere.MediaSizeRange.<Clone>$() -> Latiprimere.MediaSizeRange!
+Latiprimere.MediaSizeRange.Contains(Latiprimere.MediaSize! size) -> bool
+Latiprimere.MediaSizeRange.Equals(Latiprimere.MediaSizeRange? other) -> bool
+Latiprimere.MediaSizeRange.IsRoll.get -> bool
+Latiprimere.MediaSizeRange.IsRoll.init -> void
+Latiprimere.MediaSizeRange.MaxHeightMillimeters.get -> double
+Latiprimere.MediaSizeRange.MaxHeightMillimeters.init -> void
+Latiprimere.MediaSizeRange.MaxWidthMillimeters.get -> double
+Latiprimere.MediaSizeRange.MaxWidthMillimeters.init -> void
+Latiprimere.MediaSizeRange.MediaSizeRange() -> void
+Latiprimere.MediaSizeRange.MinHeightMillimeters.get -> double
+Latiprimere.MediaSizeRange.MinHeightMillimeters.init -> void
+Latiprimere.MediaSizeRange.MinWidthMillimeters.get -> double
+Latiprimere.MediaSizeRange.MinWidthMillimeters.init -> void
+Latiprimere.MediaType
+Latiprimere.MediaType.<Clone>$() -> Latiprimere.MediaType!
+Latiprimere.MediaType.Equals(Latiprimere.MediaType? other) -> bool
+Latiprimere.MediaType.Id.get -> string!
+Latiprimere.MediaType.Id.init -> void
+Latiprimere.MediaType.MediaType() -> void
+Latiprimere.MediaType.Name.get -> string!
+Latiprimere.MediaType.Name.init -> void
+Latiprimere.OutputBin
+Latiprimere.OutputBin.<Clone>$() -> Latiprimere.OutputBin!
+Latiprimere.OutputBin.Equals(Latiprimere.OutputBin? other) -> bool
+Latiprimere.OutputBin.Id.get -> string!
+Latiprimere.OutputBin.Id.init -> void
+Latiprimere.OutputBin.Name.get -> string!
+Latiprimere.OutputBin.Name.init -> void
+Latiprimere.OutputBin.OutputBin() -> void
 Latiprimere.PageOrientation
 Latiprimere.PageOrientation.Landscape = 2 -> Latiprimere.PageOrientation
 Latiprimere.PageOrientation.Portrait = 1 -> Latiprimere.PageOrientation
 Latiprimere.PageOrientation.PrinterDefault = 0 -> Latiprimere.PageOrientation
+Latiprimere.PageRange
+Latiprimere.PageRange.Equals(Latiprimere.PageRange other) -> bool
+Latiprimere.PageRange.First.get -> int
+Latiprimere.PageRange.Last.get -> int
+Latiprimere.PageRange.PageRange() -> void
+Latiprimere.PageRange.PageRange(int first, int last) -> void
 Latiprimere.PrintAuthenticationException
 Latiprimere.PrintAuthenticationException.PrintAuthenticationException() -> void
 Latiprimere.PrintAuthenticationException.PrintAuthenticationException(string! message) -> void
@@ -76,6 +128,7 @@ Latiprimere.PrintCertificateException.PrinterUri.init -> void
 Latiprimere.PrintContent
 Latiprimere.PrintContent.Content.get -> System.IO.Stream!
 Latiprimere.PrintContent.Format.get -> Latiprimere.DocumentFormat
+Latiprimere.PrintContent.Password.get -> string?
 Latiprimere.PrintContent.TextEncoding.get -> System.Text.Encoding?
 Latiprimere.PrintException
 Latiprimere.PrintException.NativeErrorCode.get -> int?
@@ -109,8 +162,28 @@ Latiprimere.PrintJobStatus.StateReasons.get -> System.Collections.Generic.IReadO
 Latiprimere.PrintJobStatus.StateReasons.init -> void
 Latiprimere.PrintJobStatus.Timestamp.get -> System.DateTimeOffset
 Latiprimere.PrintJobStatus.Timestamp.init -> void
+Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.Collate = 2048 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.ColorMode = 32 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.Copies = 2 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.Duplex = 4 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.Finishings = 8192 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.InputTray = 128 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.JobName = 1 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.MediaSize = 16 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.MediaType = 32768 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.None = 0 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.Orientation = 8 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.OutputBin = 16384 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.OutputFile = 512 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.PageRanges = 1024 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.Quality = 4096 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.Scaling = 64 -> Latiprimere.PrintOptionKinds
+Latiprimere.PrintOptionKinds.VendorOptions = 256 -> Latiprimere.PrintOptionKinds
 Latiprimere.PrintOptions
 Latiprimere.PrintOptions.<Clone>$() -> Latiprimere.PrintOptions!
+Latiprimere.PrintOptions.Collate.get -> bool?
+Latiprimere.PrintOptions.Collate.init -> void
 Latiprimere.PrintOptions.ColorMode.get -> Latiprimere.ColorMode
 Latiprimere.PrintOptions.ColorMode.init -> void
 Latiprimere.PrintOptions.Copies.get -> int
@@ -118,21 +191,36 @@ Latiprimere.PrintOptions.Copies.init -> void
 Latiprimere.PrintOptions.Duplex.get -> Latiprimere.DuplexMode
 Latiprimere.PrintOptions.Duplex.init -> void
 Latiprimere.PrintOptions.Equals(Latiprimere.PrintOptions? other) -> bool
+Latiprimere.PrintOptions.Finishings.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.Finishing>!
+Latiprimere.PrintOptions.Finishings.init -> void
 Latiprimere.PrintOptions.InputTray.get -> Latiprimere.InputTray?
 Latiprimere.PrintOptions.InputTray.init -> void
 Latiprimere.PrintOptions.JobName.get -> string?
 Latiprimere.PrintOptions.JobName.init -> void
 Latiprimere.PrintOptions.MediaSize.get -> Latiprimere.MediaSize?
 Latiprimere.PrintOptions.MediaSize.init -> void
+Latiprimere.PrintOptions.MediaType.get -> Latiprimere.MediaType?
+Latiprimere.PrintOptions.MediaType.init -> void
 Latiprimere.PrintOptions.Orientation.get -> Latiprimere.PageOrientation
 Latiprimere.PrintOptions.Orientation.init -> void
+Latiprimere.PrintOptions.OutputBin.get -> Latiprimere.OutputBin?
+Latiprimere.PrintOptions.OutputBin.init -> void
 Latiprimere.PrintOptions.OutputFile.get -> string?
 Latiprimere.PrintOptions.OutputFile.init -> void
+Latiprimere.PrintOptions.PageRanges.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.PageRange>!
+Latiprimere.PrintOptions.PageRanges.init -> void
 Latiprimere.PrintOptions.PrintOptions() -> void
+Latiprimere.PrintOptions.Quality.get -> Latiprimere.PrintQuality
+Latiprimere.PrintOptions.Quality.init -> void
 Latiprimere.PrintOptions.Scaling.get -> Latiprimere.ScalingMode
 Latiprimere.PrintOptions.Scaling.init -> void
 Latiprimere.PrintOptions.VendorOptions.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
 Latiprimere.PrintOptions.VendorOptions.init -> void
+Latiprimere.PrintQuality
+Latiprimere.PrintQuality.Draft = 1 -> Latiprimere.PrintQuality
+Latiprimere.PrintQuality.High = 3 -> Latiprimere.PrintQuality
+Latiprimere.PrintQuality.Normal = 2 -> Latiprimere.PrintQuality
+Latiprimere.PrintQuality.PrinterDefault = 0 -> Latiprimere.PrintQuality
 Latiprimere.PrintSystemUnavailableException
 Latiprimere.PrintSystemUnavailableException.PrintSystemUnavailableException() -> void
 Latiprimere.PrintSystemUnavailableException.PrintSystemUnavailableException(string! message) -> void
@@ -141,26 +229,40 @@ Latiprimere.PrinterCapabilities
 Latiprimere.PrinterCapabilities.<Clone>$() -> Latiprimere.PrinterCapabilities!
 Latiprimere.PrinterCapabilities.ColorModes.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.ColorMode>!
 Latiprimere.PrinterCapabilities.ColorModes.init -> void
+Latiprimere.PrinterCapabilities.CustomMediaSizes.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.MediaSizeRange!>!
+Latiprimere.PrinterCapabilities.CustomMediaSizes.init -> void
 Latiprimere.PrinterCapabilities.DefaultColorMode.get -> Latiprimere.ColorMode?
 Latiprimere.PrinterCapabilities.DefaultColorMode.init -> void
 Latiprimere.PrinterCapabilities.DefaultDuplexMode.get -> Latiprimere.DuplexMode?
 Latiprimere.PrinterCapabilities.DefaultDuplexMode.init -> void
 Latiprimere.PrinterCapabilities.DefaultMediaSize.get -> Latiprimere.MediaSize?
 Latiprimere.PrinterCapabilities.DefaultMediaSize.init -> void
+Latiprimere.PrinterCapabilities.DefaultPrintQuality.get -> Latiprimere.PrintQuality?
+Latiprimere.PrinterCapabilities.DefaultPrintQuality.init -> void
 Latiprimere.PrinterCapabilities.DocumentFormats.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.DocumentFormat>!
 Latiprimere.PrinterCapabilities.DocumentFormats.init -> void
 Latiprimere.PrinterCapabilities.DuplexModes.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.DuplexMode>!
 Latiprimere.PrinterCapabilities.DuplexModes.init -> void
 Latiprimere.PrinterCapabilities.Equals(Latiprimere.PrinterCapabilities? other) -> bool
+Latiprimere.PrinterCapabilities.Finishings.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.Finishing>!
+Latiprimere.PrinterCapabilities.Finishings.init -> void
 Latiprimere.PrinterCapabilities.InputTrays.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.InputTray!>!
 Latiprimere.PrinterCapabilities.InputTrays.init -> void
 Latiprimere.PrinterCapabilities.MaxCopies.get -> int?
 Latiprimere.PrinterCapabilities.MaxCopies.init -> void
 Latiprimere.PrinterCapabilities.MediaSizes.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.MediaSize!>!
 Latiprimere.PrinterCapabilities.MediaSizes.init -> void
+Latiprimere.PrinterCapabilities.MediaTypes.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.MediaType!>!
+Latiprimere.PrinterCapabilities.MediaTypes.init -> void
 Latiprimere.PrinterCapabilities.Orientations.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.PageOrientation>!
 Latiprimere.PrinterCapabilities.Orientations.init -> void
+Latiprimere.PrinterCapabilities.OutputBins.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.OutputBin!>!
+Latiprimere.PrinterCapabilities.OutputBins.init -> void
+Latiprimere.PrinterCapabilities.PrintQualities.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.PrintQuality>!
+Latiprimere.PrinterCapabilities.PrintQualities.init -> void
 Latiprimere.PrinterCapabilities.PrinterCapabilities() -> void
+Latiprimere.PrinterCapabilities.SupportsPageRanges.get -> bool?
+Latiprimere.PrinterCapabilities.SupportsPageRanges.init -> void
 Latiprimere.PrinterCapabilities.VendorOptions.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.VendorOption!>!
 Latiprimere.PrinterCapabilities.VendorOptions.init -> void
 Latiprimere.PrinterInfo
@@ -209,11 +311,11 @@ Latiprimere.PrinterStatus.StateReasons.init -> void
 Latiprimere.PrinterStatus.Timestamp.get -> System.DateTimeOffset
 Latiprimere.PrinterStatus.Timestamp.init -> void
 Latiprimere.Rendering.IPdfRasterizer
-Latiprimere.Rendering.IPdfRasterizer.Open(System.IO.Stream! content) -> Latiprimere.Rendering.IRasterDocument!
+Latiprimere.Rendering.IPdfRasterizer.Open(System.IO.Stream! content, Latiprimere.Rendering.PdfOpenOptions? options = null) -> Latiprimere.Rendering.IRasterDocument!
 Latiprimere.Rendering.IRasterDocument
 Latiprimere.Rendering.IRasterDocument.GetPageSize(int pageIndex) -> Latiprimere.Rendering.PageSize
 Latiprimere.Rendering.IRasterDocument.PageCount.get -> int
-Latiprimere.Rendering.IRasterDocument.RenderBand(int pageIndex, Latiprimere.Rendering.RasterBand band, System.Span<byte> pixels) -> void
+Latiprimere.Rendering.IRasterDocument.RenderBand(int pageIndex, Latiprimere.Rendering.RasterBand band, System.Span<byte> pixels, Latiprimere.Rendering.RasterRenderOptions? options = null) -> void
 Latiprimere.Rendering.PageSize
 Latiprimere.Rendering.PageSize.Deconstruct(out double WidthPoints, out double HeightPoints) -> void
 Latiprimere.Rendering.PageSize.Equals(Latiprimere.Rendering.PageSize other) -> bool
@@ -224,8 +326,15 @@ Latiprimere.Rendering.PageSize.PageSize() -> void
 Latiprimere.Rendering.PageSize.PageSize(double WidthPoints, double HeightPoints) -> void
 Latiprimere.Rendering.PageSize.WidthPoints.get -> double
 Latiprimere.Rendering.PageSize.WidthPoints.init -> void
+Latiprimere.Rendering.PdfOpenOptions
+Latiprimere.Rendering.PdfOpenOptions.<Clone>$() -> Latiprimere.Rendering.PdfOpenOptions!
+Latiprimere.Rendering.PdfOpenOptions.Equals(Latiprimere.Rendering.PdfOpenOptions? other) -> bool
+Latiprimere.Rendering.PdfOpenOptions.Password.get -> string?
+Latiprimere.Rendering.PdfOpenOptions.Password.init -> void
+Latiprimere.Rendering.PdfOpenOptions.PdfOpenOptions() -> void
 Latiprimere.Rendering.RasterBand
 Latiprimere.Rendering.RasterBand.ByteCount.get -> long
+Latiprimere.Rendering.RasterBand.BytesPerPixel.get -> int
 Latiprimere.Rendering.RasterBand.Deconstruct(out int PageWidth, out int PageHeight, out int Top, out int Height, out int Stride) -> void
 Latiprimere.Rendering.RasterBand.Equals(Latiprimere.Rendering.RasterBand other) -> bool
 Latiprimere.Rendering.RasterBand.Height.get -> int
@@ -234,6 +343,8 @@ Latiprimere.Rendering.RasterBand.PageHeight.get -> int
 Latiprimere.Rendering.RasterBand.PageHeight.init -> void
 Latiprimere.Rendering.RasterBand.PageWidth.get -> int
 Latiprimere.Rendering.RasterBand.PageWidth.init -> void
+Latiprimere.Rendering.RasterBand.PixelFormat.get -> Latiprimere.Rendering.RasterPixelFormat
+Latiprimere.Rendering.RasterBand.PixelFormat.init -> void
 Latiprimere.Rendering.RasterBand.RasterBand() -> void
 Latiprimere.Rendering.RasterBand.RasterBand(int PageWidth, int PageHeight, int Top, int Height, int Stride) -> void
 Latiprimere.Rendering.RasterBand.Rotation.get -> Latiprimere.Rendering.RasterRotation
@@ -242,6 +353,19 @@ Latiprimere.Rendering.RasterBand.Stride.get -> int
 Latiprimere.Rendering.RasterBand.Stride.init -> void
 Latiprimere.Rendering.RasterBand.Top.get -> int
 Latiprimere.Rendering.RasterBand.Top.init -> void
+Latiprimere.Rendering.RasterPixelFormat
+Latiprimere.Rendering.RasterPixelFormat.Bgra32 = 0 -> Latiprimere.Rendering.RasterPixelFormat
+Latiprimere.Rendering.RasterPixelFormat.Gray8 = 1 -> Latiprimere.Rendering.RasterPixelFormat
+Latiprimere.Rendering.RasterRenderOptions
+Latiprimere.Rendering.RasterRenderOptions.<Clone>$() -> Latiprimere.Rendering.RasterRenderOptions!
+Latiprimere.Rendering.RasterRenderOptions.Equals(Latiprimere.Rendering.RasterRenderOptions? other) -> bool
+Latiprimere.Rendering.RasterRenderOptions.RasterRenderOptions() -> void
+Latiprimere.Rendering.RasterRenderOptions.SmoothImages.get -> bool
+Latiprimere.Rendering.RasterRenderOptions.SmoothImages.init -> void
+Latiprimere.Rendering.RasterRenderOptions.SmoothLines.get -> bool
+Latiprimere.Rendering.RasterRenderOptions.SmoothLines.init -> void
+Latiprimere.Rendering.RasterRenderOptions.SmoothText.get -> bool
+Latiprimere.Rendering.RasterRenderOptions.SmoothText.init -> void
 Latiprimere.Rendering.RasterRotation
 Latiprimere.Rendering.RasterRotation.Clockwise90 = 1 -> Latiprimere.Rendering.RasterRotation
 Latiprimere.Rendering.RasterRotation.Counterclockwise90 = 3 -> Latiprimere.Rendering.RasterRotation
@@ -290,6 +414,17 @@ override Latiprimere.InputTray.ToString() -> string!
 override Latiprimere.MediaSize.Equals(object? obj) -> bool
 override Latiprimere.MediaSize.GetHashCode() -> int
 override Latiprimere.MediaSize.ToString() -> string!
+override Latiprimere.MediaSizeRange.Equals(object? obj) -> bool
+override Latiprimere.MediaSizeRange.GetHashCode() -> int
+override Latiprimere.MediaSizeRange.ToString() -> string!
+override Latiprimere.MediaType.Equals(object? obj) -> bool
+override Latiprimere.MediaType.GetHashCode() -> int
+override Latiprimere.MediaType.ToString() -> string!
+override Latiprimere.OutputBin.Equals(object? obj) -> bool
+override Latiprimere.OutputBin.GetHashCode() -> int
+override Latiprimere.OutputBin.ToString() -> string!
+override Latiprimere.PageRange.GetHashCode() -> int
+override Latiprimere.PageRange.ToString() -> string!
 override Latiprimere.PrintJobStatus.Equals(object? obj) -> bool
 override Latiprimere.PrintJobStatus.GetHashCode() -> int
 override Latiprimere.PrintJobStatus.ToString() -> string!
@@ -306,7 +441,13 @@ override Latiprimere.PrinterStatus.Equals(object? obj) -> bool
 override Latiprimere.PrinterStatus.GetHashCode() -> int
 override Latiprimere.PrinterStatus.ToString() -> string!
 override Latiprimere.Rendering.PageSize.GetHashCode() -> int
+override Latiprimere.Rendering.PdfOpenOptions.Equals(object? obj) -> bool
+override Latiprimere.Rendering.PdfOpenOptions.GetHashCode() -> int
+override Latiprimere.Rendering.PdfOpenOptions.ToString() -> string!
 override Latiprimere.Rendering.RasterBand.GetHashCode() -> int
+override Latiprimere.Rendering.RasterRenderOptions.Equals(object? obj) -> bool
+override Latiprimere.Rendering.RasterRenderOptions.GetHashCode() -> int
+override Latiprimere.Rendering.RasterRenderOptions.ToString() -> string!
 override Latiprimere.VendorOption.Equals(object? obj) -> bool
 override Latiprimere.VendorOption.GetHashCode() -> int
 override Latiprimere.VendorOption.ToString() -> string!
@@ -315,10 +456,20 @@ override Latiprimere.VendorOptionChoice.GetHashCode() -> int
 override Latiprimere.VendorOptionChoice.ToString() -> string!
 static Latiprimere.InputTray.operator !=(Latiprimere.InputTray? left, Latiprimere.InputTray? right) -> bool
 static Latiprimere.InputTray.operator ==(Latiprimere.InputTray? left, Latiprimere.InputTray? right) -> bool
+static Latiprimere.MediaSize.Custom(double widthMillimeters, double heightMillimeters) -> Latiprimere.MediaSize!
 static Latiprimere.MediaSize.operator !=(Latiprimere.MediaSize? left, Latiprimere.MediaSize? right) -> bool
 static Latiprimere.MediaSize.operator ==(Latiprimere.MediaSize? left, Latiprimere.MediaSize? right) -> bool
+static Latiprimere.MediaSizeRange.operator !=(Latiprimere.MediaSizeRange? left, Latiprimere.MediaSizeRange? right) -> bool
+static Latiprimere.MediaSizeRange.operator ==(Latiprimere.MediaSizeRange? left, Latiprimere.MediaSizeRange? right) -> bool
+static Latiprimere.MediaType.operator !=(Latiprimere.MediaType? left, Latiprimere.MediaType? right) -> bool
+static Latiprimere.MediaType.operator ==(Latiprimere.MediaType? left, Latiprimere.MediaType? right) -> bool
+static Latiprimere.OutputBin.operator !=(Latiprimere.OutputBin? left, Latiprimere.OutputBin? right) -> bool
+static Latiprimere.OutputBin.operator ==(Latiprimere.OutputBin? left, Latiprimere.OutputBin? right) -> bool
+static Latiprimere.PageRange.operator !=(Latiprimere.PageRange left, Latiprimere.PageRange right) -> bool
+static Latiprimere.PageRange.operator ==(Latiprimere.PageRange left, Latiprimere.PageRange right) -> bool
 static Latiprimere.PrintContent.FromJpeg(System.IO.Stream! content) -> Latiprimere.PrintContent!
 static Latiprimere.PrintContent.FromPdf(System.IO.Stream! content) -> Latiprimere.PrintContent!
+static Latiprimere.PrintContent.FromPdf(System.IO.Stream! content, string! password) -> Latiprimere.PrintContent!
 static Latiprimere.PrintContent.FromPng(System.IO.Stream! content) -> Latiprimere.PrintContent!
 static Latiprimere.PrintContent.FromRaw(System.IO.Stream! content) -> Latiprimere.PrintContent!
 static Latiprimere.PrintContent.FromText(System.IO.Stream! content, System.Text.Encoding! encoding) -> Latiprimere.PrintContent!
@@ -336,9 +487,15 @@ static Latiprimere.PrinterStatus.operator !=(Latiprimere.PrinterStatus? left, La
 static Latiprimere.PrinterStatus.operator ==(Latiprimere.PrinterStatus? left, Latiprimere.PrinterStatus? right) -> bool
 static Latiprimere.Rendering.PageSize.operator !=(Latiprimere.Rendering.PageSize left, Latiprimere.Rendering.PageSize right) -> bool
 static Latiprimere.Rendering.PageSize.operator ==(Latiprimere.Rendering.PageSize left, Latiprimere.Rendering.PageSize right) -> bool
+static Latiprimere.Rendering.PdfOpenOptions.operator !=(Latiprimere.Rendering.PdfOpenOptions? left, Latiprimere.Rendering.PdfOpenOptions? right) -> bool
+static Latiprimere.Rendering.PdfOpenOptions.operator ==(Latiprimere.Rendering.PdfOpenOptions? left, Latiprimere.Rendering.PdfOpenOptions? right) -> bool
 static Latiprimere.Rendering.RasterBand.Create(int pageWidth, int pageHeight, int top, int height) -> Latiprimere.Rendering.RasterBand
+static Latiprimere.Rendering.RasterBand.Create(int pageWidth, int pageHeight, int top, int height, Latiprimere.Rendering.RasterPixelFormat pixelFormat) -> Latiprimere.Rendering.RasterBand
+static Latiprimere.Rendering.RasterBand.GetBytesPerPixel(Latiprimere.Rendering.RasterPixelFormat pixelFormat) -> int
 static Latiprimere.Rendering.RasterBand.operator !=(Latiprimere.Rendering.RasterBand left, Latiprimere.Rendering.RasterBand right) -> bool
 static Latiprimere.Rendering.RasterBand.operator ==(Latiprimere.Rendering.RasterBand left, Latiprimere.Rendering.RasterBand right) -> bool
+static Latiprimere.Rendering.RasterRenderOptions.operator !=(Latiprimere.Rendering.RasterRenderOptions? left, Latiprimere.Rendering.RasterRenderOptions? right) -> bool
+static Latiprimere.Rendering.RasterRenderOptions.operator ==(Latiprimere.Rendering.RasterRenderOptions? left, Latiprimere.Rendering.RasterRenderOptions? right) -> bool
 static Latiprimere.VendorOption.operator !=(Latiprimere.VendorOption? left, Latiprimere.VendorOption? right) -> bool
 static Latiprimere.VendorOption.operator ==(Latiprimere.VendorOption? left, Latiprimere.VendorOption? right) -> bool
 static Latiprimere.VendorOptionChoice.operator !=(Latiprimere.VendorOptionChoice? left, Latiprimere.VendorOptionChoice? right) -> bool
@@ -346,7 +503,9 @@ static Latiprimere.VendorOptionChoice.operator ==(Latiprimere.VendorOptionChoice
 static readonly Latiprimere.PrintOptions.Default -> Latiprimere.PrintOptions!
 static readonly Latiprimere.PrintOptions.MinimumCopies -> int
 static readonly Latiprimere.Rendering.PageSize.PointsPerInch -> double
-static readonly Latiprimere.Rendering.RasterBand.BytesPerPixel -> int
+static readonly Latiprimere.Rendering.PdfOpenOptions.Default -> Latiprimere.Rendering.PdfOpenOptions!
+static readonly Latiprimere.Rendering.RasterRenderOptions.Default -> Latiprimere.Rendering.RasterRenderOptions!
+~override Latiprimere.PageRange.Equals(object obj) -> bool
 ~override Latiprimere.Rendering.PageSize.Equals(object obj) -> bool
 ~override Latiprimere.Rendering.PageSize.ToString() -> string
 ~override Latiprimere.Rendering.RasterBand.Equals(object obj) -> bool
