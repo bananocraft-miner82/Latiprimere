@@ -1,6 +1,16 @@
 #nullable enable
+Latiprimere.Rendering.Pdfium.PdfiumOptions
+Latiprimere.Rendering.Pdfium.PdfiumOptions.MaxDocumentBytes.get -> int
+Latiprimere.Rendering.Pdfium.PdfiumOptions.MaxDocumentBytes.set -> void
+Latiprimere.Rendering.Pdfium.PdfiumOptions.PdfiumOptions() -> void
+Latiprimere.Rendering.Pdfium.PdfiumOptions.RenderTimeout.get -> System.TimeSpan
+Latiprimere.Rendering.Pdfium.PdfiumOptions.RenderTimeout.set -> void
 Latiprimere.Rendering.Pdfium.PdfiumRasterizer
 Latiprimere.Rendering.Pdfium.PdfiumRasterizer.Open(System.IO.Stream! content, Latiprimere.Rendering.PdfOpenOptions? options = null) -> Latiprimere.Rendering.IRasterDocument!
 Latiprimere.Rendering.Pdfium.PdfiumRasterizer.PdfiumRasterizer() -> void
+Latiprimere.Rendering.Pdfium.PdfiumRasterizer.PdfiumRasterizer(Latiprimere.Rendering.Pdfium.PdfiumOptions! options) -> void
 Microsoft.Extensions.DependencyInjection.LatiprimerePdfiumServiceCollectionExtensions
 static Microsoft.Extensions.DependencyInjection.LatiprimerePdfiumServiceCollectionExtensions.AddLatiprimerePdfium(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.LatiprimerePdfiumServiceCollectionExtensions.AddLatiprimerePdfium(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Latiprimere.Rendering.Pdfium.PdfiumOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static readonly Latiprimere.Rendering.Pdfium.PdfiumOptions.DefaultMaxDocumentBytes -> int
+static readonly Latiprimere.Rendering.Pdfium.PdfiumOptions.DefaultRenderTimeout -> System.TimeSpan
