@@ -1093,6 +1093,34 @@ public sealed class IppNetworkPrintSystemTests
 	}
 
 	[Fact]
+	public async Task GivenAStoreSeededWithAPrinterOnThisMachineWhenLookedUpByNameThenItIsFoundAtItsRememberedAddress()
+	{
+		// Arrange — as the end-to-end harness seeds it: a printer on 127.0.0.1, which nothing announces. The address
+		// rules hold announcements, not the application's own file (ADR 0058).
+		Uri printerUri = new Uri("ipp://127.0.0.1:8631/ipp/print");
+		FakeIppClient client = new FakeIppClient();
+		client.AddPrinter(printerUri, new PrinterAttributesBuilder().WithName("Remembered").WithUuid("urn:uuid:" + IppNetworkPrintSystemTests.OfficeUuid).Build());
+		FakeIppPrinterDiscovery discovery = new FakeIppPrinterDiscovery();
+
+		await IppNetworkPrintSystemTests.WithAddressStoreAsync(async options =>
+		{
+			new IppAddressStore(options.AddressStorePath!, NullLogger.Instance).Save
+			(
+				[new DiscoveredIppPrinter { InstanceName = "Remembered", PrinterUri = printerUri, Uuid = IppNetworkPrintSystemTests.OfficeUuid }]
+			);
+
+			using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreatePrintSystem(client, discovery, options);
+
+			// Act
+			IPrinter? printer = await system.FindPrinterAsync("ipp:dnssd:Remembered", TestContext.Current.CancellationToken);
+
+			// Assert — found there, without searching
+			Assert.NotNull(printer);
+			Assert.Empty(discovery.ResolvedNames);
+		});
+	}
+
+	[Fact]
 	public async Task GivenMorePrintersAnnouncedThanCanBeRememberedWhenListedThenTheStoreKeepsOnlyTheLimit()
 	{
 		// Arrange — anyone on the network can announce printers, made up by the hundred

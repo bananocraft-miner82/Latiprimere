@@ -96,10 +96,10 @@ public sealed class IppAddressStoreTests : IDisposable
 	}
 
 	[Fact]
-	public void GivenEntriesAtAddressesNoPrinterHasWhenLoadedThenTheyAreLeftOut()
+	public void GivenEntriesOnThisMachineWhenLoadedThenTheyAreKeptAsTheApplicationsOwn()
 	{
-		// Arrange — loopback, a cloud metadata service and localhost, as an earlier version may have stored from
-		// announcements, beside a printer that was reached over IPPS
+		// Arrange — printers on loopback and localhost, as an application or a test harness seeds the file, beside one
+		// that was reached over IPPS. Announcements are held to the address rules before they are stored, not the file.
 		string path = this.WriteFile
 		(
 			"""
@@ -107,10 +107,8 @@ public sealed class IppAddressStoreTests : IDisposable
 			  "version": 1,
 			  "printers": [
 			    { "name": "Loopback", "printerUri": "ipp://127.0.0.1:631/ipp/print" },
-			    { "name": "Metadata", "printerUri": "ipp://169.254.169.254:80/latest" },
-			    { "name": "Local", "printerUri": "ipp://localhost:631/ipp/print" },
-			    { "name": "Half", "printerUri": "ipp://192.168.1.3/ipp/print", "secureUri": "ipps://[::1]:443/ipp/print" },
-			    { "name": "Good", "printerUri": "ipp://192.168.1.4/ipp/print", "reachedOverIpps": true }
+			    { "name": "Local", "printerUri": "ipp://localhost:631/ipp/print", "secureUri": "ipps://[::1]:443/ipp/print" },
+			    { "name": "Secure", "printerUri": "ipp://192.168.1.4/ipp/print", "reachedOverIpps": true }
 			  ]
 			}
 			"""
@@ -120,9 +118,8 @@ public sealed class IppAddressStoreTests : IDisposable
 		IReadOnlyList<DiscoveredIppPrinter> loaded = new IppAddressStore(path, NullLogger.Instance).Load();
 
 		// Assert
-		DiscoveredIppPrinter good = Assert.Single(loaded);
-		Assert.Equal("Good", good.InstanceName);
-		Assert.True(good.ReachedOverIpps);
+		Assert.Equal(new[] { "Loopback", "Local", "Secure" }, loaded.Select(printer => printer.InstanceName));
+		Assert.Equal(new[] { false, false, true }, loaded.Select(printer => printer.ReachedOverIpps));
 	}
 
 	[Fact]

@@ -22,7 +22,7 @@ Newest entries first. Each entry records what was done, what was learned, and wh
   - a printer found on the network that has been reached over IPPS is never reached over plain IPP again, remembered in the address store as `reachedOverIpps`;
   - the fallback is logged as a warning;
   - a remembered address must report the UUID its printer announced.
-- **2. Announced addresses:** loopback, unspecified, multicast, broadcast and cloud metadata addresses, and `localhost`, are skipped (`PrinterAddressRules`). A `.local` name's addresses are held to the same rules when connecting, and the address store drops such entries when it loads.
+- **2. Announced addresses:** loopback, unspecified, multicast, broadcast and cloud metadata addresses, and `localhost`, are skipped (`PrinterAddressRules`). A `.local` name's addresses are held to the same rules when connecting. The address store isn't filtered: doing so as it loaded failed CI's Native AOT check, whose `ipp.discovery.remembered-address` seeds the store with a printer on `127.0.0.1`.
 - **3. Response size:** no change, as SharpIppNext already bounds it (2026-11-21).
 - **4. PDFium:** `PdfiumOptions.MaxDocumentBytes` and `RenderTimeout`, by default 2 minutes a band. Bands now render progressively, so a page that outlasts the limit is abandoned with a `PrintException`.
 - **5. Certificates pinned at one printer's address:** `IppNetworkOptions.PrinterCertificateFingerprints` and `WindowsOptions.IppPrinterCertificateFingerprints`.
