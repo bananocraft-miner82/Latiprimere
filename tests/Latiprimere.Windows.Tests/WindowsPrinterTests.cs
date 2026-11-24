@@ -284,6 +284,142 @@ public sealed class WindowsPrinterTests
 	}
 
 	[Fact]
+	public async Task GivenPageRangesWhenPdfSubmittedThenGdiIsGivenOnlyThosePages()
+	{
+		// Arrange
+		FakeGdiPrinter gdi = new FakeGdiPrinter();
+		FakePdfRasterizer rasterizer = new FakePdfRasterizer { PageCount = 5 };
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithGdi(gdi).WithPdfRasterizer(rasterizer));
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+		PrintOptions options = new PrintOptions { PageRanges = [new PageRange(2, 3), new PageRange(5, 9)] };
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal([1, 2, 4], Assert.IsType<GdiPrintRequest>(gdi.LastRequest).Pages);
+	}
+
+	[Fact]
+	public async Task GivenPageRangesWhenRawDataSubmittedThenNotSupportedBeforeAnythingIsSpooled()
+	{
+		// Arrange
+		FakeWinSpool spool = new FakeWinSpool();
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool));
+		using MemoryStream document = new MemoryStream("ZPL"u8.ToArray());
+		PrintOptions options = new PrintOptions { PageRanges = [new PageRange(1, 1)] };
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromRaw(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		await Assert.ThrowsAsync<NotSupportedException>(submit);
+		Assert.Null(spool.LastSubmittedBytes);
+	}
+
+	[Fact]
+	public async Task GivenACustomSizeTheDriverTakesWhenPdfSubmittedThenGdiIsGivenItsDimensions()
+	{
+		// Arrange
+		FakeWinSpool spool = new FakeWinSpool();
+		FakeGdiPrinter gdi = new FakeGdiPrinter();
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool).WithGdi(gdi).WithPdfRasterizer(new FakePdfRasterizer()));
+		spool.SetCapabilities("Office", Latiprimere.Windows.Tests.Mapping.TypedOptionsCapabilitiesTests.Record(takesCustom: true));
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+		PrintOptions options = new PrintOptions { MediaSize = MediaSize.Custom(100, 150.5), MediaType = new MediaType { Id = "258", Name = "Labels" } };
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		GdiPrintRequest request = Assert.IsType<GdiPrintRequest>(gdi.LastRequest);
+		Assert.Equal(((short)1000, (short)1505), request.CustomPaper);
+		Assert.Null(request.PaperId);
+		Assert.Equal(258u, request.MediaTypeId);
+	}
+
+	[Fact]
+	public async Task GivenACustomSizeOutsideTheDriversRangeWhenPdfSubmittedThenNotSupported()
+	{
+		// Arrange
+		FakeWinSpool spool = new FakeWinSpool();
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool).WithGdi(new FakeGdiPrinter()).WithPdfRasterizer(new FakePdfRasterizer()));
+		spool.SetCapabilities("Office", Latiprimere.Windows.Tests.Mapping.TypedOptionsCapabilitiesTests.Record(takesCustom: true));
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+		PrintOptions options = new PrintOptions { MediaSize = MediaSize.Custom(300, 150) };
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		await Assert.ThrowsAsync<NotSupportedException>(submit);
+	}
+
+	[Fact]
+	public async Task GivenAMediaTypeTheDriverDoesNotListWhenPdfSubmittedThenNotSupportedNamingIt()
+	{
+		// Arrange
+		FakeWinSpool spool = new FakeWinSpool();
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithSpool(spool).WithGdi(new FakeGdiPrinter()).WithPdfRasterizer(new FakePdfRasterizer()));
+		spool.SetCapabilities("Office", Latiprimere.Windows.Tests.Mapping.TypedOptionsCapabilitiesTests.Record(takesCustom: true));
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+		PrintOptions options = new PrintOptions { MediaType = new MediaType { Id = "999", Name = "Glossy" } };
+
+		// Act
+		Func<Task> submit = () => printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert
+		NotSupportedException exception = await Assert.ThrowsAsync<NotSupportedException>(submit);
+		Assert.Contains("Glossy", exception.Message, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public void GivenAWindowsPrinterWhenItsAppliedOptionsAreReadThenFinishingsAndOutputBinsAreLeftOut()
+	{
+		// Arrange
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder());
+
+		// Act
+		PrintOptionKinds applied = printer.AppliedOptions;
+
+		// Assert
+		Assert.Equal(PrintOptionKinds.None, applied & (PrintOptionKinds.Finishings | PrintOptionKinds.OutputBin));
+		Assert.True(applied.HasFlag(PrintOptionKinds.PageRanges | PrintOptionKinds.Collate | PrintOptionKinds.Quality | PrintOptionKinds.MediaType));
+	}
+
+	[Fact]
+	public async Task GivenPasswordProtectedPdfWhenSubmitThenTheRasterizerOpensItWithThePassword()
+	{
+		// Arrange
+		FakeGdiPrinter gdi = new FakeGdiPrinter();
+		FakePdfRasterizer rasterizer = new FakePdfRasterizer();
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithGdi(gdi).WithPdfRasterizer(rasterizer));
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document, "test-password"), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal("test-password", rasterizer.LastOptions?.Password);
+		Assert.NotNull(gdi.LastRequest);
+	}
+
+	[Fact]
+	public async Task GivenPdfWithoutPasswordWhenSubmitThenTheRasterizerIsGivenNone()
+	{
+		// Arrange
+		FakePdfRasterizer rasterizer = new FakePdfRasterizer();
+		WindowsPrinter printer = WindowsPrinterTests.CreatePrinter(new WindowsPrintContextBuilder().WithGdi(new FakeGdiPrinter()).WithPdfRasterizer(rasterizer));
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Null(rasterizer.LastOptions?.Password);
+	}
+
+	[Fact]
 	public async Task GivenSizeAndTrayTheDriverListsWhenPdfSubmittedThenPassesTheirNumbersToGdi()
 	{
 		// Arrange — the size has another display name than the driver's, as when read from another printer

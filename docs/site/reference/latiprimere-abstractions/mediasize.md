@@ -55,3 +55,26 @@ public required double WidthMillimeters { get; init; }
 ```
 
 Gets the width in millimetres, with the paper in portrait.
+
+## Methods
+
+### Custom
+
+```csharp
+public static MediaSize Custom(double widthMillimeters, double heightMillimeters)
+```
+
+Creates a size of your own, such as a label or a length of a receipt roll, for a printer whose [PrinterCapabilities.CustomMediaSizes](/docs/reference/latiprimere-abstractions/printercapabilities/#custommediasizes) contain it.
+
+**Parameters**
+
+- `widthMillimeters`: The width in millimetres, in portrait.
+- `heightMillimeters`: The height in millimetres, in portrait.
+
+**Returns**
+
+The size, named `custom_` and its dimensions, as a printer names sizes without a standard name: `custom_102x152mm_102x152mm`.
+
+**Exceptions**
+
+- [ArgumentOutOfRangeException](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception): A dimension is zero, negative or not a number.

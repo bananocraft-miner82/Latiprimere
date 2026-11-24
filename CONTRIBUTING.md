@@ -908,8 +908,9 @@ So:
   version, even with default implementations, as the catalog and the IPP code depend on how they behave.
 - **No renames and no removals.** Mark a member `[Obsolete]`, with what to use instead, and remove it in the next
   major version.
-- **New enum values only where the enum says it may grow:** `DocumentFormat`, `ColorMode`, `PageOrientation` and
-  `VendorOptionKind`, whose documentation tells callers how to treat a value they don't know. Every print system
+- **New enum values only where the enum says it may grow:** `DocumentFormat`, `ColorMode`, `PageOrientation`,
+  `VendorOptionKind`, `RasterPixelFormat`, `Finishing` and `PrintOptionKinds`, whose documentation tells callers how to
+  treat a value they don't know. Every print system
   handles the new value, or refuses it as documented, in the same change. The others follow IPP's own states and
   modes, and don't grow before a major version ([ADR 0044](docs/decisions/0044-room-to-grow-after-1-0.md)).
 - **New features go where the rules allow:** new packages, optional interfaces a print system may implement besides

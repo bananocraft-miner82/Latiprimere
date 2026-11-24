@@ -14,10 +14,10 @@ public interface IWindowsPrinter : IPrinter
 
 A printer managed by the Windows spooler, with what only Windows offers: its driver's Print Capabilities and Print Tickets.
 
-Every `windows:` printer the catalog returns implements this interface, so test for it:
+Every `windows:` printer the catalog returns offers this interface. Ask for it with [IPrinter.GetFeature](/docs/reference/latiprimere-abstractions/iprinter/#getfeature), as the catalog's printers are its own, around the Windows printer:
 
 ```csharp
-if (printer is IWindowsPrinter windowsPrinter)
+if (printer.GetFeature<IWindowsPrinter>() is { } windowsPrinter)
 {
     string capabilities = await windowsPrinter.GetPrintCapabilitiesAsync();
 }

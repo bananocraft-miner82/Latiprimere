@@ -37,31 +37,30 @@ internal static class VendorOptions
 	}
 
 	/// <summary>
-	/// Asks for the printer's best print quality, through its vendor options, when it offers one.
+	/// Asks for two pages on each sheet, through the printer's vendor options, when it offers that.
 	/// </summary>
 	/// <param name="printer">The printer.</param>
-	/// <returns>The options; the defaults if the printer offers no print quality.</returns>
-	public static async Task<PrintOptions> ChooseBestQualityAsync(IPrinter printer)
+	/// <returns>The options; the defaults if the printer doesn't offer two pages per sheet.</returns>
+	public static async Task<PrintOptions> ChooseTwoPagesPerSheetAsync(IPrinter printer)
 	{
 		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync();
 
-		// IPP printers and CUPS list ipp:print-quality; Windows drivers list the Print Schema's PageOutputQuality
-		VendorOption? quality = capabilities.VendorOptions.FirstOrDefault
+		// IPP printers and CUPS list ipp:number-up; Windows drivers list the Print Schema's DocumentNUp
+		VendorOption? pagesPerSheet = capabilities.VendorOptions.FirstOrDefault
 		(
-			option => option.Key is "ipp:print-quality" or "windows:feature:psk:PageOutputQuality"
+			option => option.Key is "ipp:number-up" or "windows:feature:psk:DocumentNUp"
 		);
 
-		// 5 is IPP's "high"; psk:High is the Print Schema's
-		VendorOptionChoice? best = quality?.Choices.FirstOrDefault(choice => choice.Value is "5" or "psk:High");
+		VendorOptionChoice? two = pagesPerSheet?.Choices.FirstOrDefault(choice => choice.Value is "2" or "psk:PagesPerSheet=2");
 
-		if (quality is null || best is null)
+		if (pagesPerSheet is null || two is null)
 		{
 			return PrintOptions.Default;
 		}
 
 		return new PrintOptions
 		{
-			VendorOptions = new Dictionary<string, string> { [quality.Key] = best.Value }
+			VendorOptions = new Dictionary<string, string> { [pagesPerSheet.Key] = two.Value }
 		};
 	}
 
@@ -74,7 +73,7 @@ internal static class VendorOptions
 	/// one.</returns>
 	public static async Task SavePrintCapabilitiesAsync(IPrinter printer, string folder)
 	{
-		if (printer is not IWindowsPrinter windowsPrinter)
+		if (printer.GetFeature<IWindowsPrinter>() is not { } windowsPrinter)
 		{
 			return;
 		}

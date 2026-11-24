@@ -16,25 +16,46 @@ internal static class DevModeEditor
 	/// <param name="paperId">The DMPAPER_* number of the chosen paper size, or <see langword="null"/>.</param>
 	/// <param name="binId">The DMBIN_* number of the chosen tray, or <see langword="null"/>.</param>
 	/// <param name="isFirstPageLandscape">Whether the document's first page is wider than it is tall.</param>
+	/// <param name="customPaper">A custom size, width and length in tenths of a millimetre, sent as DMPAPER_USER in
+	/// place of <paramref name="paperId"/>; or <see langword="null"/>.</param>
+	/// <param name="mediaTypeId">The DMMEDIA_* paper type, or <see langword="null"/>.</param>
 	internal static void Apply
 	(
 		ref DevMode  devMode,
 		PrintOptions options,
 		short?       paperId,
 		short?       binId,
-		bool         isFirstPageLandscape
+		bool         isFirstPageLandscape,
+		(short Width, short Length)? customPaper = null,
+		uint?        mediaTypeId = null
 	)
 	{
 		ArgumentNullException.ThrowIfNull(options);
 
-		// Copies, collated, so a multi-page document comes out in order
+		// Copies, collated unless the job says not, so a multi-page document comes out in order
 		devMode.Copies = (short)Math.Min(options.Copies, short.MaxValue);
 		devMode.Fields |= DevModeConstants.FieldCopies;
 
 		if (options.Copies > PrintOptions.MinimumCopies)
 		{
-			devMode.Collate = DevModeConstants.CollateTrue;
+			devMode.Collate = options.Collate == false ? DevModeConstants.CollateFalse : DevModeConstants.CollateTrue;
 			devMode.Fields |= DevModeConstants.FieldCollate;
+		}
+
+		// Quality, only when chosen (ADR 0056)
+		short? quality = DevModeEditor.ToPrintQuality(options.Quality);
+
+		if (quality is not null)
+		{
+			devMode.PrintQuality = quality.Value;
+			devMode.Fields |= DevModeConstants.FieldPrintQuality;
+		}
+
+		// Paper type, only when chosen
+		if (mediaTypeId is not null)
+		{
+			devMode.MediaType = mediaTypeId.Value;
+			devMode.Fields |= DevModeConstants.FieldMediaType;
 		}
 
 		// Duplex, only when chosen
@@ -55,8 +76,18 @@ internal static class DevModeEditor
 			devMode.Fields |= DevModeConstants.FieldColor;
 		}
 
+		// A custom size: DMPAPER_USER with its width and length, and no form name to override them
+		if (customPaper is { } custom)
+		{
+			devMode.PaperSize = DevModeConstants.PaperUser;
+			devMode.PaperWidth = custom.Width;
+			devMode.PaperLength = custom.Length;
+			devMode.Fields |= DevModeConstants.FieldPaperSize | DevModeConstants.FieldPaperWidth | DevModeConstants.FieldPaperLength;
+			devMode.Fields &= ~DevModeConstants.FieldFormName;
+		}
+
 		// Paper size, only when chosen; a length, width or form name left set would override it
-		if (paperId is not null)
+		else if (paperId is not null)
 		{
 			devMode.PaperSize = paperId.Value;
 			devMode.Fields |= DevModeConstants.FieldPaperSize;
@@ -97,6 +128,22 @@ internal static class DevModeEditor
 		devMode.Fields |= DevModeConstants.FieldCopies;
 
 		return requestedCopies;
+	}
+
+	/// <summary>
+	/// Maps a print quality to a DMRES_* value.
+	/// </summary>
+	/// <param name="quality">The quality.</param>
+	/// <returns>The value, or <see langword="null"/> to keep the printer's setting.</returns>
+	internal static short? ToPrintQuality(PrintQuality quality)
+	{
+		return quality switch
+		{
+			PrintQuality.Draft  => DevModeConstants.QualityDraft,
+			PrintQuality.Normal => DevModeConstants.QualityMedium,
+			PrintQuality.High   => DevModeConstants.QualityHigh,
+			_                   => null,
+		};
 	}
 
 	/// <summary>

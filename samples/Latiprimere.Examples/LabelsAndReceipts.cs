@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Latiprimere;
@@ -7,7 +8,8 @@ using Latiprimere;
 namespace LatiprimereExamples;
 
 /// <summary>
-/// The examples from "Labels and receipts": raw printing in the printer's own language.
+/// The examples from "Labels and receipts": raw printing in the printer's own language, and PDF labels on a custom
+/// size.
 /// </summary>
 internal static class LabelsAndReceipts
 {
@@ -56,5 +58,32 @@ internal static class LabelsAndReceipts
 		data.Position = 0;
 
 		await printer.SubmitAsync(PrintContent.FromRaw(data), new PrintOptions { JobName = "Receipt" });
+	}
+
+	/// <summary>
+	/// Prints a PDF label on 102 x 152 mm labels, if the printer takes that size.
+	/// </summary>
+	/// <param name="printer">The label printer.</param>
+	/// <param name="label">The label, as a PDF.</param>
+	/// <returns>A task that completes when the label has been sent.</returns>
+	public static async Task PrintPdfLabelAsync(IPrinter printer, Stream label)
+	{
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync();
+		MediaSize size = MediaSize.Custom(102, 152);
+
+		if (!capabilities.CustomMediaSizes.Any(range => range.Contains(size)))
+		{
+			Console.WriteLine($"{printer.Info.Name} doesn't take 102 x 152 mm labels.");
+
+			return;
+		}
+
+		// IPP printers name label stock "labels"; Windows drivers number their media types
+		MediaType? labels = capabilities.MediaTypes.FirstOrDefault(type => type.Id == "labels");
+
+		PrintOptions options = new PrintOptions { MediaSize = size, MediaType = labels };
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(label), options);
+
+		Console.WriteLine($"Sent the label as job {job.Id}");
 	}
 }

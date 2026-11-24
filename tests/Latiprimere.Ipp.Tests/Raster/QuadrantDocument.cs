@@ -56,7 +56,7 @@ internal sealed class QuadrantDocument : IRasterDocument
 	}
 
 	/// <inheritdoc/>
-	public void RenderBand(int pageIndex, RasterBand band, Span<byte> pixels)
+	public void RenderBand(int pageIndex, RasterBand band, Span<byte> pixels, RasterRenderOptions? options = null)
 	{
 		if (this.RenderFailure is not null)
 		{
@@ -96,7 +96,14 @@ internal sealed class QuadrantDocument : IRasterDocument
 					_ => ((byte)255, (byte)255, (byte)255),
 				};
 
-				int offset = (row * band.Stride) + (x * RasterBand.BytesPerPixel);
+				if (band.PixelFormat == RasterPixelFormat.Gray8)
+				{
+					pixels[(row * band.Stride) + x] = (byte)(((77 * r) + (150 * g) + (29 * b) + 128) >> 8);
+
+					continue;
+				}
+
+				int offset = (row * band.Stride) + (x * band.BytesPerPixel);
 				pixels[offset] = b;
 				pixels[offset + 1] = g;
 				pixels[offset + 2] = r;

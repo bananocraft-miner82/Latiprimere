@@ -34,6 +34,14 @@ public IReadOnlyList<ColorMode> ColorModes { get; init; }
 
 Gets the colour modes the printer supports.
 
+### CustomMediaSizes
+
+```csharp
+public IReadOnlyList<MediaSizeRange> CustomMediaSizes { get; init; }
+```
+
+Gets the ranges of custom paper sizes the printer takes, beyond [PrinterCapabilities.MediaSizes](/docs/reference/latiprimere-abstractions/printercapabilities/#mediasizes): custom sheets, or lengths cut from a roll. Empty if it reports none.
+
 ### DefaultColorMode
 
 ```csharp
@@ -58,6 +66,14 @@ public MediaSize? DefaultMediaSize { get; init; }
 
 Gets the paper size used when a job doesn't choose one, or `null` if not reported.
 
+### DefaultPrintQuality
+
+```csharp
+public PrintQuality? DefaultPrintQuality { get; init; }
+```
+
+Gets the printer's default print quality, or `null` if it doesn't report one.
+
 ### DocumentFormats
 
 ```csharp
@@ -75,6 +91,14 @@ public IReadOnlyList<DuplexMode> DuplexModes { get; init; }
 ```
 
 Gets the one- and two-sided modes the printer supports.
+
+### Finishings
+
+```csharp
+public IReadOnlyList<Finishing> Finishings { get; init; }
+```
+
+Gets the finishings the printer offers, such as staples, of those [Finishing](/docs/reference/latiprimere-abstractions/finishing/) names.
 
 ### InputTrays
 
@@ -100,6 +124,14 @@ public IReadOnlyList<MediaSize> MediaSizes { get; init; }
 
 Gets the paper sizes the printer supports.
 
+### MediaTypes
+
+```csharp
+public IReadOnlyList<MediaType> MediaTypes { get; init; }
+```
+
+Gets the kinds of paper the printer takes, such as plain paper, labels or photo paper.
+
 ### Orientations
 
 ```csharp
@@ -107,6 +139,32 @@ public IReadOnlyList<PageOrientation> Orientations { get; init; }
 ```
 
 Gets the page orientations the printer supports.
+
+### OutputBins
+
+```csharp
+public IReadOnlyList<OutputBin> OutputBins { get; init; }
+```
+
+Gets where the printer can deliver the printed sheets.
+
+### PrintQualities
+
+```csharp
+public IReadOnlyList<PrintQuality> PrintQualities { get; init; }
+```
+
+Gets the print qualities the printer offers. Never contains [PrintQuality.PrinterDefault](/docs/reference/latiprimere-abstractions/printquality/#values).
+
+### SupportsPageRanges
+
+```csharp
+public bool? SupportsPageRanges { get; init; }
+```
+
+Gets whether the printer itself prints only some pages of a document it is sent, or `null` if it doesn't say.
+
+[PrintOptions.PageRanges](/docs/reference/latiprimere-abstractions/printoptions/#pageranges) works on every printer: where Latiprimere renders the pages, as on the Windows spooler or for raster, it renders only those asked for.
 
 ### VendorOptions
 

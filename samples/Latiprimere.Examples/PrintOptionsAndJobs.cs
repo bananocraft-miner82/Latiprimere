@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Latiprimere;
@@ -48,6 +49,30 @@ internal static class PrintOptionsAndJobs
 	}
 
 	/// <summary>
+	/// Prints pages 2 and 3, two copies collated, at draft quality where the printer offers it.
+	/// </summary>
+	/// <param name="printer">The printer.</param>
+	/// <param name="pdfPath">The PDF to print.</param>
+	/// <returns>A task that completes when the job has been sent.</returns>
+	public static async Task PrintPagesAsync(IPrinter printer, string pdfPath)
+	{
+		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync();
+
+		PrintOptions options = new PrintOptions
+		{
+			PageRanges = [new PageRange(2, 3)],
+			Copies = 2,
+			Collate = true,
+			Quality = capabilities.PrintQualities.Contains(PrintQuality.Draft) ? PrintQuality.Draft : PrintQuality.PrinterDefault,
+		};
+
+		using FileStream document = File.OpenRead(pdfPath);
+		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options);
+
+		Console.WriteLine($"Printing pages 2 and 3 as job {job.Id}");
+	}
+
+	/// <summary>
 	/// Waits for a job to finish, checking every two seconds, and reports whether it printed.
 	/// </summary>
 	/// <param name="job">The job.</param>
@@ -87,6 +112,29 @@ internal static class PrintOptionsAndJobs
 			bool cancelled = await job.CancelAsync();
 
 			Console.WriteLine(cancelled ? "Cancelled the job." : "The job had already finished.");
+		}
+	}
+
+	/// <summary>
+	/// Reports a printer's state each time it changes, such as when it runs out of paper, until cancelled.
+	/// </summary>
+	/// <param name="printer">The printer.</param>
+	/// <param name="cancellationToken">A token to stop following the printer.</param>
+	/// <returns>A task that completes when following has stopped.</returns>
+	public static async Task FollowPrinterAsync(IPrinter printer, CancellationToken cancellationToken)
+	{
+		try
+		{
+			await foreach (PrinterStatus status in printer.WatchStatusAsync(cancellationToken))
+			{
+				string reasons = status.StateReasons.Count > 0 ? $" ({string.Join(", ", status.StateReasons)})" : string.Empty;
+
+				Console.WriteLine($"{status.State}{reasons} {status.StateMessage}");
+			}
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			Console.WriteLine("Stopped following the printer.");
 		}
 	}
 

@@ -1,3 +1,4 @@
+using Latiprimere.Rendering.Pdfium.Interop;
 using Latiprimere.Rendering.Pdfium.Tests.Fakes;
 using Latiprimere.Testing.Fakes;
 using Latiprimere.Testing.Fixtures;
@@ -137,6 +138,59 @@ public sealed class PdfiumRasterizerTests
 
 		// Assert — the caller's stream failed, which is the caller's to handle, not a printing failure
 		Assert.Throws<IOException>(open);
+	}
+
+	[Theory]
+	[InlineData(TestDocuments.LineArtPassword)]
+	[InlineData("test-owner")]
+	public void GivenPasswordProtectedPdfWithItsPasswordWhenOpenThenItRenders(string password)
+	{
+		// Arrange: either the password for opening it or the owner password
+		PdfiumRasterizer rasterizer = new PdfiumRasterizer();
+		using FileStream content = TestDocuments.Open(TestDocuments.LineArtWithPassword);
+		RasterBand band = RasterBand.Create(595, 842, 0, 842, RasterPixelFormat.Gray8);
+		byte[] pixels = new byte[band.ByteCount];
+
+		// Act
+		using IRasterDocument document = rasterizer.Open(content, new PdfOpenOptions { Password = password });
+		document.RenderBand(0, band, pixels);
+
+		// Assert: the middle of the circle, at (300, 642) from the top, is black
+		Assert.Equal(1, document.PageCount);
+		Assert.Equal(0, pixels[(642 * 595) + 300]);
+	}
+
+	[Fact]
+	public void GivenPasswordProtectedPdfWithoutPasswordWhenOpenThenThrowsPrintExceptionSayingHowToGiveIt()
+	{
+		// Arrange
+		PdfiumRasterizer rasterizer = new PdfiumRasterizer();
+		using FileStream content = TestDocuments.Open(TestDocuments.LineArtWithPassword);
+
+		// Act
+		Func<IRasterDocument> open = () => rasterizer.Open(content);
+
+		// Assert
+		PrintException exception = Assert.Throws<PrintException>(open);
+		Assert.Contains("PrintContent.FromPdf(stream, password)", exception.Message, StringComparison.Ordinal);
+		Assert.Equal((int)PdfiumConstants.ErrorPassword, exception.NativeErrorCode);
+	}
+
+	[Fact]
+	public void GivenWrongPasswordWhenOpenThenThrowsPrintExceptionWithoutThePassword()
+	{
+		// Arrange
+		PdfiumRasterizer rasterizer = new PdfiumRasterizer();
+		using FileStream content = TestDocuments.Open(TestDocuments.LineArtWithPassword);
+		PdfOpenOptions options = new PdfOpenOptions { Password = "not-the-password" };
+
+		// Act
+		Func<IRasterDocument> open = () => rasterizer.Open(content, options);
+
+		// Assert
+		PrintException exception = Assert.Throws<PrintException>(open);
+		Assert.Contains("open it", exception.Message, StringComparison.Ordinal);
+		Assert.DoesNotContain("not-the-password", exception.Message, StringComparison.Ordinal);
 	}
 
 	[Fact]

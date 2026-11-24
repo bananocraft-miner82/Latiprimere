@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
 	<resheader name="resmimetype">
 		<value>text/microsoft-resx</value>
@@ -21,7 +21,8 @@
 		<comment>{0} is the limit in bytes, about 2 GB, formatted with digit grouping.</comment>
 	</data>
 	<data name="PdfPasswordProtected" xml:space="preserve">
-		<value>The PDF is password-protected and cannot be printed.</value>
+		<value>The PDF is password-protected. Print it with PrintContent.FromPdf(stream, password).</value>
+		<comment>Thrown when a PDF needs a password and none was given.</comment>
 	</data>
 	<data name="PageLoadFailed" xml:space="preserve">
 		<value>Page {0} of the PDF could not be loaded.</value>
@@ -39,5 +40,9 @@
 	</data>
 	<data name="BandOutsidePage" xml:space="preserve">
 		<value>The band must lie within the page.</value>
+	</data>
+	<data name="PdfPasswordWrong" xml:space="preserve">
+		<value>The password given for the PDF doesn't open it.</value>
+		<comment>Thrown when a PDF's password was given but is wrong. Never include the password.</comment>
 	</data>
 </root>

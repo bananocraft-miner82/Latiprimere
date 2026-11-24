@@ -24,11 +24,13 @@ public sealed class PrintContent
 	/// <param name="content">The readable stream containing the document data.</param>
 	/// <param name="format">The format of the document data.</param>
 	/// <param name="textEncoding">The encoding of text, or <see langword="null"/> for other formats.</param>
-	private PrintContent(Stream content, DocumentFormat format, Encoding? textEncoding)
+	/// <param name="password">The PDF's password, or <see langword="null"/>.</param>
+	private PrintContent(Stream content, DocumentFormat format, Encoding? textEncoding, string? password = null)
 	{
 		this.Content = content;
 		this.Format = format;
 		this.TextEncoding = textEncoding;
+		this.Password = password;
 	}
 
 	/// <summary>
@@ -47,6 +49,15 @@ public sealed class PrintContent
 	public Encoding? TextEncoding { get; }
 
 	/// <summary>
+	/// Gets the password that opens a password-protected PDF, or <see langword="null"/> for none.
+	/// </summary>
+	/// <remarks>
+	/// Print systems pass it only to whatever opens the PDF: the rasteriser, or a printer that takes a password with
+	/// the document. It is never written to logs or exception messages.
+	/// </remarks>
+	public string? Password { get; }
+
+	/// <summary>
 	/// Creates print content from a stream containing a PDF document.
 	/// </summary>
 	/// <param name="content">A readable stream containing the PDF document.</param>
@@ -57,6 +68,35 @@ public sealed class PrintContent
 	{
 		// Validate and wrap the PDF stream
 		return PrintContent.Create(content, DocumentFormat.Pdf);
+	}
+
+	/// <summary>
+	/// Creates print content from a stream containing a password-protected PDF document.
+	/// </summary>
+	/// <param name="content">A readable stream containing the PDF document.</param>
+	/// <param name="password">The password that opens it: the one for opening the document, or the owner's.</param>
+	/// <returns>The print content.</returns>
+	/// <remarks>
+	/// <para>
+	/// The PDF is rendered by Latiprimere wherever it is printed as raster or through the Windows spooler. A printer
+	/// that takes PDF itself is sent the password with the document when it lists IPP's
+	/// <c>document-password-supported</c>, and otherwise is sent the pages as raster, when it takes a raster format.
+	/// A printer or CUPS queue that can do neither refuses the job with <see cref="NotSupportedException"/>.
+	/// </para>
+	/// <para>
+	/// A wrong password fails the job with a <see cref="PrintException"/> before anything is printed.
+	/// </para>
+	/// </remarks>
+	/// <exception cref="ArgumentNullException"><paramref name="content"/> or <paramref name="password"/> is
+	/// <see langword="null"/>.</exception>
+	/// <exception cref="ArgumentException"><paramref name="content"/> cannot be read.</exception>
+	public static PrintContent FromPdf(Stream content, string password)
+	{
+		ArgumentNullException.ThrowIfNull(password);
+
+		PrintContent.Validate(content);
+
+		return new PrintContent(content, DocumentFormat.Pdf, textEncoding: null, password);
 	}
 
 	/// <summary>

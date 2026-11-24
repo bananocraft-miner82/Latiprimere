@@ -15,9 +15,10 @@ namespace Latiprimere.Ipp.Mapping;
 /// value can be sent as it is.
 /// </para>
 /// <para>
-/// Left out: attributes the typed options send (<c>copies</c>, <c>sides</c>, <c>media</c> and the rest), operation
-/// attributes such as <c>document-name</c>, and attributes whose values vendor options can't express, such as
-/// collections and page ranges.
+/// Left out: attributes the typed options send (<c>copies</c>, <c>sides</c>, <c>media</c>, <c>print-quality</c>
+/// and the rest), operation attributes such as <c>document-name</c>, and attributes whose values vendor options
+/// can't express, such as collections. <c>finishings</c> stays, as it holds far more than the
+/// <see cref="Finishing"/> names (ADR 0057).
 /// </para>
 /// </remarks>
 internal static class IppVendorOptionMapper
@@ -29,7 +30,6 @@ internal static class IppVendorOptionMapper
 	private const string DefaultSuffix = "-default";            // A printer's default value for an attribute
 	private const string CollectionSuffix = "-col";             // Collection attributes, which values can't express
 	private const string JobPriority = "job-priority";          // Its -supported value is a count of levels
-	private const string PrintQuality = "print-quality";        // An enum with names (RFC 8011)
 	private const string Finishings = "finishings";             // An enum with names, which takes several values
 	private const int LowestPriority = 1;                       // job-priority's range (RFC 8011)
 	private const int HighestPriority = 100;
@@ -44,6 +44,11 @@ internal static class IppVendorOptionMapper
 		"media-source",
 		"orientation-requested",
 		"print-color-mode",
+		"page-ranges",
+		"multiple-document-handling",
+		"print-quality",
+		"output-bin",
+		"media-type",
 		"job-name",
 		"ipp-attribute-fidelity",
 		"job-mandatory-attributes",
@@ -57,7 +62,6 @@ internal static class IppVendorOptionMapper
 		"document-metadata",
 		"document-password",
 		"overrides",
-		"page-ranges",
 		"job-k-octets",
 		"job-impressions",
 		"job-media-sheets",
@@ -78,14 +82,6 @@ internal static class IppVendorOptionMapper
 		["printer-resolution"] = "Resolution",
 		["print-content-optimize"] = "Optimise for",
 		["job-hold-until"] = "Hold until",
-	};
-
-	/// <summary>Names for the enum values of <c>print-quality</c> (RFC 8011).</summary>
-	private static readonly Dictionary<int, string> PrintQualityNames = new Dictionary<int, string>
-	{
-		[3] = "Draft",
-		[4] = "Normal",
-		[5] = "High",
 	};
 
 	/// <summary>Names for the common enum values of <c>finishings</c> (RFC 8011 and PWG 5100.1).</summary>
@@ -356,7 +352,6 @@ internal static class IppVendorOptionMapper
 
 		string displayName = attribute.Tag switch
 		{
-			Tag.Enum when name == IppVendorOptionMapper.PrintQuality && attribute.Value is int quality => IppVendorOptionMapper.PrintQualityNames.GetValueOrDefault(quality, value),
 			Tag.Enum when name == IppVendorOptionMapper.Finishings && attribute.Value is int finishing => IppVendorOptionMapper.FinishingNames.GetValueOrDefault(finishing, value),
 			Tag.Keyword => IppKeywords.Describe(value),
 			Tag.Boolean => attribute.Value is true ? "Yes" : "No",

@@ -79,7 +79,7 @@ public static class ExampleScenarios
 	{
 		Id = "samples.examples.print-options",
 		Area = ScenarioArea.Samples,
-		Title = "The print-options example prints two copies, two-sided and landscape, to CUPS-PDF and follows the job to Completed",
+		Title = "The print-options examples print two copies, two-sided and landscape, to CUPS-PDF and follow the job to Completed; print pages 2 and 3 collated; and follow the printer until stopped",
 		Needs = TargetNeeds.CupsContainer,
 		RunAsync = ExampleScenarios.PrintOptionsAndJobsAsync
 	};
@@ -198,7 +198,7 @@ public static class ExampleScenarios
 		SampleRun run = await Samples.RunAsync(context, Samples.Examples, ["vendor-options", target.Value.PrinterId]);
 		context.CheckEqual("it exits with 0", 0, run.ExitCode);
 		context.Check($"it lists options as {target.Value.Prefix} keys", run.Output.Contains(Environment.NewLine + target.Value.Prefix, StringComparison.Ordinal) || run.Output.StartsWith(target.Value.Prefix, StringComparison.Ordinal));
-		context.Check("it says which best quality it would choose", run.Output.Contains("Best quality:", StringComparison.Ordinal));
+		context.Check("it says how it would ask for two pages per sheet", run.Output.Contains("Two pages per sheet:", StringComparison.Ordinal));
 	}
 
 	/// <summary>
@@ -257,6 +257,15 @@ public static class ExampleScenarios
 		context.CheckEqual("it exits with 0", 0, run.ExitCode);
 		context.Check("it follows the job to Completed", run.Output.Contains("Completed", StringComparison.Ordinal));
 		context.Check("it doesn't give up following", !run.Output.Contains("Stopped following", StringComparison.Ordinal));
+
+		SampleRun pages = await Samples.RunAsync(context, Samples.Examples, ["pages", TestPrinters.CupsPdf, Samples.GetDocumentPath(TestDocuments.ThreePages)]);
+		context.CheckEqual("the pages example exits with 0", 0, pages.ExitCode);
+		context.Check("it sends pages 2 and 3", pages.Output.Contains("Printing pages 2 and 3 as job", StringComparison.Ordinal));
+
+		SampleRun status = await Samples.RunAsync(context, Samples.Examples, ["printer-status", TestPrinters.CupsPdf]);
+		context.CheckEqual("the printer-status example exits with 0", 0, status.ExitCode);
+		context.Check("it reports the printer's state", status.Output.Contains("Idle", StringComparison.Ordinal) || status.Output.Contains("Processing", StringComparison.Ordinal), status.Output);
+		context.Check("it stops following when cancelled", status.Output.Contains("Stopped following the printer.", StringComparison.Ordinal));
 	}
 
 	/// <summary>

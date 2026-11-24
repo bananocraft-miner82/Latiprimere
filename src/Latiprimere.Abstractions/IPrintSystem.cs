@@ -5,8 +5,11 @@ namespace Latiprimere;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Applications normally use <see cref="IPrinterCatalog"/>, which combines every supported print system.
-/// Printer identifiers returned by a print system must not clash with those of other print systems.
+/// Applications normally use <see cref="IPrinterCatalog"/>, which combines every supported print system. Its
+/// printers are its own, around a print system's, and refuse a job that sets a <see cref="PrintOptions"/> setting
+/// the print system's printer doesn't apply (<see cref="IPrinter.AppliedOptions"/>); a printer from a print system
+/// used directly has no such check. Printer identifiers returned by a print system must not clash with those of other
+/// print systems.
 /// </para>
 /// <para>
 /// Print systems may hold connections, such as the HTTP client of the CUPS and IPP print systems, so dispose them

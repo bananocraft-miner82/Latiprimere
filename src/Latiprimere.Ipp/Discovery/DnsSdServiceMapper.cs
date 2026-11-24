@@ -159,13 +159,17 @@ internal static class DnsSdServiceMapper
 	}
 
 	/// <summary>
-	/// Chooses the host to put in the printer URI: an IPv4 address if there is one, because it works on every platform
-	/// without mDNS name resolution; otherwise the announced host name.
+	/// Chooses the host to put in the printer URI: an IPv4 address if there is one, then an IPv6 address that isn't
+	/// link-local, because either works on every platform without mDNS name resolution; otherwise the announced host
+	/// name, such as <c>printer.local</c>.
 	/// </summary>
 	/// <param name="service">The announcement.</param>
-	/// <returns>The host, or <see langword="null"/> if there is none.</returns>
+	/// <returns>The host, with an IPv6 address in brackets as a URI has it; or <see langword="null"/> if there is
+	/// none.</returns>
 	/// <remarks>
 	/// IPv6 link-local addresses are avoided because they need a scope identifier that is only valid on this machine.
+	/// An IPv6 address comes into play when the announcement reached this machine over IPv6 only: Avahi, for one,
+	/// doesn't put IPv4 addresses in its answers over IPv6.
 	/// </remarks>
 	private static string? ChooseHost(DnsSdService service)
 	{
@@ -176,7 +180,29 @@ internal static class DnsSdServiceMapper
 			return ipv4.ToString();
 		}
 
+		IPAddress? ipv6 = service.Addresses.FirstOrDefault(DnsSdServiceMapper.IsRoutableIpv6);
+
+		if (ipv6 is not null)
+		{
+			return $"[{ipv6}]";
+		}
+
 		return string.IsNullOrWhiteSpace(service.Hostname) ? null : service.Hostname.TrimEnd('.');
+	}
+
+	/// <summary>
+	/// Tells whether an address is IPv6 and usable without a scope: not link-local, multicast or a mapped IPv4
+	/// address.
+	/// </summary>
+	/// <param name="address">The address.</param>
+	/// <returns><see langword="true"/> if it can go in a printer URI as it is.</returns>
+	private static bool IsRoutableIpv6(IPAddress address)
+	{
+		return address.AddressFamily == AddressFamily.InterNetworkV6
+			   && !address.IsIPv6LinkLocal
+			   && !address.IsIPv6Multicast
+			   && !address.IsIPv4MappedToIPv6
+			   && address.ScopeId == 0;
 	}
 
 	/// <summary>

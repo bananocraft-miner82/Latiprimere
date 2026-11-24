@@ -88,6 +88,51 @@ internal static class CapabilitiesCommand
 
 		CapabilitiesCommand.WriteLine
 		(
+			CliMessages.CapabilityCustomSizes,
+			capabilities.CustomMediaSizes.Select(CapabilitiesCommand.FormatRange)
+		);
+
+		CapabilitiesCommand.WriteLine
+		(
+			CliMessages.CapabilityMediaTypes,
+			capabilities.MediaTypes.Select(type => CliMessages.FormatNamedValue(type.Name, type.Id))
+		);
+
+		CapabilitiesCommand.WriteLine
+		(
+			CliMessages.CapabilityQuality,
+			capabilities.PrintQualities.Select
+			(
+				quality => CapabilitiesCommand.Mark
+				(
+					quality.ToString(),
+					quality == capabilities.DefaultPrintQuality
+				)
+			)
+		);
+
+		CapabilitiesCommand.WriteLine
+		(
+			CliMessages.CapabilityFinishings,
+			capabilities.Finishings.Select(finishing => finishing.ToString())
+		);
+
+		CapabilitiesCommand.WriteLine
+		(
+			CliMessages.CapabilityOutputBins,
+			capabilities.OutputBins.Select(bin => CliMessages.FormatNamedValue(bin.Name, bin.Id))
+		);
+
+		CapabilitiesCommand.WriteLine
+		(
+			CliMessages.CapabilityPageRanges,
+			capabilities.SupportsPageRanges is bool supportsPageRanges
+				? new[] { supportsPageRanges ? CliMessages.YesValue : CliMessages.NoValue }
+				: Array.Empty<string>()
+		);
+
+		CapabilitiesCommand.WriteLine
+		(
 			CliMessages.CapabilityFormats,
 			capabilities.DocumentFormats.Select(format => format.ToString())
 		);
@@ -140,6 +185,36 @@ internal static class CapabilitiesCommand
 
 			ConsoleOutput.Write(CliMessages.VendorOptionLine, option.Key, option.DisplayName, values);
 		}
+	}
+
+	/// <summary>
+	/// Describes a range of custom paper sizes, in millimetres.
+	/// </summary>
+	/// <param name="range">The range.</param>
+	/// <returns>The description.</returns>
+	private static string FormatRange(MediaSizeRange range)
+	{
+		string[] bounds =
+		[
+			CapabilitiesCommand.FormatMillimetres(range.MinWidthMillimeters),
+			CapabilitiesCommand.FormatMillimetres(range.MaxWidthMillimeters),
+			CapabilitiesCommand.FormatMillimetres(range.MinHeightMillimeters),
+			CapabilitiesCommand.FormatMillimetres(range.MaxHeightMillimeters),
+		];
+
+		return range.IsRoll
+			? CliMessages.FormatRollSizeValue(bounds[0], bounds[1], bounds[2], bounds[3])
+			: CliMessages.FormatCustomSizeValue(bounds[0], bounds[1], bounds[2], bounds[3]);
+	}
+
+	/// <summary>
+	/// Writes a length in millimetres with at most two decimals.
+	/// </summary>
+	/// <param name="millimetres">The length.</param>
+	/// <returns>The length as text, such as <c>25.4</c>.</returns>
+	private static string FormatMillimetres(double millimetres)
+	{
+		return millimetres.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 	}
 
 	/// <summary>

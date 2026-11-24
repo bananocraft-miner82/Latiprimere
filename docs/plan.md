@@ -18,7 +18,7 @@ Latiprimere lets any .NET application, with or without a UI, find printers, lear
 ## Non-goals (for v1)
 
 - Print dialogs and print preview. These belong in optional per-framework add-on packages later.
-- Layout, reporting or document-generation engines. Callers bring PDF, images or raw printer language.
+- Layout, reporting or document-generation engines. Callers bring PDF, images or raw printer language. A companion product that makes documents, outside the core packages, comes after 1.0 ([ADR 0053](decisions/0053-document-generation-companion.md)).
 - Android and iOS.
 - Printer installation, driver management or print-server administration.
 
@@ -186,7 +186,10 @@ Three of the later items come forward, so 1.0 starts with them (owner, 2026-11-2
 - [x] Images: JPEG and PNG (P4-3). Done 2026-11-20 ([ADR 0047](decisions/0047-printing-images.md)): `PrintContent.FromJpeg` and `FromPng`, `PrintOptions.Scaling` and `PrinterCapabilities.DocumentFormats`; JPEGs passed through, a PNG decoder written here, and images placed on a page as a PDF where they can't go as they are. A photo on the HP's paper is in the sign-off
 - [x] Plain text (P4-4). Done 2026-11-20 ([ADR 0048](decisions/0048-printing-plain-text.md)): `PrintContent.FromText`; CUPS lays text out, and elsewhere Latiprimere does, as a PDF in Courier, with Windows-1252 characters only. Text on the HP's paper is in the sign-off
 - [x] Printer and job events (P4-5). Done 2026-11-20 ([ADR 0049](decisions/0049-following-printers-and-jobs.md)): `PrinterStatus`, `IPrinter.GetStatusAsync` and `WatchStatusAsync`, and `IPrintJob.WatchStatusAsync` as a member. Windows follows the spooler's change notifications; CUPS and network printers are polled, as CUPS doesn't wait on IPP notifications
-- [ ] Docs, samples and an API review of the additions (P4-6)
+- [x] Options for the PDF rasteriser: pixel format, smoothing and passwords, while its interfaces can still change (P4-8, accepted 2026-11-23). Done 2026-11-23 ([ADR 0054](decisions/0054-rasteriser-options.md)): `RasterPixelFormat` and `Gray8` bands, `RasterRenderOptions`, `PdfOpenOptions` and `PrintContent.FromPdf(stream, password)`; IPP raster in grey and black and Windows monochrome jobs rendered in grey. The HP on paper is in the sign-off
+- [x] A layer of Latiprimere's own around every printer, with platform features through a member instead of a cast, and options an adapter doesn't apply refused (P4-9, accepted 2026-11-23). Done 2026-11-23 ([ADR 0055](decisions/0055-catalog-printers.md)): `CatalogPrinter` and `CatalogPrintJob`, `GetFeature<T>()`, `IPrinter.AppliedOptions` and `PrintOptionKinds`
+- [x] Typed options before 1.0: page ranges, collation, custom and roll paper, quality, finishings, output bin and media type (P4-10, accepted 2026-11-23). Done 2026-11-23 ([ADR 0056](decisions/0056-typed-options-before-1-0.md)): on IPP and CUPS all of them; on Windows all but finishings and output bins, which Windows printers refuse through `AppliedOptions`
+- [x] Docs, samples and an API review of the additions (P4-6, [ADR 0057](decisions/0057-api-review-phase-4.md))
 - [ ] The sign-off extended to them (P4-7)
 
 ### Later (unscheduled)
@@ -197,6 +200,54 @@ Each can be added after 1.0 without breaking the API; [ADR 0044](decisions/0044-
 - Image and plain-text content helpers: proposed for Phase 4. Beyond it: text in any script, which needs an embedded font
 - Printer event subscriptions: proposed for Phase 4, for jobs and printers' states. Beyond it: printers appearing and going (a default-implemented catalog member)
 - Android/iOS (new adapter packages and target frameworks)
+
+Gaps found by the capability review of 2026-11-23 (owner: "Add the relevant items to our plan"). Each fits the rules after 1.0 by the same routes:
+
+- **A printer's queue of jobs:** `IPrinter.GetJobsAsync`, listing the jobs waiting or printing, not only one looked up by its ID. IPP has Get-Jobs, which CUPS and network printers answer, and the Windows spooler has `EnumJobs`. A member with a default implementation that throws `NotSupportedException`, so other `IPrinter` classes keep compiling. Whether it lists other users' jobs, and what CUPS lets one user see of another's, is for its ADR
+- **Raw printer languages, built for you:** builders for ZPL (Zebra labels) and ESC/POS (receipts), with text, barcodes, QR codes, images as raster commands, cutting and the cash drawer, each giving a `PrintContent.FromRaw` stream. A new package that uses only the public API. Part of the companion product in [ADR 0053](decisions/0053-document-generation-companion.md), which also renders whole documents to these languages
+- **Raw connections without IPP:** a print system for printers reached at a host and port, AppSocket (port 9100, often called JetDirect), as many label and receipt printers are. Only raw data, and no job status beyond "sent", as the protocol has none. A new adapter package implementing `IPrintSystem`, with printers configured by address as for direct IPP. USB and serial printers stay with the spooler and CUPS, which already reach them
+- **Preview without a UI framework:** a page of any `PrintContent` as an image, laid out as it would print, so a web app can show a preview. PDFs already render through `IPdfRasterizer`; images and text would need the layout that is internal to `Latiprimere.Ipp` today, through a public converter to PDF. Comes before, and is used by, the UI add-ons
+- **Not planned:** installing printers, drivers, or changing a queue's own settings. That stays a non-goal
+
+More gaps in the core, found by a second review the same day (owner: "Add all, tiered"). Each is additive: a new property, a member with a default implementation, or a new package. Each gets its own ADR before it's built.
+
+**Tier 1: common needs, modest effort.** Items 1 to 3 come first, as the Documents companion's stages 1 to 3 rely on 2 and 3.
+
+1. **Page ranges:** moved to Phase 4 as P4-10, with collation (accepted 2026-11-23). `PrintOptions.PageRanges`, to print some pages, not all. Today there's no way: `page-ranges` is refused as a vendor option ([ADR 0032](decisions/0032-vendor-options-in-capabilities.md)), and the Windows PDF path draws every page. IPP and CUPS send `page-ranges`; Windows and the raster path draw only the pages chosen
+2. **Custom and roll paper sizes:** moved to Phase 4 as part of P4-10 (accepted 2026-11-23). The limits a printer reports for them (`custom_min_…`, `roll_max_…` in IPP, left out by [ADR 0011](decisions/0011-capability-model.md)) as a new `PrinterCapabilities` property, and a size within them accepted in `PrintOptions.MediaSize`. Label and receipt printers rely on them
+3. **Printable area and borderless printing:** where on each paper size the printer can print, and whether it can print to the edge. From IPP's `media-*-margin` attributes and `media-col`, and the Windows driver's printable area. Any layout needs it, the Documents companion's included
+4. **Supplies and alerts:** ink, toner and paper levels, and the printer's alerts, on `PrinterStatus`. From IPP's `marker-*` attributes; what Windows drivers report is to be examined. For back-office and kiosk monitoring
+5. **Tracing and metrics:** in P4-9's layer around printers (accepted 2026-11-23). An `ActivitySource` and a `Meter`, through `System.Diagnostics`, so OpenTelemetry sees jobs submitted, failures, durations and retries. Logging is the only telemetry today. A separate package may add an ASP.NET Core health check for "is the printer reachable"
+
+**Tier 2: valuable, more work.**
+
+6. **Typed settings for what vendor options reach today:** quality, finishings, output bin and media type moved to Phase 4 as part of P4-10 (accepted 2026-11-23); resolution and pages per sheet stay here. Print quality, resolution, finishings (staple, punch), pages per sheet, output bin and media type, so they work the same on every print system instead of through `ipp:` or `windows:feature:` keys. Each also listed in `PrinterCapabilities`
+7. **Holding and releasing jobs:** hold, release and restart (IPP's Hold-Job and Release-Job, the operation for restarting that printers support, which its ADR checks, and the spooler's `SetJob`), printing later (`job-hold-until`) and job priority. Members on `IPrintJob` with default implementations that throw `NotSupportedException`
+8. **Kerberos (Negotiate) authentication** for CUPS and print servers that require it, left out by [ADR 0020](decisions/0020-cups-authentication.md), as answering the server's challenge sends the document twice. Needs a way round that, such as a request without the document first
+9. **Several documents in one job,** such as a cover sheet and a PDF printed and stapled together: IPP's Create-Job and Send-Document, and one spooler job on Windows
+10. **A durable outbox, as a separate package:** jobs for a network printer that is off wait on disk and are retried for hours, not only the 2 minutes of the busy retry ([ADR 0017](decisions/0017-retry-busy-ipp-printers.md)). The Windows spooler and CUPS already hold jobs; direct IPP doesn't
+
+**Tier 3: small items earlier ADRs left for later.**
+
+11. **Common paper sizes built in,** and a `MediaSize` from a PWG name, so a caller needn't give the dimensions ([ADR 0025](decisions/0025-choose-paper-colour-and-tray.md))
+12. **Which print systems the catalog skipped,** in its result, not only in the log ([ADR 0008](decisions/0008-print-system-failure-isolation.md), option c)
+13. **IPP notifications** for printers that wait on `notify-wait`, behind the existing watch members ([ADR 0049](decisions/0049-following-printers-and-jobs.md)), and reverse orientations and the `auto` colour mode, in the enums that may grow ([ADR 0011](decisions/0011-capability-model.md), [ADR 0044](decisions/0044-room-to-grow-after-1-0.md))
+
+### Companion product: documents (after 1.0)
+
+Making documents stays out of the core packages. A companion product beside them was accepted on 2026-11-23 ([ADR 0053](decisions/0053-document-generation-companion.md)):
+
+- **Print-first, not a general report engine:** labels, receipts, tickets, packing slips and simple invoices, laid out once and rendered to PDF, ZPL or ESC/POS, at the size the printer's capabilities give
+- **Separate packages,** `Latiprimere.Documents.*`, which the core never references, so printing stays free of them
+- **Starts straight after the 1.0 sign-off,** so it doesn't hold 1.0 up
+
+Stages, each useful alone (sizes rough, from ADR 0053):
+
+- [ ] Stage 0: a guide to printing PDFs made with QuestPDF, PDFsharp/MigraDoc and HTML-to-PDF tools (a day)
+- [ ] Stage 1: ZPL and ESC/POS builders, `Latiprimere.Documents.Commands` (1–2 weeks)
+- [ ] Stage 2: the page model and PDF output in the standard 14 fonts, `Latiprimere.Documents` (3–4 weeks)
+- [ ] Stage 2b: embedded TrueType and OpenType fonts, subset, for Latin, Greek, Cyrillic and CJK (2–3 weeks)
+- [ ] Stage 3: documents to label and receipt printers as ZPL or ESC/POS, `Latiprimere.Documents.Rendering` (1–2 weeks)
 
 ## Risks
 

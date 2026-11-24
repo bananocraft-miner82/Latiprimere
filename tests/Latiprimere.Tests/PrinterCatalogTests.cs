@@ -161,7 +161,7 @@ public sealed class PrinterCatalogTests
 		IPrinter printer = await catalog.GetPrinterAsync("label-printer", TestContext.Current.CancellationToken);
 
 		// Assert
-		Assert.Same(expectedPrinter, printer);
+		Assert.Same(expectedPrinter, printer?.GetFeature<FakePrinter>());
 	}
 
 	[Fact]
@@ -253,7 +253,7 @@ public sealed class PrinterCatalogTests
 		IPrinter? printer = await catalog.GetDefaultPrinterAsync(TestContext.Current.CancellationToken);
 
 		// Assert
-		Assert.Same(expectedPrinter, printer);
+		Assert.Same(expectedPrinter, printer?.GetFeature<FakePrinter>());
 	}
 
 	[Fact]
@@ -395,7 +395,7 @@ public sealed class PrinterCatalogTests
 		IPrinter? printer = await catalog.GetDefaultPrinterAsync(TestContext.Current.CancellationToken);
 
 		// Assert
-		Assert.Same(expectedPrinter, printer);
+		Assert.Same(expectedPrinter, printer?.GetFeature<FakePrinter>());
 	}
 
 	[Fact]

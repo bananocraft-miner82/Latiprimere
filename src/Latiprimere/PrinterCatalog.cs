@@ -16,6 +16,12 @@ namespace Latiprimere;
 /// unreachable print system doesn't hide the printers of the others. The call fails only if every print system fails.
 /// </para>
 /// <para>
+/// The printers it returns are its own, around the print system's. A job that sets a <see cref="PrintOptions"/>
+/// setting the print system's printer doesn't apply (<see cref="IPrinter.AppliedOptions"/>) is refused with
+/// <see cref="NotSupportedException"/> before anything is sent. Reach what a print system's printer offers beyond
+/// <see cref="IPrinter"/> with <see cref="IPrinter.GetFeature{T}"/>, not a cast.
+/// </para>
+/// <para>
 /// The catalog doesn't own the print systems it is given and never disposes them. A dependency injection container
 /// disposes the ones it created; an application that created them with a factory disposes them itself, after it has
 /// finished with the catalog.
@@ -115,7 +121,7 @@ public sealed partial class PrinterCatalog : IPrinterCatalog
 			throw PrinterNotFoundException.FromPrinterId(printerId);
 		}
 
-		return foundPrinter;
+		return CatalogPrinter.Wrap(foundPrinter)!;
 	}
 
 	/// <inheritdoc/>
@@ -152,7 +158,7 @@ public sealed partial class PrinterCatalog : IPrinterCatalog
 			this.ThrowIfEveryPrintSystemFailed(failures);
 		}
 
-		return defaultPrinter;
+		return CatalogPrinter.Wrap(defaultPrinter);
 	}
 
 	/// <summary>

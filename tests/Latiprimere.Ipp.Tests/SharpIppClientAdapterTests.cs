@@ -372,6 +372,45 @@ public sealed class SharpIppClientAdapterTests
 	}
 
 	[Fact]
+	public async Task GivenADocumentPasswordWhenPrintJobSentThenItIsAnOctetStringOfItsUtf8Bytes()
+	{
+		// Arrange: a password with a character outside ASCII, as PWG 5100.13 sends passwords as octets (ADR 0054).
+		// SharpIppNext writes a string value as ASCII, which would turn the character into '?', so bytes are given
+		StubHttpMessageHandler stub = new StubHttpMessageHandler
+		(
+			HttpStatusCode.OK,
+			"application/ipp",
+			SharpIppClientAdapterTests.CreatePrintJobResponse(7)
+		);
+
+		using SharpIppClientAdapter client = new SharpIppClientAdapter(new HttpClient(stub, disposeHandler: true), sendsCredentials: false);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		PrintJobRequest request = new PrintJobRequest
+		{
+			Document            = document,
+			OperationAttributes = new PrintJobOperationAttributes
+			{
+				PrinterUri         = new IppValue<Uri>(SharpIppClientAdapterTests.PrinterUri),
+				RequestingUserName = new StringWithLanguage("ann")
+			}
+		};
+
+		IppVendorAttributes vendorAttributes = new IppVendorAttributes
+		{
+			Operation = [new IppAttribute(Tag.OctetStringWithAnUnspecifiedFormat, "document-password", Encoding.UTF8.GetBytes("pass\u00e9"))]
+		};
+
+		// Act
+		await client.PrintJobAsync(request, vendorAttributes, TestContext.Current.CancellationToken);
+
+		// Assert: tag 0x30, octetString, holding the UTF-8 bytes
+		byte[] body = Assert.IsType<byte[]>(stub.LastRequestBody);
+		byte[] expected = SharpIppClientAdapterTests.EncodeAttribute(0x30, "document-password", Encoding.UTF8.GetBytes("pass\u00e9"));
+		Assert.True(body.AsSpan().IndexOf(expected) > 0);
+	}
+
+	[Fact]
 	public async Task GivenVendorAttributesRefusedByPrinterWhenPrintJobSentThenThrowsPrintExceptionWithTheStatus()
 	{
 		// Arrange — client-error-attributes-or-values-not-supported (0x040B)

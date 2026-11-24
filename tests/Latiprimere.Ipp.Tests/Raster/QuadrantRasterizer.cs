@@ -25,17 +25,21 @@ internal sealed class QuadrantRasterizer : IPdfRasterizer
 	/// <summary>Gets every document opened, in order.</summary>
 	internal List<QuadrantDocument> Opened { get; } = [];
 
+	/// <summary>Gets the options each document was opened with, in order.</summary>
+	internal List<PdfOpenOptions?> OpenedWith { get; } = [];
+
 	/// <summary>Gets or sets the failure rendering throws, if any.</summary>
 	internal Exception? RenderFailure { get; set; }
 
 	/// <inheritdoc/>
-	public IRasterDocument Open(Stream content)
+	public IRasterDocument Open(Stream content, PdfOpenOptions? options = null)
 	{
 		ArgumentNullException.ThrowIfNull(content);
 
 		PageSize[] pages = Enumerable.Repeat(QuadrantRasterizer.PortraitA4, this.pageCount).ToArray();
 		QuadrantDocument document = new QuadrantDocument(pages) { RenderFailure = this.RenderFailure };
 		this.Opened.Add(document);
+		this.OpenedWith.Add(options);
 
 		return document;
 	}

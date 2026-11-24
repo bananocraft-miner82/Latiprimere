@@ -50,13 +50,26 @@ internal readonly record struct PageLayout(int X, int Y, int Width, int Height, 
 	/// Works out how many rendered rows to produce at a time so each band stays within a memory budget.
 	/// </summary>
 	/// <param name="maxBandBytes">The largest band, in bytes.</param>
+	/// <param name="pixelFormat">The format bands are rendered in.</param>
 	/// <returns>The number of rows per band: at least one, at most the rendered height.</returns>
-	internal int GetRowsPerBand(long maxBandBytes)
+	internal int GetRowsPerBand(long maxBandBytes, RasterPixelFormat pixelFormat = RasterPixelFormat.Bgra32)
 	{
-		long stride = (long)this.RenderWidth * RasterBand.BytesPerPixel;
-		long rows = maxBandBytes / stride;
+		long rows = maxBandBytes / this.GetStride(pixelFormat);
 
 		return (int)Math.Clamp(rows, 1, this.RenderHeight);
+	}
+
+	/// <summary>
+	/// Gets the bytes from one rendered row to the next, as a device-independent bitmap needs them: a whole number of
+	/// 4-byte words, which 32-bit pixels always are and 8-bit grey rows are padded to.
+	/// </summary>
+	/// <param name="pixelFormat">The format bands are rendered in.</param>
+	/// <returns>The stride, in bytes.</returns>
+	internal int GetStride(RasterPixelFormat pixelFormat)
+	{
+		int bytes = this.RenderWidth * RasterBand.GetBytesPerPixel(pixelFormat);
+
+		return (bytes + 3) & ~3;
 	}
 
 	/// <summary>

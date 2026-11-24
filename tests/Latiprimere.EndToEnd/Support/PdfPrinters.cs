@@ -43,7 +43,7 @@ public static class PdfPrinters
 		using FileStream document = TestDocuments.Open(documentName);
 		DateTime submittedAt = DateTime.UtcNow;
 
-		IPrintJob job = await printer.SubmitAsync(PdfPrinters.ToContent(document, documentName), options with { JobName = options.JobName ?? "Latiprimere end-to-end" }, context.CancellationToken);
+		IPrintJob job = await printer.SubmitAsync(PdfPrinters.ToContent(document, documentName, null), options with { JobName = options.JobName ?? "Latiprimere end-to-end" }, context.CancellationToken);
 		context.Note($"Submitted job {job.Id} ({label}).");
 		PrintJobStatus status = await JobFollower.WaitUntilFinishedAsync(context, job);
 		context.RequireEqual($"the {label} job completes", PrintJobState.Completed, status.State);
@@ -67,8 +67,9 @@ public static class PdfPrinters
 	/// <param name="documentName">The test document: a PDF, a PNG or JPEG image, or UTF-8 text.</param>
 	/// <param name="options">How to print it; the output file is set here.</param>
 	/// <param name="label">Names the output file, such as <c>landscape</c>.</param>
+	/// <param name="password">The PDF's password, or <see langword="null"/> for none.</param>
 	/// <returns>What the driver wrote.</returns>
-	public static async Task<PdfSummary> PrintToMicrosoftPdfAsync(ScenarioContext context, IPrinter printer, string documentName, PrintOptions options, string label)
+	public static async Task<PdfSummary> PrintToMicrosoftPdfAsync(ScenarioContext context, IPrinter printer, string documentName, PrintOptions options, string label, string? password = null)
 	{
 		ArgumentNullException.ThrowIfNull(context);
 		ArgumentNullException.ThrowIfNull(printer);
@@ -87,7 +88,7 @@ public static class PdfPrinters
 		// Only one job at a time, across every test process, or the driver can stall and leave an empty file
 		using (SharedPrinterLock printerLock = new SharedPrinterLock(TestPrinters.MicrosoftPrintToPdfName))
 		{
-			IPrintJob job = await printer.SubmitAsync(PdfPrinters.ToContent(document, documentName), withFile, context.CancellationToken);
+			IPrintJob job = await printer.SubmitAsync(PdfPrinters.ToContent(document, documentName, password), withFile, context.CancellationToken);
 			context.Note($"Submitted job {job.Id} ({label}).");
 			PrintJobStatus status = await JobFollower.WaitUntilFinishedAsync(context, job);
 			context.RequireEqual($"the {label} job completes", PrintJobState.Completed, status.State);
@@ -106,14 +107,16 @@ public static class PdfPrinters
 	/// </summary>
 	/// <param name="document">The document's stream.</param>
 	/// <param name="documentName">Its file name.</param>
+	/// <param name="password">A PDF's password, or <see langword="null"/> for none.</param>
 	/// <returns>The content: a PNG, a JPEG, UTF-8 text, or a PDF.</returns>
-	private static PrintContent ToContent(Stream document, string documentName)
+	private static PrintContent ToContent(Stream document, string documentName, string? password)
 	{
 		return Path.GetExtension(documentName).ToUpperInvariant() switch
 		{
 			".PNG" => PrintContent.FromPng(document),
 			".JPG" => PrintContent.FromJpeg(document),
 			".TXT" => PrintContent.FromText(document, System.Text.Encoding.UTF8),
+			_ when password is not null => PrintContent.FromPdf(document, password),
 			_      => PrintContent.FromPdf(document),
 		};
 	}

@@ -72,7 +72,7 @@ Drafted for the owner to confirm. None of these is a decision yet:
 
 ## Consequences
 
-- **Five years per line is a real commitment.** When .NET 12 brings a `12.0.x` line, `11.0.x` still needs security fixes until five years after its first stable release. That means maintaining a branch and releasing from it, which the release workflow can't do yet: it releases from `release` only.
+- **Five years per line is a real commitment.** When .NET 12 brings a `12.0.x` line, `11.0.x` still needs security fixes until five years after its first stable release. That means maintaining a branch and releasing from it, which the release workflow can't do yet: it releases from `release` only. [ADR 0052](0052-support-branches.md) proposes how.
 - **The owner sets up, before relying on the policy:**
   - **GitHub private vulnerability reporting:** in the repository's Settings, then Advanced Security, then Private vulnerability reporting, choose Enable.
   - **the `security@latiprimere.com` mailbox;**

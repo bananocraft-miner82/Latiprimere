@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Latiprimere;
 using Microsoft.Extensions.DependencyInjection;
@@ -71,12 +72,32 @@ internal static class Program
 			case "vendor-options" when arguments.Length == 1:
 				IPrinter printer = await catalog.GetPrinterAsync(arguments[0]);
 				await VendorOptions.ShowVendorOptionsAsync(printer);
-				PrintOptions best = await VendorOptions.ChooseBestQualityAsync(printer);
-				Console.WriteLine($"Best quality: {string.Join(", ", best.VendorOptions.Select(option => $"{option.Key}={option.Value}"))}");
+				PrintOptions twoUp = await VendorOptions.ChooseTwoPagesPerSheetAsync(printer);
+				Console.WriteLine($"Two pages per sheet: {string.Join(", ", twoUp.VendorOptions.Select(option => $"{option.Key}={option.Value}"))}");
 				return 0;
 
 			case "options" when arguments.Length == 2:
 				await PrintOptionsAndJobs.PrintWithOptionsAsync(await catalog.GetPrinterAsync(arguments[0]), arguments[1]);
+				return 0;
+
+			case "pages" when arguments.Length == 2:
+				await PrintOptionsAndJobs.PrintPagesAsync(await catalog.GetPrinterAsync(arguments[0]), arguments[1]);
+				return 0;
+
+			case "printer-status" when arguments.Length == 1:
+				using (CancellationTokenSource following = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
+				{
+					await PrintOptionsAndJobs.FollowPrinterAsync(await catalog.GetPrinterAsync(arguments[0]), following.Token);
+				}
+
+				return 0;
+
+			case "pdf-label" when arguments.Length == 2:
+				using (FileStream label = File.OpenRead(arguments[1]))
+				{
+					await LabelsAndReceipts.PrintPdfLabelAsync(await catalog.GetPrinterAsync(arguments[0]), label);
+				}
+
 				return 0;
 
 			case "label" when arguments.Length == 2:
@@ -122,7 +143,10 @@ internal static class Program
 		Console.WriteLine("  options <printer-id> <pdf>         Print options and following jobs");
 		Console.WriteLine("  capabilities <printer-id>          Reading printer capabilities");
 		Console.WriteLine("  vendor-options <printer-id>        Vendor options and Windows Print Capabilities");
+		Console.WriteLine("  pages <printer-id> <pdf>           Print options: pages 2 and 3, collated, at draft quality");
+		Console.WriteLine("  printer-status <printer-id>        Print options: following a printer for three seconds");
 		Console.WriteLine("  label <printer-id> <order>         Labels and receipts: a ZPL label");
+		Console.WriteLine("  pdf-label <printer-id> <pdf>       Labels and receipts: a PDF on 102 x 152 mm labels");
 		Console.WriteLine("  receipt <printer-id>               Labels and receipts: an ESC/POS receipt");
 		Console.WriteLine("  errors <printer-id> <pdf>          Errors and troubleshooting");
 		Console.WriteLine("  logging                            Logging: listing printers, logging at Debug");

@@ -55,8 +55,11 @@ public sealed class RasterPdfRoundTripTests
 				document.GetPageSize(pageIndex), PageOrientation.PrinterDefault, mediaWidth, mediaHeight, dpi
 			);
 
-			byte[] expected = new byte[width * height * RasterBand.BytesPerPixel];
-			document.RenderBand(pageIndex, RasterBand.Create(width, height, 0, height) with { Rotation = rotation }, expected);
+			// In the format the encoder renders the colour space in: grey for grey (ADR 0054)
+			RasterPixelFormat pixelFormat = RasterPixels.RenderFormat((RasterColorSpace)colorSpace);
+			RasterBand band = RasterBand.Create(width, height, 0, height, pixelFormat) with { Rotation = rotation };
+			byte[] expected = new byte[band.ByteCount];
+			document.RenderBand(pageIndex, band, expected);
 			RasterPdfRoundTripTests.AssertSamePixels(page, expected, x, y, width, height, (RasterColorSpace)colorSpace);
 		}
 	}
@@ -65,7 +68,7 @@ public sealed class RasterPdfRoundTripTests
 	/// Checks every pixel of a decoded page: the rendered pixels inside the content box, white outside.
 	/// </summary>
 	/// <param name="page">The decoded page.</param>
-	/// <param name="rendered">The content as rendered, four bytes a pixel.</param>
+	/// <param name="rendered">The content as rendered: four bytes a pixel for colour, one of grey otherwise.</param>
 	/// <param name="left">The content's left.</param>
 	/// <param name="top">Its top.</param>
 	/// <param name="width">Its width.</param>
@@ -82,12 +85,19 @@ public sealed class RasterPdfRoundTripTests
 			for (int x = 0; x < page.Width; x++)
 			{
 				bool inside = x >= left && x < left + width && y >= top && y < top + height;
-				int source = inside ? (((y - top) * width) + (x - left)) * RasterBand.BytesPerPixel : -1;
-				(int r, int g, int b) = inside ? (rendered[source + 2], rendered[source + 1], rendered[source]) : (255, 255, 255);
+				int pixel = inside ? ((y - top) * width) + (x - left) : -1;
+				bool same;
 
-				bool same = colorSpace == RasterColorSpace.Srgb8
-					? line[x * 3] == r && line[(x * 3) + 1] == g && line[(x * 3) + 2] == b
-					: line[x] == (((77 * r) + (150 * g) + (29 * b) + 128) >> 8);
+				if (colorSpace == RasterColorSpace.Srgb8)
+				{
+					int source = pixel * RasterBand.GetBytesPerPixel(RasterPixelFormat.Bgra32);
+					(int r, int g, int b) = inside ? (rendered[source + 2], rendered[source + 1], rendered[source]) : (255, 255, 255);
+					same = line[x * 3] == r && line[(x * 3) + 1] == g && line[(x * 3) + 2] == b;
+				}
+				else
+				{
+					same = line[x] == (inside ? rendered[pixel] : 255);
+				}
 
 				differences += same ? 0 : 1;
 			}

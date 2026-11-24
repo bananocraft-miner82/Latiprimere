@@ -17,6 +17,7 @@ The interfaces, records, enums and exceptions every package shares, in the `Lati
 - [ColorMode](/docs/reference/latiprimere-abstractions/colormode/): Enumerates the ways a printer can render colour.
 - [DocumentFormat](/docs/reference/latiprimere-abstractions/documentformat/): Enumerates the document formats that can be submitted to a printer.
 - [DuplexMode](/docs/reference/latiprimere-abstractions/duplexmode/): Enumerates the ways pages can be printed on one or both sides of the paper.
+- [Finishing](/docs/reference/latiprimere-abstractions/finishing/): Something a printer does to the printed sheets: staples, holes or a fold.
 - [InputTray](/docs/reference/latiprimere-abstractions/inputtray/): A paper source on a printer, such as a tray or the manual feed.
 - [IPdfRasterizer](/docs/reference/latiprimere-abstractions/ipdfrasterizer/): Turns PDF documents into pixels, for print systems that need images rather than PDF, such as the Windows spooler.
 - [IPrinter](/docs/reference/latiprimere-abstractions/iprinter/): A printer that can accept print jobs.
@@ -25,8 +26,13 @@ The interfaces, records, enums and exceptions every package shares, in the `Lati
 - [IPrintSystem](/docs/reference/latiprimere-abstractions/iprintsystem/): A platform print system, such as the Windows spooler or CUPS, implemented by a Latiprimere platform adapter.
 - [IRasterDocument](/docs/reference/latiprimere-abstractions/irasterdocument/): An opened document whose pages can be rendered to pixels, one horizontal band at a time.
 - [MediaSize](/docs/reference/latiprimere-abstractions/mediasize/): A paper size a printer can print on.
+- [MediaSizeRange](/docs/reference/latiprimere-abstractions/mediasizerange/): The sizes of paper a printer takes beyond its listed sizes: custom sheets, or lengths cut from a roll, such as a receipt or label printer's.
+- [MediaType](/docs/reference/latiprimere-abstractions/mediatype/): A kind of paper or other medium to print on, such as plain paper, labels or glossy photo paper, as the printer reports it.
+- [OutputBin](/docs/reference/latiprimere-abstractions/outputbin/): Where a printer delivers the printed sheets, such as its top tray or a mailbox, as the printer reports it.
 - [PageOrientation](/docs/reference/latiprimere-abstractions/pageorientation/): Enumerates the orientations in which pages can be printed.
+- [PageRange](/docs/reference/latiprimere-abstractions/pagerange/): A run of pages to print, counted from 1, both ends included, as [PrintOptions.PageRanges](/docs/reference/latiprimere-abstractions/printoptions/#pageranges) takes them. One page is a range whose first and last are the same: `new PageRange(3, 3)`.
 - [PageSize](/docs/reference/latiprimere-abstractions/pagesize/): The size of a document page.
+- [PdfOpenOptions](/docs/reference/latiprimere-abstractions/pdfopenoptions/): Describes how a PDF is opened for rasterising.
 - [PrintAuthenticationException](/docs/reference/latiprimere-abstractions/printauthenticationexception/): The exception thrown when a print system needs a user name and password for a request, or doesn't accept the ones it was given.
 - [PrintCertificateException](/docs/reference/latiprimere-abstractions/printcertificateexception/): The exception thrown when a printer's certificate isn't trusted, so no encrypted connection to it was made.
 - [PrintContent](/docs/reference/latiprimere-abstractions/printcontent/): Represents a document to be printed: its data and its format.
@@ -38,9 +44,13 @@ The interfaces, records, enums and exceptions every package shares, in the `Lati
 - [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The exception thrown when a printing operation fails. Base class for all Latiprimere exceptions.
 - [PrintJobState](/docs/reference/latiprimere-abstractions/printjobstate/): Enumerates the states a print job can be in. Modelled on the IPP job states.
 - [PrintJobStatus](/docs/reference/latiprimere-abstractions/printjobstatus/): Describes the status of a print job at a point in time.
+- [PrintOptionKinds](/docs/reference/latiprimere-abstractions/printoptionkinds/): The settings of [PrintOptions](/docs/reference/latiprimere-abstractions/printoptions/), as flags, for saying which of them a printer applies ([IPrinter.AppliedOptions](/docs/reference/latiprimere-abstractions/iprinter/#appliedoptions)).
 - [PrintOptions](/docs/reference/latiprimere-abstractions/printoptions/): Describes how a print job should be printed.
+- [PrintQuality](/docs/reference/latiprimere-abstractions/printquality/): How carefully to print, trading speed and ink for detail, as IPP's `print-quality` has it.
 - [PrintSystemUnavailableException](/docs/reference/latiprimere-abstractions/printsystemunavailableexception/): The exception thrown when a print system can't be used: no supported print system is available on the current platform, usually because no Latiprimere platform adapter has been registered for it, or a print system's own service isn't running, such as the Windows Print Spooler.
 - [RasterBand](/docs/reference/latiprimere-abstractions/rasterband/): Describes one horizontal band of a page rendered at a given pixel size.
+- [RasterPixelFormat](/docs/reference/latiprimere-abstractions/rasterpixelformat/): How a rendered band's pixels are laid out in memory.
+- [RasterRenderOptions](/docs/reference/latiprimere-abstractions/rasterrenderoptions/): Describes how a band is rendered, beyond its size, pixel format and rotation.
 - [RasterRotation](/docs/reference/latiprimere-abstractions/rasterrotation/): How far to turn a page as it is rendered, clockwise, in quarter turns.
 - [ScalingMode](/docs/reference/latiprimere-abstractions/scalingmode/): Enumerates the ways an image is sized on the paper, as IPP's `print-scaling` has them.
 - [VendorOption](/docs/reference/latiprimere-abstractions/vendoroption/): A setting a printer offers beyond the typed options in [PrintOptions](/docs/reference/latiprimere-abstractions/printoptions/), such as print quality, stapling or a driver's own settings, with the values it takes.

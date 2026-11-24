@@ -185,8 +185,9 @@ jobs:
       # Publishes the CLI sample and the end-to-end harness with Native AOT for each target, fails on any trimming or
       # AOT warning, and runs some of the native harness's scenarios against this runner's test printers: listing,
       # options through CUPS and straight to ippeveprinter, Microsoft Print to PDF, and the scripted printer for raster,
-      # vendor options, remembered addresses, a stalled upload, job reasons and a Windows queue over IPPS
-      # (tools/aot-check/check-aot.sh lists them; ADR 0029). A scenario whose printers the runner doesn't have is skipped.
+      # vendor options, remembered addresses, a stalled upload, job reasons, a Windows queue over IPPS, spooler
+      # notifications, the typed options and password-protected PDFs (tools/aot-check/check-aot.sh lists them; ADR
+      # 0029). A scenario whose printers the runner doesn't have is skipped.
       - name: Check Native AOT
         shell: bash
         run: |

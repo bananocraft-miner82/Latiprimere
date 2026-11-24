@@ -14,7 +14,7 @@ public interface IPrintSystem : IDisposable
 
 A platform print system, such as the Windows spooler or CUPS, implemented by a Latiprimere platform adapter.
 
-Applications normally use [IPrinterCatalog](/docs/reference/latiprimere-abstractions/iprintercatalog/), which combines every supported print system. Printer identifiers returned by a print system must not clash with those of other print systems.
+Applications normally use [IPrinterCatalog](/docs/reference/latiprimere-abstractions/iprintercatalog/), which combines every supported print system. Its printers are its own, around a print system's, and refuse a job that sets a [PrintOptions](/docs/reference/latiprimere-abstractions/printoptions/) setting the print system's printer doesn't apply ([IPrinter.AppliedOptions](/docs/reference/latiprimere-abstractions/iprinter/#appliedoptions)); a printer from a print system used directly has no such check. Printer identifiers returned by a print system must not clash with those of other print systems.
 
 Print systems may hold connections, such as the HTTP client of the CUPS and IPP print systems, so dispose them when finished. A dependency injection container does that for the print systems it creates; an application that creates them with a factory disposes them itself. Printers and jobs obtained from a print system stop working once it is disposed.
 

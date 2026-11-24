@@ -1,11 +1,11 @@
 ---
 title: Labels and receipts
-description: Send raw printer data, such as ZPL to a Zebra label printer or ESC/POS to a receipt printer.
+description: Send raw printer data, such as ZPL to a Zebra label printer or ESC/POS to a receipt printer, or print PDF labels on a custom paper size.
 sidebar:
   order: 4
 ---
 
-Label and receipt printers usually have their own languages: ZPL for Zebra label printers, ESC/POS for most receipt printers. To use one, build the commands yourself and send them with `PrintContent.FromRaw`. Latiprimere passes the bytes to the printer unchanged.
+Label and receipt printers usually have their own languages: ZPL for Zebra label printers, ESC/POS for most receipt printers. To use one, build the commands yourself and send them with `PrintContent.FromRaw`. Latiprimere passes the bytes to the printer unchanged. A printer with a driver, or one that takes PDFs over IPP, can also print PDF labels on a size you choose: see [PDF labels on a custom size](#pdf-labels-on-a-custom-size).
 
 ## A shipping label in ZPL
 
@@ -67,6 +67,35 @@ The example uses plain ASCII. For characters such as `£` or `é`, choose a code
 - **Virtual printers refuse raw data.** Microsoft Print to PDF would silently produce nothing, so Latiprimere refuses with `NotSupportedException` before anything is queued.
 - **Text-only printers refuse PDFs.** A Windows printer set up with the Generic / Text Only driver can't print a PDF's pages, and its queue would stop with an error, so Latiprimere refuses with `NotSupportedException`. Send it raw data instead.
 - **Some printers or queues don't accept raw data** at all. The job is then rejected with a `PrintException`.
+
+## PDF labels on a custom size
+
+Label stock rarely matches a named paper size. `MediaSize.Custom(width, height)` makes a size in millimetres, which a printer takes when it falls within one of its `CustomMediaSizes`. This prints a PDF on 102 x 152 mm labels:
+
+```csharp
+static async Task PrintPdfLabelAsync(IPrinter printer, Stream label)
+{
+	PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync();
+	MediaSize size = MediaSize.Custom(102, 152);
+
+	if (!capabilities.CustomMediaSizes.Any(range => range.Contains(size)))
+	{
+		Console.WriteLine($"{printer.Info.Name} doesn't take 102 x 152 mm labels.");
+
+		return;
+	}
+
+	// IPP printers name label stock "labels"; Windows drivers number their media types
+	MediaType? labels = capabilities.MediaTypes.FirstOrDefault(type => type.Id == "labels");
+
+	PrintOptions options = new PrintOptions { MediaSize = size, MediaType = labels };
+	IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(label), options);
+
+	Console.WriteLine($"Sent the label as job {job.Id}");
+}
+```
+
+A range with `IsRoll` is a roll: its heights are how long a piece the printer can cut. Network printers and CUPS are sent the size in `media-col`; Windows sets the driver's custom paper size, when its driver lists one and the size is within its limits.
 
 ## Label printers on the network
 

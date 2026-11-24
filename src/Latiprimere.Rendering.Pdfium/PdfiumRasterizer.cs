@@ -18,9 +18,9 @@ public sealed unsafe class PdfiumRasterizer : IPdfRasterizer
 	private const int InitialBufferBytes = 64 * 1024;   // For streams whose length isn't known
 
 	/// <inheritdoc/>
-	public IRasterDocument Open(Stream content)
+	public IRasterDocument Open(Stream content, PdfOpenOptions? options = null)
 	{
-		return PdfiumRasterizer.Open(content, PdfiumRasterizer.MaxDocumentBytes);
+		return PdfiumRasterizer.Open(content, PdfiumRasterizer.MaxDocumentBytes, options?.Password);
 	}
 
 	/// <summary>
@@ -28,10 +28,11 @@ public sealed unsafe class PdfiumRasterizer : IPdfRasterizer
 	/// </summary>
 	/// <param name="content">The PDF document, read from its current position.</param>
 	/// <param name="maxDocumentBytes">The longest document accepted, in bytes.</param>
+	/// <param name="password">The document's password, or <see langword="null"/>.</param>
 	/// <returns>The open document. The caller disposes it.</returns>
 	/// <exception cref="PrintException">The document is too large, or PDFium can't open it.</exception>
 	/// <remarks>Tests pass a small limit, as reaching 2 GB isn't practical.</remarks>
-	internal static IRasterDocument Open(Stream content, int maxDocumentBytes)
+	internal static IRasterDocument Open(Stream content, int maxDocumentBytes, string? password = null)
 	{
 		ArgumentNullException.ThrowIfNull(content);
 
@@ -44,11 +45,11 @@ public sealed unsafe class PdfiumRasterizer : IPdfRasterizer
 			{
 				PdfiumLibrary.EnsureInitialised();
 				PdfiumLibrary.ReleasePending();
-				IntPtr document = PdfiumNative.LoadMemDocument((byte*)data, (nuint)length, null);
+				IntPtr document = PdfiumNative.LoadMemDocument((byte*)data, (nuint)length, password);
 
 				if (document == IntPtr.Zero)
 				{
-					throw PdfiumRasterizer.CreateLoadException(PdfiumNative.GetLastError());
+					throw PdfiumRasterizer.CreateLoadException(PdfiumNative.GetLastError(), password is not null);
 				}
 
 				return new PdfiumDocument(document, data, PdfiumNative.GetPageCount(document));
@@ -149,12 +150,16 @@ public sealed unsafe class PdfiumRasterizer : IPdfRasterizer
 	/// Creates the exception for a document PDFium could not open.
 	/// </summary>
 	/// <param name="error">The FPDF_ERR_* code.</param>
-	/// <returns>The exception, with the PDFium error as its native error code.</returns>
-	private static PrintException CreateLoadException(uint error)
+	/// <param name="hasPassword">Whether a password was given, so a password error means it was wrong.</param>
+	/// <returns>The exception, with the PDFium error as its native error code. It never holds the password.</returns>
+	private static PrintException CreateLoadException(uint error, bool hasPassword)
 	{
-		string message = error == PdfiumConstants.ErrorPassword
-			? ExceptionMessages.PdfPasswordProtected
-			: ExceptionMessages.FormatPdfNotReadable(error);
+		string message = error switch
+		{
+			PdfiumConstants.ErrorPassword when hasPassword => ExceptionMessages.PdfPasswordWrong,
+			PdfiumConstants.ErrorPassword                  => ExceptionMessages.PdfPasswordProtected,
+			_                                              => ExceptionMessages.FormatPdfNotReadable(error),
+		};
 
 		return new PrintException(message) { NativeErrorCode = (int)error };
 	}

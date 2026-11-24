@@ -29,6 +29,16 @@ internal sealed record GdiPrintRequest
 	/// <summary>Gets the DMBIN_* number of the chosen tray, or <see langword="null"/> to keep the printer's.</summary>
 	public short? BinId { get; init; }
 
+	/// <summary>Gets a custom paper size, width and length in tenths of a millimetre, sent as DMPAPER_USER, or
+	/// <see langword="null"/>.</summary>
+	public (short Width, short Length)? CustomPaper { get; init; }
+
+	/// <summary>Gets the DMMEDIA_* paper type, or <see langword="null"/> for the driver's default.</summary>
+	public uint? MediaTypeId { get; init; }
+
+	/// <summary>Gets the zero-based pages to print, in order (ADR 0056).</summary>
+	public required IReadOnlyList<int> Pages { get; init; }
+
 	/// <summary>Gets a DEVMODE saved from the driver (<c>windows:devmode</c>), with its private data, to start from
 	/// instead of the driver's defaults; or <see langword="null"/>.</summary>
 	public byte[]? SavedDevMode { get; init; }

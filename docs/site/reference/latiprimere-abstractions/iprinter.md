@@ -18,6 +18,18 @@ Safe to use from several threads at once, for example to submit several jobs tog
 
 ## Properties
 
+### AppliedOptions
+
+```csharp
+PrintOptionKinds AppliedOptions { get; }
+```
+
+Gets the settings of [PrintOptions](/docs/reference/latiprimere-abstractions/printoptions/) this printer applies to a job.
+
+A printer from [IPrinterCatalog](/docs/reference/latiprimere-abstractions/iprintercatalog/) refuses a job that sets anything else to other than its default, with [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception), before anything is sent, rather than printing as if it weren't set. That matters for settings a later version of Latiprimere adds, which a print system written for this one wouldn't know to apply. A setting the printer applies may still be refused for a job, as when the printer lacks the paper size asked for.
+
+The default implementation gives every setting this version of [PrintOptions](/docs/reference/latiprimere-abstractions/printoptions/) has. A print system that applies a setting added later says so by overriding this.
+
 ### Info
 
 ```csharp
@@ -49,6 +61,24 @@ The capabilities. Anything the print system doesn't report is left empty.
 **Exceptions**
 
 - [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system or printer couldn't be asked.
+
+### GetFeature
+
+```csharp
+T? GetFeature<T>()
+```
+
+Gets what a printer of one print system offers beyond [IPrinter](/docs/reference/latiprimere-abstractions/iprinter/), such as `Latiprimere.Windows.IWindowsPrinter`, or `null` if it offers none of that kind.
+
+Use this rather than a cast: printers from [IPrinterCatalog](/docs/reference/latiprimere-abstractions/iprintercatalog/) are Latiprimere's own, around the print system's, so a cast to a print system's interface fails where this finds it. The default implementation casts this printer.
+
+**Type parameters**
+
+- `T`: The interface asked for.
+
+**Returns**
+
+The printer as `T`, or `null`.
 
 ### GetJobAsync
 

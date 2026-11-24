@@ -67,15 +67,17 @@ if [ -n "$PREVIOUS_VERSION" ]; then
 		echo "v$PREVIOUS_VERSION isn't in this commit's history. Merge the pull request 'Post-release $PREVIOUS_VERSION' into main, then main into release." >&2
 		exit 1
 	fi
+fi
 
-	# If the changelog changed since the previous release but has no "## Unreleased", the new notes went under a
-	# released version's heading, as 11.0.5's did under 11.0.3's. Stop, rather than publish a changelog that
-	# credits them to the wrong release. (Corrections to earlier entries can go out with the next release's notes.)
-	if ! tr -d '\r' < CHANGELOG.md | grep -qx '## Unreleased' \
-		&& ! git diff --quiet "v$PREVIOUS_VERSION" -- CHANGELOG.md; then
-		echo "CHANGELOG.md changed since v$PREVIOUS_VERSION but has no '## Unreleased' heading. Put this release's notes under '## Unreleased', above '## $PREVIOUS_VERSION', on main." >&2
-		exit 1
-	fi
+# Every release needs notes under "## Unreleased", which become its changelog entry. Without them it would have no
+# entry, as 11.0.9-preview had none, and users would get no word of what changed, so stop before anything changes. A
+# release with nothing to tell users says so in a line. This also catches notes written under a released version's
+# heading, as 11.0.5's were under 11.0.3's, which would credit them to the wrong release. (Corrections to earlier
+# entries can go out with the next release's notes.)
+if ! tr -d '\r' < CHANGELOG.md \
+	| awk '$0 == "## Unreleased" { found = 1; next } found && /^## / { exit } found && NF && !/^#/ { notes = 1 } END { exit !notes }'; then
+	echo "CHANGELOG.md has no notes under '## Unreleased'. Write this release's notes there, above the newest release's heading, on main, then merge main into release again. For a release with nothing to tell users, say so in a line." >&2
+	exit 1
 fi
 
 # Writes standard input to a file, with CRLF line endings if the second argument is "crlf"
@@ -175,15 +177,10 @@ read_file README.md \
 	| sed -E "/^> \*\*Status:\*\*/ s/([Vv]ersion) [^ ]+ is on/\1 $VERSION is on/" \
 	| write_file README.md "$endings"
 
-# Changelog: the notes written under "## Unreleased" become this version's. Without them the release still goes
-# ahead, with a warning, and the website shows no entry for it. (Notes under a released heading stopped it above.)
-if read_file CHANGELOG.md | grep -qx '## Unreleased'; then
-	endings=$(line_endings CHANGELOG.md)
-	read_file CHANGELOG.md \
-		| awk -v heading="## $VERSION - $(date -u +%Y-%m-%d)" '!done && $0 == "## Unreleased" { print heading; done = 1; next } { print }' \
-		| write_file CHANGELOG.md "$endings"
-else
-	echo "::warning::CHANGELOG.md has no '## Unreleased' notes, so $VERSION has no entry in it."
-fi
+# Changelog: the notes written under "## Unreleased", checked above, become this version's
+endings=$(line_endings CHANGELOG.md)
+read_file CHANGELOG.md \
+	| awk -v heading="## $VERSION - $(date -u +%Y-%m-%d)" '!done && $0 == "## Unreleased" { print heading; done = 1; next } { print }' \
+	| write_file CHANGELOG.md "$endings"
 
 echo "Prepared $VERSION. Previous release: ${PREVIOUS_VERSION:-none}."
