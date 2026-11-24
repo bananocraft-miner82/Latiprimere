@@ -44,6 +44,30 @@ Gets or sets a value indicating whether a printer identifier may name any IPP UR
 
 Looking a printer up by URI connects to whatever host and port the URI names. When identifiers can come from outside the application, such as from a web request, allowing any URI would let others make it connect to internal services (server-side request forgery). Turn this on only when every identifier the application looks up is trusted. Otherwise a lookup of an unlisted URI finds no printer, without connecting.
 
+### AllowPlainIppAfterIpps
+
+```csharp
+public bool AllowPlainIppAfterIpps { get; set; }
+```
+
+Gets or sets a value indicating whether a printer found on the network may be reached over plain IPP after it has been reached over IPPS, when its IPPS address stops working. Defaults to `false`.
+
+By default, once a printer found on the network has been reached over IPPS with a trusted certificate, while a certificate is pinned or [IppNetworkOptions.ServerCertificateValidationCallback](/docs/reference/latiprimere-ipp/ippnetworkoptions/#servercertificatevalidationcallback) is set, it is refused with a [PrintException](/docs/reference/latiprimere-abstractions/printexception/) rather than reached over plain IPP, if its IPPS address stops answering, its certificate is no longer trusted, or its name is announced with only a plain address. Any of those could be a device on the network forcing its jobs onto plain IPP, where they can be read. A printer that has never been reached over IPPS falls back either way.
+
+Set it to `true` to fall back as before, as for printers whose certificates change often and whose documents needn't be kept private. The fallback is logged as a warning. It has no effect while [IppNetworkOptions.RequireEncryption](/docs/reference/latiprimere-ipp/ippnetworkoptions/#requireencryption) is set, which never allows plain IPP. Whether each printer was reached over IPPS is remembered either way, so turning it off again protects them at once.
+
+### AllowRememberedAddressWithoutUuid
+
+```csharp
+public bool AllowRememberedAddressWithoutUuid { get; set; }
+```
+
+Gets or sets a value indicating whether a printer found on the network that announced a UUID may be used at its remembered address when the printer there reports no UUID at all. Defaults to `false`.
+
+Looking a printer up by name tries the address it was last seen at first, and uses it only if the printer there is the same: it must report, as `printer-uuid`, the UUID it announced. By default, one that reports no UUID isn't taken on trust, as another device at the address could pass by leaving it out; the network is searched for the name instead, which takes a little longer.
+
+Set it to `true` to take such a printer on trust, as before, for older printers that announce a UUID but don't report `printer-uuid` and that would otherwise be searched for at every lookup. A printer that reports a different UUID is never used there, and one that announced none is always taken on trust.
+
 ### BusyRetryDuration
 
 ```csharp
@@ -82,7 +106,7 @@ Gets or sets the user name and password sent to every printer over IPPS, or `nul
 
 They are sent with every request, as HTTP Basic authentication, and only over IPPS, never in clear text. A printer that asks for a password over plain IPP is refused with a [PrintAuthenticationException](/docs/reference/latiprimere-abstractions/printauthenticationexception/) saying to use its `ipps://` address. The [NetworkCredential.Domain](https://learn.microsoft.com/dotnet/api/system.net.networkcredential.domain) is not used.
 
-Every printer reached over IPPS receives them, once its certificate is trusted. While they are set, a certificate the system trusts is enough only for printers configured in [IppNetworkOptions.PrinterUris](/docs/reference/latiprimere-ipp/ippnetworkoptions/#printeruris) or [IppNetworkOptions.PrinterCredentials](/docs/reference/latiprimere-ipp/ippnetworkoptions/#printercredentials): anyone on the network can announce a printer at a host whose certificate a public authority issued, so a printer found on the network must have its certificate pinned in [IppNetworkOptions.TrustedCertificateFingerprints](/docs/reference/latiprimere-ipp/ippnetworkoptions/#trustedcertificatefingerprints) or accepted by [IppNetworkOptions.ServerCertificateValidationCallback](/docs/reference/latiprimere-ipp/ippnetworkoptions/#servercertificatevalidationcallback). Until then its IPPS address is refused, and it is reached over plain IPP, without them, if it announces that too. To keep a password to one printer, use [IppNetworkOptions.PrinterCredentials](/docs/reference/latiprimere-ipp/ippnetworkoptions/#printercredentials).
+Every printer reached over IPPS receives them, once its certificate is trusted. While they are set, a certificate the system trusts is enough only for printers configured in [IppNetworkOptions.PrinterUris](/docs/reference/latiprimere-ipp/ippnetworkoptions/#printeruris) or [IppNetworkOptions.PrinterCredentials](/docs/reference/latiprimere-ipp/ippnetworkoptions/#printercredentials): anyone on the network can announce a printer at a host whose certificate a public authority issued, so a printer found on the network must have its certificate pinned in [IppNetworkOptions.TrustedCertificateFingerprints](/docs/reference/latiprimere-ipp/ippnetworkoptions/#trustedcertificatefingerprints) or accepted by [IppNetworkOptions.ServerCertificateValidationCallback](/docs/reference/latiprimere-ipp/ippnetworkoptions/#servercertificatevalidationcallback). Until then its IPPS address is refused, and it is reached over plain IPP, without them, if it announces that too and [IppNetworkOptions.RequireEncryption](/docs/reference/latiprimere-ipp/ippnetworkoptions/#requireencryption) isn't set. To keep a password to one printer, use [IppNetworkOptions.PrinterCredentials](/docs/reference/latiprimere-ipp/ippnetworkoptions/#printercredentials).
 
 ### DiscoveryDuration
 
@@ -120,6 +144,16 @@ Lower resolutions render and upload faster: an A4 page at 600 dpi is four times 
 
 - [ArgumentOutOfRangeException](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception): The value is zero or negative.
 
+### PrinterCertificateFingerprints
+
+```csharp
+public IDictionary<Uri, string> PrinterCertificateFingerprints { get; }
+```
+
+Gets the SHA-256 fingerprints of printer certificates to trust over IPPS only at one printer's address, by printer URI, such as `ipps://192.168.1.20/ipp/print`. They are matched by the URI's host, and written as in [IppNetworkOptions.TrustedCertificateFingerprints](/docs/reference/latiprimere-ipp/ippnetworkoptions/#trustedcertificatefingerprints).
+
+A certificate pinned here is trusted only at that host, whatever name it carries, so the same certificate presented anywhere else is refused. A printer found on the network is reached at the address it announces, so pin it by that address; if it gets a new one, its certificate is refused there until it is pinned again.
+
 ### PrinterCredentials
 
 ```csharp
@@ -148,6 +182,18 @@ The first the printer lists is used. A printer that takes PDF is always sent the
 
 PCLm is a PDF of image strips, which Mopria printers take; Latiprimere compresses its strips with Flate or run-length encoding, whichever the printer prefers.
 
+### RequireEncryption
+
+```csharp
+public bool RequireEncryption { get; set; }
+```
+
+Gets or sets a value indicating whether every request goes over an encrypted connection (IPPS), never plain IPP. Defaults to `false`.
+
+When `true`, a printer found on the network is reached only at its IPPS address: one that announces none, or whose certificate isn't trusted, is refused with a [PrintException](/docs/reference/latiprimere-abstractions/printexception/) rather than reached over plain IPP, where anyone able to watch the network could read the documents. Looking up an `ipp://` URI is refused the same way, without connecting, and an `ipp://` URI in [IppNetworkOptions.PrinterUris](/docs/reference/latiprimere-ipp/ippnetworkoptions/#printeruris) throws [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception) when the print system is created.
+
+Without it, a printer found on the network is still never reached over plain IPP once it has been reached over IPPS with a trusted certificate, while a certificate is pinned or the callback is set, so a device that answers in its place, or blocks its IPPS port, can't make it fall back; unless [IppNetworkOptions.AllowPlainIppAfterIpps](/docs/reference/latiprimere-ipp/ippnetworkoptions/#allowplainippafteripps) is set.
+
 ### ServerCertificateValidationCallback
 
 ```csharp
@@ -168,7 +214,9 @@ Gets the SHA-256 fingerprints of printer certificates to trust over IPPS (`ipps:
 
 Printers nearly always present a certificate they made themselves, which no computer trusts, so a printer's IPPS address is refused until its certificate is trusted. A certificate pinned here is trusted whatever name it carries, as printers' certificates rarely name the address they're reached at. The [PrintException](/docs/reference/latiprimere-abstractions/printexception/) for a refused certificate gives its fingerprint; check it against the one the printer's web page shows before adding it.
 
-Once a certificate is pinned, or [IppNetworkOptions.ServerCertificateValidationCallback](/docs/reference/latiprimere-ipp/ippnetworkoptions/#servercertificatevalidationcallback) is set, a printer found on the network that announces both addresses is reached over IPPS, and over plain IPP only if its certificate isn't trusted.
+Once a certificate is pinned, or [IppNetworkOptions.ServerCertificateValidationCallback](/docs/reference/latiprimere-ipp/ippnetworkoptions/#servercertificatevalidationcallback) is set, a printer found on the network that announces both addresses is reached over IPPS, and over plain IPP only if its certificate isn't trusted and it has never been reached over IPPS before. Set [IppNetworkOptions.RequireEncryption](/docs/reference/latiprimere-ipp/ippnetworkoptions/#requireencryption) to never reach one over plain IPP.
+
+A pinned certificate is trusted at any address. Printers of one model sometimes share a certificate made at the factory, which would then be trusted on every one of them; to trust a certificate only at one printer's address, pin it in [IppNetworkOptions.PrinterCertificateFingerprints](/docs/reference/latiprimere-ipp/ippnetworkoptions/#printercertificatefingerprints) instead.
 
 ### UploadStallTimeout
 

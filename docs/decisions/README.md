@@ -63,6 +63,7 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0055](0055-catalog-printers.md) | The catalog's own printers, and the options they apply | Accepted |
 | [0056](0056-typed-options-before-1-0.md) | Typed options before 1.0: page ranges, collation, quality, finishings, output bins, media types and custom sizes | Accepted |
 | [0057](0057-api-review-phase-4.md) | Public API review of Phase 4's additions | Accepted |
+| [0058](0058-hardening-after-security-review.md) | Hardening after an outside security review: IPPS without forced fallback, announced addresses, PDFium limits, pinned actions | Accepted |
 
 ## Template
 

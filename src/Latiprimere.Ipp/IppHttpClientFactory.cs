@@ -181,9 +181,9 @@ internal static class IppHttpClientFactory
 	/// </remarks>
 	private static HttpClient CreateClient(SocketsHttpHandler handler, IppConnectionSecurity security, TimeSpan uploadStallTimeout)
 	{
-		HttpMessageHandler outerHandler = !security.UseTls && !security.HasCredentials
-			? handler
-			: new IppConnectionHandler(security, handler);
+		HttpMessageHandler outerHandler = security.NeedsHandler
+			? new IppConnectionHandler(security, handler)
+			: handler;
 
 		if (uploadStallTimeout != Timeout.InfiniteTimeSpan)
 		{

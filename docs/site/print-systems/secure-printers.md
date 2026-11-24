@@ -63,6 +63,7 @@ services.AddLatiprimereIpp(options =>
 - **A pinned certificate is trusted whatever name it carries,** since printers' certificates rarely name the address they're reached at.
 - **The port:** an `ipps://` address without one means IPP's port, 631. Some printers take IPPS on another port, often 443: use the port the printer's web page or announcement gives.
 - **A new certificate,** after a reset or a firmware update, is refused until you pin it too. Keep the old fingerprint until the printer has its new one, then remove it.
+- **Pin it at one address** with `PrinterCertificateFingerprints[new Uri("ipps://192.168.20.15:443/ipp/print")] = fingerprint` instead. Printers of one model sometimes share a certificate made at the factory, and a fingerprint in `TrustedCertificateFingerprints` trusts every device that presents it. One pinned by address is refused at any other host, so pin a printer found on the network by the address it announces.
 
 A certificate the computer already trusts, such as one your organisation's certificate authority issued to the printer, needs no pin. For any other rule, set `ServerCertificateValidationCallback`: it's asked about each certificate that isn't pinned and that the computer's trust isn't enough for, which, with a shared password, includes printers found on the network (see below). Return `true` only for a certificate you have checked.
 
@@ -84,9 +85,29 @@ If you pin several printers but have a password for only one, give it in `Printe
 
 ## Printers found on the network
 
-Once a certificate is pinned or the callback is set, a printer found on the network that announces both an IPP and an IPPS address is reached over IPPS. If its certificate isn't trusted, or nothing answers at its IPPS address, it's reached over plain IPP instead, without any password, and that's logged at Information. With neither set, printers found on the network are reached over plain IPP, as when IPPS wasn't supported. An IPPS address is only taken from an announcement by the same host as the printer's IPP one.
+Once a certificate is pinned or the callback is set, a printer found on the network that announces both an IPP and an IPPS address is reached over IPPS. If its certificate isn't trusted, or nothing answers at its IPPS address, it's reached over plain IPP instead, without any password, and that's logged as a warning. With neither set, printers found on the network are reached over plain IPP, as when IPPS wasn't supported. An IPPS address is only taken from an announcement by the same host as the printer's IPP one.
 
-That fallback means a pinned certificate protects a printer only at the address you configured: a device that announces the printer's name gets its jobs over plain IPP, by name. For documents that must reach the real printer, print to its `ipps://` address. See [Anyone on the network can announce a printer](/docs/print-systems/network-printers/#anyone-on-the-network-can-announce-a-printer).
+**A printer reached over IPPS once is never reached over plain IPP again** under its name. That holds if its IPPS address stops answering, its certificate changes, or its name is announced with only a plain address, any of which a device on the network could cause. It's refused with a `PrintException` instead, which says why. With `AddressStorePath` set, that's remembered across restarts. A printer that changes its certificate is refused until you pin the new one. To fall back as before, for printers whose documents needn't be kept private, set `AllowPlainIppAfterIpps`.
+
+The fallback is still there for a printer that has never been reached over IPPS, so pinning one printer doesn't stop the others printing. To refuse plain IPP for every printer, set `RequireEncryption`:
+
+```csharp
+services.AddLatiprimereIpp(options =>
+{
+	// Only over IPPS: a printer that announces no IPPS address, or whose certificate isn't trusted, is refused
+	options.RequireEncryption = true;
+	options.TrustedCertificateFingerprints.Add(fingerprint);
+});
+```
+
+With `RequireEncryption` set:
+
+- **A printer found on the network is reached only at its IPPS address.** One that announces none, or whose certificate isn't trusted, is refused with a `PrintException`.
+- **Looking up an `ipp://` URI is refused** without connecting.
+- **An `ipp://` URI in `PrinterUris`** throws `ArgumentException` when `AddLatiprimereIpp` is called.
+- **The system's trust is enough** for a certificate an authority issued, without pinning.
+
+Even so, a device that announces the printer's name with a certificate you trust gets its jobs. For documents that must reach the real printer, print to its `ipps://` address. See [Anyone on the network can announce a printer](/docs/print-systems/network-printers/#anyone-on-the-network-can-announce-a-printer).
 
 ### Hosts are compared as written
 

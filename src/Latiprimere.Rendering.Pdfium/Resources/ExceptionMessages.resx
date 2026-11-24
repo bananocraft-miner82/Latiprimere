@@ -45,4 +45,8 @@
 		<value>The password given for the PDF doesn't open it.</value>
 		<comment>Thrown when a PDF's password was given but is wrong. Never include the password.</comment>
 	</data>
+	<data name="PageRenderTimedOut" xml:space="preserve">
+		<value>Page {0} took longer than {1} seconds to render, so it was abandoned: the PDF may be built to keep a renderer busy. PdfiumOptions.RenderTimeout sets the limit.</value>
+		<comment>{0} is the page number, from 1; {1} the limit in seconds.</comment>
+	</data>
 </root>

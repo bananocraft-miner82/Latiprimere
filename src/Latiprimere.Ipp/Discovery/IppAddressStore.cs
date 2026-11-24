@@ -140,7 +140,7 @@ internal sealed class IppAddressStore
 
 	/// <summary>
 	/// Turns a stored entry back into a printer, if it makes sense: a name, and absolute <c>ipp</c> or <c>ipps</c>
-	/// URIs.
+	/// URIs at hosts a printer may have (ADR 0058), as an earlier version may have stored an announcement of any.
 	/// </summary>
 	/// <param name="stored">The entry.</param>
 	/// <returns>The printer, or <see langword="null"/> to leave the entry out.</returns>
@@ -156,13 +156,14 @@ internal sealed class IppAddressStore
 
 		return new DiscoveredIppPrinter
 		{
-			InstanceName = stored.Name,
-			PrinterUri   = printerUri,
-			SecureUri    = secureUri,
-			Uuid         = DnsSdServiceMapper.NormalizeUuid(stored.Uuid),
-			MakeAndModel = stored.MakeAndModel,
-			Location     = stored.Location,
-			LastSeen     = stored.LastSeen
+			InstanceName    = stored.Name,
+			PrinterUri      = printerUri,
+			SecureUri       = secureUri,
+			Uuid            = DnsSdServiceMapper.NormalizeUuid(stored.Uuid),
+			MakeAndModel    = stored.MakeAndModel,
+			Location        = stored.Location,
+			LastSeen        = stored.LastSeen,
+			ReachedOverIpps = stored.ReachedOverIpps == true
 		};
 	}
 
@@ -175,24 +176,29 @@ internal sealed class IppAddressStore
 	{
 		return new StoredPrinter
 		{
-			Name         = printer.InstanceName,
-			PrinterUri   = printer.PrinterUri.AbsoluteUri,
-			SecureUri    = printer.SecureUri?.AbsoluteUri,
-			Uuid         = printer.Uuid,
-			MakeAndModel = printer.MakeAndModel,
-			Location     = printer.Location,
-			LastSeen     = printer.LastSeen
+			Name            = printer.InstanceName,
+			PrinterUri      = printer.PrinterUri.AbsoluteUri,
+			SecureUri       = printer.SecureUri?.AbsoluteUri,
+			Uuid            = printer.Uuid,
+			MakeAndModel    = printer.MakeAndModel,
+			Location        = printer.Location,
+			LastSeen        = printer.LastSeen,
+			ReachedOverIpps = printer.ReachedOverIpps ? true : null
 		};
 	}
 
 	/// <summary>
-	/// Reads a stored URI, if it's an absolute <c>ipp</c> or <c>ipps</c> one.
+	/// Reads a stored URI, if it's an absolute <c>ipp</c> or <c>ipps</c> one at a host a printer may have.
 	/// </summary>
 	/// <param name="value">The stored text, or <see langword="null"/>.</param>
 	/// <returns>The URI, or <see langword="null"/>.</returns>
 	private static Uri? ToIppUri(string? value)
 	{
-		return Uri.TryCreate(value, UriKind.Absolute, out Uri? uri) && uri.Scheme is "ipp" or "ipps" ? uri : null;
+		return Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
+			   && uri.Scheme is "ipp" or "ipps"
+			   && Connections.PrinterAddressRules.CanBePrinterHost(uri.Host)
+			? uri
+			: null;
 	}
 
 	/// <summary>

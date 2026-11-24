@@ -4,6 +4,22 @@ What changed in each release of Latiprimere, newest first. All the packages shar
 
 Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` sections such as Added, Changed, Fixed, Removed and Known limitations. Work not yet released goes under `## Unreleased`, which the website doesn't show.
 
+## Unreleased
+
+### Added
+
+- **`IppNetworkOptions.RequireEncryption`** keeps every job to IPPS. A printer found on the network is reached only at its IPPS address, and one that announces none, or whose certificate isn't trusted, is refused with `PrintException` rather than reached over plain IPP. An `ipp://` URI is refused without connecting, and one in `PrinterUris` throws `ArgumentException` when the print system is created ([ADR 0058](docs/decisions/0058-hardening-after-security-review.md)).
+- **Certificates pinned at one printer's address:** `IppNetworkOptions.PrinterCertificateFingerprints` and `WindowsOptions.IppPrinterCertificateFingerprints`, by printer URI. A certificate pinned there is refused at any other host, which matters when printers of one model share a certificate made at the factory ([ADR 0058](docs/decisions/0058-hardening-after-security-review.md)).
+- **Limits on PDFs rendered with PDFium:** `PdfiumOptions.MaxDocumentBytes`, and `RenderTimeout`, by default 2 minutes per band, after which a page built to keep the renderer busy is abandoned with `PrintException`, so it can't hold up every other PDF in the process. Pass them to `new PdfiumRasterizer(options)` or `AddLatiprimerePdfium(options => ...)` ([ADR 0058](docs/decisions/0058-hardening-after-security-review.md)).
+
+### Changed
+
+- **A printer found on the network that has been reached over IPPS is never reached over plain IPP again** while a certificate is pinned or the validation callback is set, even if its IPPS address stops answering or its name is announced without one. A device on the network could otherwise force its jobs onto plain IPP. The address store remembers it, as `reachedOverIpps`, within format 1. A fall back to plain IPP is now logged as a warning. Set `IppNetworkOptions.AllowPlainIppAfterIpps` to fall back as before ([ADR 0058](docs/decisions/0058-hardening-after-security-review.md)).
+- **A remembered address must report the UUID its printer announced:** a printer there that reports none is searched for instead of taken on trust. Set `IppNetworkOptions.AllowRememberedAddressWithoutUuid` for older printers that don't report one.
+- **Printers announced at addresses no printer has are skipped:** loopback, unspecified, multicast and broadcast addresses, `localhost`, and the cloud metadata services at `169.254.169.254` and `fd00:ec2::254`. A `.local` name, which anyone on the network can answer for, is held to the same rules when connecting, and such entries are left out of the address store when it is loaded ([ADR 0058](docs/decisions/0058-hardening-after-security-review.md)).
+- **Native libraries are found only where they belong:** Latiprimere.Windows loads its Windows libraries from System32 only, and Latiprimere.Rendering.Pdfium never searches the current directory or the PATH for PDFium.
+- **The build and release workflows pin each GitHub Action to a commit,** rather than a tag its owner could move.
+
 ## 11.0.10-preview - 2026-11-24
 
 ### Added

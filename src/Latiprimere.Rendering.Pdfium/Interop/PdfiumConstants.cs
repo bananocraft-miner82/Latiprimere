@@ -33,4 +33,7 @@ internal static class PdfiumConstants
 
 	/// <summary>Opaque white in 0xAARRGGBB form.</summary>
 	internal const uint White = 0xFFFFFFFF;
+
+	/// <summary>FPDF_RENDER_TOBECONTINUED: progressive rendering paused, and can carry on.</summary>
+	internal const int RenderToBeContinued = 1;
 }

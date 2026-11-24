@@ -78,7 +78,10 @@ internal static unsafe partial class PdfiumNative
 	[LibraryImport(LibraryName, EntryPoint = "FPDFBitmap_FillRect")]
 	internal static partial int FillRect(IntPtr bitmap, int left, int top, int width, int height, uint color);
 
-	/// <summary>FPDF_RenderPageBitmap: renders a page into a bitmap, clipped to the bitmap's bounds.</summary>
+	/// <summary>
+	/// FPDF_RenderPageBitmap_Start: renders a page into a bitmap, clipped to the bitmap's bounds, asking the pause
+	/// between steps whether to stop for now.
+	/// </summary>
 	/// <param name="bitmap">The bitmap handle.</param>
 	/// <param name="page">The page handle.</param>
 	/// <param name="startX">Where the page's left edge falls in the bitmap.</param>
@@ -87,18 +90,33 @@ internal static unsafe partial class PdfiumNative
 	/// <param name="sizeY">The height the whole page is rendered at.</param>
 	/// <param name="rotate">Extra rotation in quarter turns.</param>
 	/// <param name="flags">FPDF_* render flags.</param>
-	[LibraryImport(LibraryName, EntryPoint = "FPDF_RenderPageBitmap")]
-	internal static partial void RenderPageBitmap
+	/// <param name="pause">The pause.</param>
+	/// <returns>An FPDF_RENDER_* status.</returns>
+	[LibraryImport(LibraryName, EntryPoint = "FPDF_RenderPageBitmap_Start")]
+	internal static partial int RenderPageBitmapStart
 	(
-		IntPtr bitmap,
-		IntPtr page,
-		int    startX,
-		int    startY,
-		int    sizeX,
-		int    sizeY,
-		int    rotate,
-		int    flags
+		IntPtr       bitmap,
+		IntPtr       page,
+		int          startX,
+		int          startY,
+		int          sizeX,
+		int          sizeY,
+		int          rotate,
+		int          flags,
+		PdfiumPause* pause
 	);
+
+	/// <summary>FPDF_RenderPage_Continue: carries on rendering a page that paused.</summary>
+	/// <param name="page">The page handle.</param>
+	/// <param name="pause">The pause.</param>
+	/// <returns>An FPDF_RENDER_* status.</returns>
+	[LibraryImport(LibraryName, EntryPoint = "FPDF_RenderPage_Continue")]
+	internal static partial int RenderPageContinue(IntPtr page, PdfiumPause* pause);
+
+	/// <summary>FPDF_RenderPage_Close: ends a page's progressive rendering, finished or not, and frees its state.</summary>
+	/// <param name="page">The page handle.</param>
+	[LibraryImport(LibraryName, EntryPoint = "FPDF_RenderPage_Close")]
+	internal static partial void RenderPageClose(IntPtr page);
 
 	/// <summary>FPDFBitmap_Destroy. Does not free caller-owned memory.</summary>
 	/// <param name="bitmap">The bitmap handle.</param>

@@ -14,6 +14,38 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 ---
 
+## 2026-11-24: Hardening after an outside security review
+
+**Done** (owner: "Can you analyse the results and identify potential fixes", then "Fix all findings, starting at the top and working down"), recorded in [ADR 0058](decisions/0058-hardening-after-security-review.md), accepted (owner: "Accept ADR 0058"):
+- **1. No forced fall back to plain IPP:**
+  - `IppNetworkOptions.RequireEncryption` keeps every request to IPPS;
+  - a printer found on the network that has been reached over IPPS is never reached over plain IPP again, remembered in the address store as `reachedOverIpps`;
+  - the fallback is logged as a warning;
+  - a remembered address must report the UUID its printer announced.
+- **2. Announced addresses:** loopback, unspecified, multicast, broadcast and cloud metadata addresses, and `localhost`, are skipped (`PrinterAddressRules`). A `.local` name's addresses are held to the same rules when connecting, and the address store drops such entries when it loads.
+- **3. Response size:** no change, as SharpIppNext already bounds it (2026-11-21).
+- **4. PDFium:** `PdfiumOptions.MaxDocumentBytes` and `RenderTimeout`, by default 2 minutes a band. Bands now render progressively, so a page that outlasts the limit is abandoned with a `PrintException`.
+- **5. Certificates pinned at one printer's address:** `IppNetworkOptions.PrinterCertificateFingerprints` and `WindowsOptions.IppPrinterCertificateFingerprints`.
+- **6. Loading and supply chain:**
+  - `DefaultDllImportSearchPaths` on Latiprimere.Windows (System32) and Latiprimere.Rendering.Pdfium (its own folder and Windows' safe directories);
+  - every workflow action pinned to a commit SHA.
+- **Docs:** the changelog, the secure and network printer pages, the web app guide, a `SecurePrinters` sample for `RequireEncryption`, and the regenerated API reference.
+- **Each choice made configurable** (owner: "Can you make each of the decision options configurable for the package end users where possible"):
+  - new `IppNetworkOptions.AllowPlainIppAfterIpps` and `AllowRememberedAddressWithoutUuid`, both off;
+  - the rest already had settings: `RequireEncryption`, `PdfiumOptions.MaxDocumentBytes` and `RenderTimeout`, and the per-address pins;
+  - left fixed: the address rules, the native library search paths and the pinned actions, with ADR 0058 saying why.
+- **Tests:** 3,592 in all on this Windows machine, none failing and 282 skipped, the integration tests whose printers it doesn't have. The new ones cover each fix, including a page of 5,000 shapes that outlasts a render timeout. Not run here: the Linux and macOS builds, the mDNS job and the Native AOT checks, which CI runs.
+
+**Learned**
+- **The review read only the docs,** and its CVE for SharpIppNext isn't in the advisory database NuGet uses. `dotnet list package --vulnerable --include-transitive` reports nothing.
+- **PDFium pauses progressive rendering about every 100 page objects,** and not while reading a page's content, so `RenderTimeout` bounds drawing, not loading.
+
+**Next**
+- Owner: commit, and open the pull request.
+- Later: render PDFs in a separate process, so a crash in PDFium can't take the application with it; and fuzz the IPP, PNG, JPEG and PDF readers.
+
+---
+
 ## 2026-11-23: P4-6, docs, samples and the API review of Phase 4
 
 **Done** (owner: "Start P4-6", then "Accept all")

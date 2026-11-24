@@ -18,6 +18,9 @@ public sealed class IppNetworkPrintSystemTests
 	/// <summary>Where the Office printer is after DHCP gives it a new address.</summary>
 	private static readonly Uri MovedOfficeUri = new Uri("ipp://192.168.1.45:631/ipp/print");
 
+	/// <summary>The Office printer's IPPS address.</summary>
+	private static readonly Uri SecureOfficeUri = new Uri("ipps://192.168.1.20:443/ipp/print");
+
 	/// <summary>The Office printer's UUID.</summary>
 	private const string OfficeUuid = "aaaaaaaa-0000-4000-8000-0000000000aa";
 
@@ -735,6 +738,293 @@ public sealed class IppNetworkPrintSystemTests
 		// Assert — the address used is the one the next request goes to
 		Assert.NotNull(printer);
 		Assert.Equal(new Uri(expected), client.GetPrinterAttributesRequests[^1].OperationAttributes?.PrinterUri?.Value);
+	}
+
+	[Theory]
+	[InlineData("untrusted")]
+	[InlineData("unreachable")]
+	public async Task GivenPrinterReachedOverIppsBeforeWhenItsIppsAddressFailsThenItIsRefusedRatherThanReachedOverPlainIpp(string failure)
+	{
+		// Arrange — reached over IPPS once; then its certificate isn't trusted, or its IPPS port doesn't answer, as
+		// when another device answers in its place or blocks the port (provided by InlineData above)
+		FakeIppClient client = IppNetworkPrintSystemTests.CreateClientWithBothAddresses();
+		FakeIppPrinterDiscovery discovery = IppNetworkPrintSystemTests.CreateOfficeDiscovery(withIpps: true);
+		using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreateIppsPrintSystem(client, discovery, new IppNetworkOptions());
+		Assert.NotNull(await IppNetworkPrintSystemTests.FindOfficeAsync(system));
+
+		if (failure == "untrusted")
+		{
+			client.AddUntrusted(IppNetworkPrintSystemTests.SecureOfficeUri);
+		}
+		else
+		{
+			client.AddUnreachable(IppNetworkPrintSystemTests.SecureOfficeUri);
+		}
+
+		// Act
+		Exception? exception = await Record.ExceptionAsync(() => IppNetworkPrintSystemTests.FindOfficeAsync(system));
+
+		// Assert — refused, and nothing was asked of its plain address
+		Assert.IsAssignableFrom<PrintException>(exception);
+		Assert.False(IppNetworkPrintSystemTests.WasAskedOverPlainIpp(client));
+	}
+
+	[Fact]
+	public async Task GivenPrinterReachedOverIppsBeforeWhenItsNameIsAnnouncedWithOnlyAPlainAddressThenItIsRefused()
+	{
+		// Arrange — reached over IPPS; then its IPPS address is gone, and the name is announced over plain IPP only
+		FakeIppClient client = IppNetworkPrintSystemTests.CreateClientWithBothAddresses();
+		FakeIppPrinterDiscovery discovery = IppNetworkPrintSystemTests.CreateOfficeDiscovery(withIpps: true);
+		using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreateIppsPrintSystem(client, discovery, new IppNetworkOptions());
+		Assert.NotNull(await IppNetworkPrintSystemTests.FindOfficeAsync(system));
+
+		client.AddUnreachable(IppNetworkPrintSystemTests.SecureOfficeUri);
+		discovery.Clear();
+		discovery.AddPrinter("Office", IppNetworkPrintSystemTests.OfficeUri);
+
+		// Act
+		Exception? exception = await Record.ExceptionAsync(() => IppNetworkPrintSystemTests.FindOfficeAsync(system));
+
+		// Assert
+		Assert.IsType<PrintException>(exception);
+		Assert.Contains("was reached over an encrypted (IPPS) connection before", exception.Message, StringComparison.Ordinal);
+		Assert.False(IppNetworkPrintSystemTests.WasAskedOverPlainIpp(client));
+	}
+
+	[Fact]
+	public async Task GivenNothingBeyondTheSystemsTrustWhenPrinterAnnouncingIppsIsLookedUpAgainThenPlainIppIsUsedAsBefore()
+	{
+		// Arrange — IPPS isn't preferred, so plain IPP is all the printer is ever reached over
+		FakeIppClient client = IppNetworkPrintSystemTests.CreateClientWithBothAddresses();
+		FakeIppPrinterDiscovery discovery = IppNetworkPrintSystemTests.CreateOfficeDiscovery(withIpps: true);
+		using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreateIppsPrintSystem(client, discovery, new IppNetworkOptions(), prefersIpps: false);
+		Assert.NotNull(await IppNetworkPrintSystemTests.FindOfficeAsync(system));
+
+		// Act
+		IPrinter? printer = await IppNetworkPrintSystemTests.FindOfficeAsync(system);
+
+		// Assert
+		Assert.NotNull(printer);
+		Assert.Equal(IppNetworkPrintSystemTests.OfficeUri, client.GetPrinterAttributesRequests[^1].OperationAttributes?.PrinterUri?.Value);
+	}
+
+	[Theory]
+	[InlineData("none", true)]
+	[InlineData("untrusted", false)]
+	[InlineData("unreachable", false)]
+	[InlineData("plain only", false)]
+	public async Task GivenEncryptionRequiredWhenPrinterFoundOnTheNetworkIsLookedUpThenItIsReachedOnlyOverIpps(string failure, bool expected)
+	{
+		// Arrange — its IPPS address fine, its certificate untrusted, nothing listening there, or no IPPS address
+		// announced at all (provided by InlineData above)
+		FakeIppClient client = IppNetworkPrintSystemTests.CreateClientWithBothAddresses();
+		FakeIppPrinterDiscovery discovery = IppNetworkPrintSystemTests.CreateOfficeDiscovery(withIpps: failure != "plain only");
+
+		if (failure == "untrusted")
+		{
+			client.AddUntrusted(IppNetworkPrintSystemTests.SecureOfficeUri);
+		}
+		else if (failure == "unreachable")
+		{
+			client.AddUnreachable(IppNetworkPrintSystemTests.SecureOfficeUri);
+		}
+
+		IppNetworkOptions options = new IppNetworkOptions { RequireEncryption = true };
+		using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreateIppsPrintSystem(client, discovery, options);
+
+		// Act
+		Exception? exception = await Record.ExceptionAsync(() => IppNetworkPrintSystemTests.FindOfficeAsync(system));
+
+		// Assert — found over IPPS, or refused with a PrintException; never asked over plain IPP
+		Assert.Equal(expected, exception is null);
+		Assert.True(expected || exception is PrintException);
+		Assert.False(IppNetworkPrintSystemTests.WasAskedOverPlainIpp(client));
+	}
+
+	[Fact]
+	public async Task GivenEncryptionRequiredWhenAPlainUriIsLookedUpThenThrowsPrintExceptionWithoutContactingIt()
+	{
+		// Arrange — even with any URI allowed
+		FakeIppClient client = IppNetworkPrintSystemTests.CreateClientWithBothAddresses();
+		IppNetworkOptions options = new IppNetworkOptions { RequireEncryption = true, AllowAnyPrinterUri = true };
+		using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreateIppsPrintSystem(client, new FakeIppPrinterDiscovery(), options);
+
+		// Act
+		Exception? exception = await Record.ExceptionAsync
+		(
+			() => system.FindPrinterAsync("ipp:" + IppNetworkPrintSystemTests.OfficeUri.AbsoluteUri, TestContext.Current.CancellationToken)
+		);
+
+		// Assert
+		Assert.IsType<PrintException>(exception);
+		Assert.Contains("RequireEncryption", exception.Message, StringComparison.Ordinal);
+		Assert.Empty(client.GetPrinterAttributesRequests);
+	}
+
+	[Fact]
+	public async Task GivenAnAddressStoreWhenAPrinterIsReachedOverIppsThenItIsRememberedAcrossARestart()
+	{
+		// Arrange
+		FakeIppClient client = IppNetworkPrintSystemTests.CreateClientWithBothAddresses();
+		FakeIppPrinterDiscovery discovery = IppNetworkPrintSystemTests.CreateOfficeDiscovery(withIpps: true);
+
+		await IppNetworkPrintSystemTests.WithAddressStoreAsync(async options =>
+		{
+			using (IppNetworkPrintSystem first = IppNetworkPrintSystemTests.CreateIppsPrintSystem(client, discovery, options))
+			{
+				Assert.NotNull(await IppNetworkPrintSystemTests.FindOfficeAsync(first));
+			}
+
+			client.AddUntrusted(IppNetworkPrintSystemTests.SecureOfficeUri);
+			using IppNetworkPrintSystem second = IppNetworkPrintSystemTests.CreateIppsPrintSystem(client, discovery, options);
+
+			// Act
+			Exception? exception = await Record.ExceptionAsync(() => IppNetworkPrintSystemTests.FindOfficeAsync(second));
+
+			// Assert — remembered in the file, so the restarted print system doesn't fall back either
+			Assert.True(Assert.Single(IppNetworkPrintSystemTests.LoadStore(options)).ReachedOverIpps);
+			Assert.IsAssignableFrom<PrintException>(exception);
+			Assert.False(IppNetworkPrintSystemTests.WasAskedOverPlainIpp(client));
+		});
+	}
+
+	[Fact]
+	public async Task GivenPrinterThatAnnouncedAUuidWhenItsRememberedAddressAnswersWithoutOneThenItIsSearchedForInstead()
+	{
+		// Arrange — the address remembered for the name now answers with no printer-uuid at all
+		FakeIppClient client = new FakeIppClient();
+		client.AddPrinter(IppNetworkPrintSystemTests.OfficeUri, new PrinterAttributesBuilder().WithName("Office").Build());
+		FakeIppPrinterDiscovery discovery = new FakeIppPrinterDiscovery();
+		discovery.AddPrinter("Office", IppNetworkPrintSystemTests.OfficeUri, IppNetworkPrintSystemTests.OfficeUuid);
+		using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreatePrintSystem(client, discovery);
+		_ = await system.GetPrintersAsync(TestContext.Current.CancellationToken);
+
+		// Act
+		_ = await IppNetworkPrintSystemTests.FindOfficeAsync(system);
+
+		// Assert — not taken on trust: the name was searched for
+		Assert.Single(discovery.ResolvedNames);
+	}
+
+	[Theory]
+	[InlineData(null, true)]
+	[InlineData(IppNetworkPrintSystemTests.OtherUuid, false)]
+	public async Task GivenRememberedAddressWithoutUuidAllowedWhenItsPrinterReportsNoneThenItIsUsedButAnotherUuidIsStillRefused(string? reportedUuid, bool expected)
+	{
+		// Arrange — the application takes older printers that don't report printer-uuid on trust; the printer at the
+		// remembered address reports none, or another printer's (provided by InlineData above)
+		PrinterAttributesBuilder attributes = new PrinterAttributesBuilder().WithName("Office");
+		FakeIppClient client = new FakeIppClient();
+		client.AddPrinter(IppNetworkPrintSystemTests.OfficeUri, (reportedUuid is null ? attributes : attributes.WithUuid("urn:uuid:" + reportedUuid)).Build());
+		FakeIppPrinterDiscovery discovery = new FakeIppPrinterDiscovery();
+		discovery.AddPrinter("Office", IppNetworkPrintSystemTests.OfficeUri, IppNetworkPrintSystemTests.OfficeUuid);
+		IppNetworkOptions options = new IppNetworkOptions { AllowRememberedAddressWithoutUuid = true };
+		using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreatePrintSystem(client, discovery, options);
+		_ = await system.GetPrintersAsync(TestContext.Current.CancellationToken);
+
+		// Act
+		_ = await IppNetworkPrintSystemTests.FindOfficeAsync(system);
+
+		// Assert — used at its address without a search, or searched for
+		Assert.Equal(expected ? 0 : 1, discovery.ResolvedNames.Count);
+	}
+
+	[Fact]
+	public async Task GivenPlainIppAfterIppsAllowedWhenAPrinterReachedOverIppsLosesItsIppsAddressThenItFallsBackToPlainIpp()
+	{
+		// Arrange — reached over IPPS once; then its certificate isn't trusted, and the application allows the fallback
+		FakeIppClient client = IppNetworkPrintSystemTests.CreateClientWithBothAddresses();
+		FakeIppPrinterDiscovery discovery = IppNetworkPrintSystemTests.CreateOfficeDiscovery(withIpps: true);
+		IppNetworkOptions options = new IppNetworkOptions { AllowPlainIppAfterIpps = true };
+		using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreateIppsPrintSystem(client, discovery, options);
+		Assert.NotNull(await IppNetworkPrintSystemTests.FindOfficeAsync(system));
+		client.AddUntrusted(IppNetworkPrintSystemTests.SecureOfficeUri);
+
+		// Act
+		IPrinter? printer = await IppNetworkPrintSystemTests.FindOfficeAsync(system);
+
+		// Assert
+		Assert.NotNull(printer);
+		Assert.Equal(IppNetworkPrintSystemTests.OfficeUri, client.GetPrinterAttributesRequests[^1].OperationAttributes?.PrinterUri?.Value);
+	}
+
+	[Fact]
+	public async Task GivenPlainIppAfterIppsAllowedButEncryptionRequiredWhenItsIppsAddressFailsThenItIsStillRefused()
+	{
+		// Arrange — required encryption wins over the allowed fallback
+		FakeIppClient client = IppNetworkPrintSystemTests.CreateClientWithBothAddresses();
+		FakeIppPrinterDiscovery discovery = IppNetworkPrintSystemTests.CreateOfficeDiscovery(withIpps: true);
+		IppNetworkOptions options = new IppNetworkOptions { AllowPlainIppAfterIpps = true, RequireEncryption = true };
+		using IppNetworkPrintSystem system = IppNetworkPrintSystemTests.CreateIppsPrintSystem(client, discovery, options);
+		client.AddUntrusted(IppNetworkPrintSystemTests.SecureOfficeUri);
+
+		// Act
+		Exception? exception = await Record.ExceptionAsync(() => IppNetworkPrintSystemTests.FindOfficeAsync(system));
+
+		// Assert
+		Assert.IsAssignableFrom<PrintException>(exception);
+		Assert.False(IppNetworkPrintSystemTests.WasAskedOverPlainIpp(client));
+	}
+
+	/// <summary>
+	/// Creates a fake client with the Office printer at both its plain and its IPPS address.
+	/// </summary>
+	/// <returns>The client.</returns>
+	private static FakeIppClient CreateClientWithBothAddresses()
+	{
+		FakeIppClient client = new FakeIppClient();
+		client.AddPrinter(IppNetworkPrintSystemTests.OfficeUri, new PrinterAttributesBuilder().WithName("Office").Build());
+		client.AddPrinter(IppNetworkPrintSystemTests.SecureOfficeUri, new PrinterAttributesBuilder().WithName("Office").Build());
+
+		return client;
+	}
+
+	/// <summary>
+	/// Creates a discovery that finds the Office printer, at its plain address and, if asked, its IPPS one.
+	/// </summary>
+	/// <param name="withIpps">Whether it announces its IPPS address too.</param>
+	/// <returns>The discovery.</returns>
+	private static FakeIppPrinterDiscovery CreateOfficeDiscovery(bool withIpps)
+	{
+		FakeIppPrinterDiscovery discovery = new FakeIppPrinterDiscovery();
+		discovery.AddPrinter("Office", IppNetworkPrintSystemTests.OfficeUri, secureUri: withIpps ? IppNetworkPrintSystemTests.SecureOfficeUri : null);
+
+		return discovery;
+	}
+
+	/// <summary>
+	/// Checks whether the Office printer was asked anything at its plain IPP address.
+	/// </summary>
+	/// <param name="client">The fake client.</param>
+	/// <returns>Whether it was.</returns>
+	private static bool WasAskedOverPlainIpp(FakeIppClient client)
+	{
+		return client.GetPrinterAttributesRequests.Any(request => request.OperationAttributes?.PrinterUri?.Value == IppNetworkPrintSystemTests.OfficeUri);
+	}
+
+	/// <summary>
+	/// Creates a network print system over fakes that prefers printers' IPPS addresses, as when a certificate is
+	/// pinned.
+	/// </summary>
+	/// <param name="client">The fake IPP client. The print system doesn't own it, so it can be used again.</param>
+	/// <param name="discovery">The fake discovery.</param>
+	/// <param name="options">The options.</param>
+	/// <param name="prefersIpps">Whether IPPS addresses are preferred.</param>
+	/// <returns>The print system.</returns>
+	private static IppNetworkPrintSystem CreateIppsPrintSystem
+	(
+		FakeIppClient           client,
+		FakeIppPrinterDiscovery discovery,
+		IppNetworkOptions       options,
+		bool                    prefersIpps = true
+	)
+	{
+		IppPrintContext context = new IppPrintContextBuilder().WithClient(client).WithDocumentFormats(IppDocumentFormats.Standard).Build();
+
+		return new IppNetworkPrintSystem(context, discovery, options, ownedClient: null)
+		{
+			PrefersIpps = prefersIpps
+		};
 	}
 
 	[Theory]

@@ -9,15 +9,17 @@ namespace Latiprimere.Ipp.Connections;
 
 /// <summary>
 /// Decides which printers' TLS certificates are trusted: those the system trusts (when a shared password is
-/// configured, only for hosts the application named), those pinned by SHA-256 fingerprint, and those the application's
-/// callback accepts (ADR 0037). Remembers each certificate it refuses, so the error can say what to pin.
+/// configured, only for hosts the application named), those pinned by SHA-256 fingerprint, at any host or at one
+/// printer's host only (ADR 0058), and those the application's callback accepts (ADR 0037). Remembers each certificate
+/// it refuses, so the error can say what to pin.
 /// </summary>
 internal sealed class IppCertificateTrust
 {
 	/// <summary>The length of a SHA-256 fingerprint in hexadecimal digits.</summary>
 	private const int FingerprintDigits = 64;
 
-	private readonly HashSet<string> pinned;                              // Normalised fingerprints trusted
+	private readonly HashSet<string> pinned;                              // Normalised fingerprints trusted at any host
+	private readonly Dictionary<string, HashSet<string>> pinnedByHost;    // Normalised fingerprints trusted at one host
 	private readonly RemoteCertificateValidationCallback? callback;        // The application's own check, if any
 	private readonly HashSet<string>? systemTrustHosts;                    // Hosts the system's trust is enough for; null for all
 	private readonly ConcurrentDictionary<string, RefusedCertificate> refusedByHost =
@@ -57,10 +59,55 @@ internal sealed class IppCertificateTrust
 		RemoteCertificateValidationCallback? callback,
 		IEnumerable<string>?                 systemTrustHosts
 	)
+		: this(pinnedFingerprints, [], callback, systemTrustHosts)
+	{
+	}
+
+	/// <summary>
+	/// Initialises a new instance of the <see cref="IppCertificateTrust"/> class with certificates pinned at any host
+	/// and at particular printers' hosts (ADR 0058).
+	/// </summary>
+	/// <param name="pinnedFingerprints">SHA-256 fingerprints of certificates to trust at any host.</param>
+	/// <param name="printerFingerprints">SHA-256 fingerprints of certificates to trust only at the host of each
+	/// printer URI.</param>
+	/// <param name="callback">The application's check for certificates the system's trust and the pins don't accept,
+	/// or <see langword="null"/>.</param>
+	/// <param name="systemTrustHosts">The hosts for which a certificate the system trusts is enough, or
+	/// <see langword="null"/> for every host.</param>
+	/// <exception cref="ArgumentException">A fingerprint isn't 32 bytes in hexadecimal, or a printer URI isn't an
+	/// absolute ipp or ipps URI.</exception>
+	public IppCertificateTrust
+	(
+		IEnumerable<string>                    pinnedFingerprints,
+		IEnumerable<KeyValuePair<Uri, string>> printerFingerprints,
+		RemoteCertificateValidationCallback?   callback,
+		IEnumerable<string>?                   systemTrustHosts
+	)
 	{
 		ArgumentNullException.ThrowIfNull(pinnedFingerprints);
+		ArgumentNullException.ThrowIfNull(printerFingerprints);
 
 		this.pinned = new HashSet<string>(pinnedFingerprints.Select(IppCertificateTrust.NormalizeFingerprint), StringComparer.Ordinal);
+		this.pinnedByHost = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+		foreach (KeyValuePair<Uri, string> printer in printerFingerprints)
+		{
+			if (!IppConnectionSecurity.IsPrinterCredentialsUri(printer.Key))
+			{
+				throw new ArgumentException(ExceptionMessages.FormatIppPrinterFingerprintUriInvalid(printer.Key), nameof(printerFingerprints));
+			}
+
+			string host = IppCertificateTrust.NormalizeHost(printer.Key.IdnHost);
+
+			if (!this.pinnedByHost.TryGetValue(host, out HashSet<string>? fingerprints))
+			{
+				fingerprints = new HashSet<string>(StringComparer.Ordinal);
+				this.pinnedByHost[host] = fingerprints;
+			}
+
+			fingerprints.Add(IppCertificateTrust.NormalizeFingerprint(printer.Value));
+		}
+
 		this.callback = callback;
 		this.systemTrustHosts = systemTrustHosts is null
 			? null
@@ -73,18 +120,21 @@ internal sealed class IppCertificateTrust
 	/// any host, including one with a certificate from a public authority, so its certificate must be pinned or
 	/// accepted by the callback before the password goes to it.
 	/// </summary>
-	/// <param name="pinnedFingerprints">SHA-256 fingerprints of certificates to trust.</param>
+	/// <param name="pinnedFingerprints">SHA-256 fingerprints of certificates to trust at any host.</param>
+	/// <param name="printerFingerprints">SHA-256 fingerprints of certificates to trust at one printer's host.</param>
 	/// <param name="callback">The application's check, or <see langword="null"/>.</param>
 	/// <param name="sharedCredentials">The credentials for every printer, or <see langword="null"/>.</param>
 	/// <param name="configuredUris">The printer URIs the application named; relative ones are left out.</param>
 	/// <returns>The check.</returns>
-	/// <exception cref="ArgumentException">A fingerprint isn't 32 bytes in hexadecimal.</exception>
+	/// <exception cref="ArgumentException">A fingerprint isn't 32 bytes in hexadecimal, or a printer URI isn't an
+	/// absolute ipp or ipps URI.</exception>
 	public static IppCertificateTrust CreateForPrinters
 	(
-		IEnumerable<string>                  pinnedFingerprints,
-		RemoteCertificateValidationCallback? callback,
-		System.Net.NetworkCredential?        sharedCredentials,
-		IEnumerable<Uri?>                    configuredUris
+		IEnumerable<string>                    pinnedFingerprints,
+		IEnumerable<KeyValuePair<Uri, string>> printerFingerprints,
+		RemoteCertificateValidationCallback?   callback,
+		System.Net.NetworkCredential?          sharedCredentials,
+		IEnumerable<Uri?>                      configuredUris
 	)
 	{
 		ArgumentNullException.ThrowIfNull(configuredUris);
@@ -96,7 +146,7 @@ internal sealed class IppCertificateTrust
 				.Select(uri => uri!.IdnHost)
 				.ToList();
 
-		return new IppCertificateTrust(pinnedFingerprints, callback, systemTrustHosts);
+		return new IppCertificateTrust(pinnedFingerprints, printerFingerprints, callback, systemTrustHosts);
 	}
 
 	/// <summary>
@@ -107,7 +157,7 @@ internal sealed class IppCertificateTrust
 	{
 		get
 		{
-			return this.pinned.Count > 0 || this.callback is not null;
+			return this.pinned.Count > 0 || this.pinnedByHost.Count > 0 || this.callback is not null;
 		}
 	}
 
@@ -235,10 +285,18 @@ internal sealed class IppCertificateTrust
 			return false;
 		}
 
-		// Pinned: trusted whatever name it carries, as printers' certificates rarely name the address used
-		string fingerprint = IppCertificateTrust.GetFingerprint(certificate);
+		// Pinned: trusted whatever name it carries, as printers' certificates rarely name the address used; at any
+		// host, or only at the printer's own (ADR 0058)
+		string fingerprint = IppCertificateTrust.GetFingerprint(certificate).Replace(":", string.Empty, StringComparison.Ordinal);
 
-		if (this.pinned.Contains(fingerprint.Replace(":", string.Empty, StringComparison.Ordinal)))
+		if (this.pinned.Contains(fingerprint))
+		{
+			return true;
+		}
+
+		if (host is not null
+			&& this.pinnedByHost.TryGetValue(IppCertificateTrust.NormalizeHost(host), out HashSet<string>? hostPins)
+			&& hostPins.Contains(fingerprint))
 		{
 			return true;
 		}

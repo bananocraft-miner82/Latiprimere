@@ -54,6 +54,51 @@ public sealed class IppNetworkPrintSystemFactoryTests
 		Assert.Throws<ArgumentException>(create);
 	}
 
+	[Fact]
+	public void GivenEncryptionRequiredAndAPlainPrinterUriWhenCreateThenThrowsArgumentExceptionNamingIt()
+	{
+		// Arrange
+		IppNetworkOptions options = new IppNetworkOptions { EnableDiscovery = false, RequireEncryption = true };
+		options.PrinterUris.Add(new Uri("ipps://192.168.1.21/ipp/print"));
+		options.PrinterUris.Add(new Uri("ipp://192.168.1.20/ipp/print"));
+
+		// Act
+		Action create = () => IppNetworkPrintSystemFactory.Create(options).Dispose();
+
+		// Assert
+		ArgumentException exception = Assert.Throws<ArgumentException>(create);
+		Assert.Contains("ipp://192.168.1.20/ipp/print", exception.Message, StringComparison.Ordinal);
+	}
+
+	[Theory]
+	[InlineData(false, false)]
+	[InlineData(true, true)]
+	public void GivenEncryptionRequiredOrNotWhenCreateThenPrintersIppsAddressesArePreferredOnlyWhenItIs(bool requireEncryption, bool expected)
+	{
+		// Arrange — nothing pinned, so only required encryption makes IPPS preferred (provided by InlineData above)
+		IppNetworkOptions options = new IppNetworkOptions { EnableDiscovery = false, RequireEncryption = requireEncryption };
+
+		// Act
+		using IppNetworkPrintSystem printSystem = (IppNetworkPrintSystem)IppNetworkPrintSystemFactory.Create(options);
+
+		// Assert
+		Assert.Equal(expected, printSystem.PrefersIpps);
+	}
+
+	[Fact]
+	public void GivenPrinterCertificateFingerprintWhenCertificateTrustCreatedThenItTrustsBeyondTheSystem()
+	{
+		// Arrange
+		IppNetworkOptions options = new IppNetworkOptions();
+		options.PrinterCertificateFingerprints[new Uri("ipps://192.168.1.20/ipp/print")] = new string('A', 64);
+
+		// Act
+		IppCertificateTrust trust = IppNetworkPrintSystemFactory.CreateCertificateTrust(options);
+
+		// Assert
+		Assert.True(trust.TrustsBeyondSystem);
+	}
+
 	[Theory]
 	[InlineData("", "secret")]
 	[InlineData("ann:smith", "secret")]

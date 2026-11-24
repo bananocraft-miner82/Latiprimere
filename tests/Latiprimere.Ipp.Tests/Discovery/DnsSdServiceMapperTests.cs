@@ -236,4 +236,95 @@ public sealed class DnsSdServiceMapperTests
 		// Assert
 		Assert.Equal("/printers/office", printer?.PrinterUri.AbsolutePath);
 	}
+
+	[Theory]
+	[InlineData("127.0.0.1")]
+	[InlineData("127.10.0.1")]
+	[InlineData("0.0.0.0")]
+	[InlineData("169.254.169.254")]
+	[InlineData("224.0.0.251")]
+	[InlineData("255.255.255.255")]
+	[InlineData("::1")]
+	[InlineData("fd00:ec2::254")]
+	public void GivenAnnouncementOfOnlyAnAddressNoPrinterHasWhenMappedThenSkipsItRatherThanUsingItsName(string address)
+	{
+		// Arrange — anyone on the network can announce a printer at this machine's loopback or a cloud metadata
+		// service (provided by InlineData above), with a name that could resolve to the same
+		DnsSdService service = new DnsSdService
+		{
+			Instance    = "Office Laser",
+			ServiceType = "_ipp._tcp",
+			Hostname    = "office-laser.local.",
+			Port        = 631,
+			Addresses   = new[] { IPAddress.Parse(address) }
+		};
+
+		// Act
+		DiscoveredIppPrinter? printer = DnsSdServiceMapper.ToDiscoveredPrinter(service);
+
+		// Assert
+		Assert.Null(printer);
+	}
+
+	[Fact]
+	public void GivenAnnouncementOfLoopbackBesideAPrintersAddressWhenMappedThenUsesThePrintersAddress()
+	{
+		// Arrange
+		DnsSdService service = new DnsSdService
+		{
+			Instance    = "Office Laser",
+			ServiceType = "_ipp._tcp",
+			Hostname    = "office-laser.local.",
+			Port        = 631,
+			Addresses   = new[] { IPAddress.Loopback, IPAddress.Parse("192.168.1.20") }
+		};
+
+		// Act
+		DiscoveredIppPrinter? printer = DnsSdServiceMapper.ToDiscoveredPrinter(service);
+
+		// Assert
+		Assert.Equal(new Uri("ipp://192.168.1.20:631/ipp/print"), printer?.PrinterUri);
+	}
+
+	[Theory]
+	[InlineData("localhost.")]
+	[InlineData("LOCALHOST")]
+	[InlineData("printer.localhost.")]
+	public void GivenAnnouncementOfLocalhostWithoutAddressesWhenMappedThenSkipsIt(string hostname)
+	{
+		// Arrange — a name that is always this machine (provided by InlineData above)
+		DnsSdService service = new DnsSdService
+		{
+			Instance    = "Office Laser",
+			ServiceType = "_ipp._tcp",
+			Hostname    = hostname,
+			Port        = 631
+		};
+
+		// Act
+		DiscoveredIppPrinter? printer = DnsSdServiceMapper.ToDiscoveredPrinter(service);
+
+		// Assert
+		Assert.Null(printer);
+	}
+
+	[Fact]
+	public void GivenAnnouncementWithOnlyALinkLocalIpv6AddressWhenMappedThenStillUsesItsName()
+	{
+		// Arrange — link-local isn't refused, only unusable in a URI, so the name is used as before
+		DnsSdService service = new DnsSdService
+		{
+			Instance    = "Office Laser",
+			ServiceType = "_ipp._tcp",
+			Hostname    = "office-laser.local.",
+			Port        = 631,
+			Addresses   = new[] { IPAddress.Parse("fe80::1") }
+		};
+
+		// Act
+		DiscoveredIppPrinter? printer = DnsSdServiceMapper.ToDiscoveredPrinter(service);
+
+		// Assert
+		Assert.Equal(new Uri("ipp://office-laser.local:631/ipp/print"), printer?.PrinterUri);
+	}
 }

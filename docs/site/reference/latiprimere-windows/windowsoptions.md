@@ -46,6 +46,16 @@ They are sent with every request, as HTTP Basic authentication, and only over IP
 
 While they are set, a certificate the system trusts is enough only for printers in [WindowsOptions.IppPrinterUris](/docs/reference/latiprimere-windows/windowsoptions/#ippprinteruris) or [WindowsOptions.IppPrinterCredentials](/docs/reference/latiprimere-windows/windowsoptions/#ippprintercredentials): anyone on the network can announce a printer with a WSD queue's UUID at a host whose certificate a public authority issued, so a printer found that way must have its certificate pinned in [WindowsOptions.IppTrustedCertificateFingerprints](/docs/reference/latiprimere-windows/windowsoptions/#ipptrustedcertificatefingerprints) or accepted by [WindowsOptions.IppServerCertificateValidationCallback](/docs/reference/latiprimere-windows/windowsoptions/#ippservercertificatevalidationcallback). To keep a password to one printer, use [WindowsOptions.IppPrinterCredentials](/docs/reference/latiprimere-windows/windowsoptions/#ippprintercredentials).
 
+### IppPrinterCertificateFingerprints
+
+```csharp
+public IDictionary<Uri, string> IppPrinterCertificateFingerprints { get; }
+```
+
+Gets the SHA-256 fingerprints of printer certificates to trust when [WindowsOptions.PrintPdfOverIpp](/docs/reference/latiprimere-windows/windowsoptions/#printpdfoveripp) sends a job over IPPS, only at one printer's address, by printer URI, such as `ipps://192.168.1.20/ipp/print`. They are matched by the URI's host, and work as `IppNetworkOptions.PrinterCertificateFingerprints` do.
+
+A certificate in [WindowsOptions.IppTrustedCertificateFingerprints](/docs/reference/latiprimere-windows/windowsoptions/#ipptrustedcertificatefingerprints) is trusted at any address, which matters when printers of one model share a certificate made at the factory. One pinned here is refused anywhere else.
+
 ### IppPrinterCredentials
 
 ```csharp
