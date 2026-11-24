@@ -182,6 +182,14 @@ internal static class RasterJobPlanner
 				_                      => RasterJobPlanner.UrfBackSide(urf),
 			},
 			Orientation     = options.Orientation,
+			PrintQuality    = options.Quality switch
+			{
+				PrintQuality.Draft  => 3,
+				PrintQuality.Normal => 4,
+				PrintQuality.High   => 5,
+				_                   => 0,
+			},
+			PageRanges      = options.PageRanges,
 			PclmStripHeight = RasterJobPlanner.ChooseStripHeight(byName),
 			PclmCompression = RasterJobPlanner.ChooseStripCompression(byName)
 		};

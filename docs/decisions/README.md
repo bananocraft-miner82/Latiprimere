@@ -57,6 +57,12 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0049](0049-following-printers-and-jobs.md) | Following printers and jobs | Accepted |
 | [0050](0050-commercial-licence-agreement.md) | Commercial Licence agreement, from Common Paper's Software License Agreement | Proposed |
 | [0051](0051-security-policy-sbom-and-cra.md) | Security policy, SBOMs and groundwork for the Cyber Resilience Act | Proposed |
+| [0052](0052-support-branches.md) | Support branches for older .NET lines | Proposed |
+| [0053](0053-document-generation-companion.md) | Document generation as a companion product | Accepted |
+| [0054](0054-rasteriser-options.md) | Options for the PDF rasteriser: pixel format, smoothing and passwords | Accepted |
+| [0055](0055-catalog-printers.md) | The catalog's own printers, and the options they apply | Accepted |
+| [0056](0056-typed-options-before-1-0.md) | Typed options before 1.0: page ranges, collation, quality, finishings, output bins, media types and custom sizes | Accepted |
+| [0057](0057-api-review-phase-4.md) | Public API review of Phase 4's additions | Accepted |
 
 ## Template
 

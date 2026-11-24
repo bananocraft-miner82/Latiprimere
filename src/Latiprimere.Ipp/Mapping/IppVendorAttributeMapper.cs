@@ -226,6 +226,11 @@ internal static partial class IppVendorAttributeMapper
 		IppVendorAttributeMapper.AddIf(names, job?.PrintColorMode is not null, "print-color-mode");
 		IppVendorAttributeMapper.AddIf(names, job?.Media is not null, "media");
 		IppVendorAttributeMapper.AddIf(names, job?.MediaCol is not null, "media-col");
+		IppVendorAttributeMapper.AddIf(names, job?.PageRanges is not null, "page-ranges");
+		IppVendorAttributeMapper.AddIf(names, job?.MultipleDocumentHandling is not null, "multiple-document-handling");
+		IppVendorAttributeMapper.AddIf(names, job?.PrintQuality is not null, "print-quality");
+		IppVendorAttributeMapper.AddIf(names, job?.Finishings is not null, "finishings");
+		IppVendorAttributeMapper.AddIf(names, job?.OutputBin is not null, "output-bin");
 
 		return names;
 	}

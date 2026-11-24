@@ -6,10 +6,11 @@ namespace Latiprimere.Windows;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every <c>windows:</c> printer the catalog returns implements this interface, so test for it:
+/// Every <c>windows:</c> printer the catalog returns offers this interface. Ask for it with
+/// <see cref="IPrinter.GetFeature{T}"/>, as the catalog's printers are its own, around the Windows printer:
 /// </para>
 /// <code>
-/// if (printer is IWindowsPrinter windowsPrinter)
+/// if (printer.GetFeature&lt;IWindowsPrinter&gt;() is { } windowsPrinter)
 /// {
 ///     string capabilities = await windowsPrinter.GetPrintCapabilitiesAsync();
 /// }

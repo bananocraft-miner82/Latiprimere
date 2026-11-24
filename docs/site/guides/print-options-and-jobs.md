@@ -1,6 +1,6 @@
 ---
 title: Print options and following jobs
-description: Choose copies, two-sided printing and orientation, follow a job's progress with a timeout, cancel it, and find it again after a restart.
+description: Choose copies, pages, two-sided printing, quality and paper, print images, text and password-protected PDFs, follow a job or a printer, cancel a job, and find it again after a restart.
 sidebar:
   order: 1
 ---
@@ -19,6 +19,12 @@ sidebar:
 | `ColorMode`   | `Color` or `Monochrome`                                    | `PrinterDefault`               |
 | `Scaling`     | `Fit`, `Fill` or `None`, for images                        | `PrinterDefault`               |
 | `InputTray`   | One of the printer's trays                                 | `null`: the printer's default  |
+| `MediaType`   | One of the printer's kinds of paper, such as labels        | `null`: the printer's default  |
+| `PageRanges`  | Pages to print, such as `[new PageRange(2, 5)]`            | Empty: every page              |
+| `Collate`     | `true` for whole copies in turn, `false` for each page's copies together | `null`: the printer's default |
+| `Quality`     | `Draft`, `Normal` or `High`                                | `PrinterDefault`               |
+| `Finishings`  | Staples, holes or a fold, as `Finishing` values            | Empty: the printer's default   |
+| `OutputBin`   | One of the printer's output bins                           | `null`: the printer's default  |
 | `OutputFile`  | A file to print to instead of the printer (Windows only)   | `null`: print normally         |
 | `VendorOptions` | Anything else the printer offers, by key: see below      | Empty                          |
 
@@ -27,6 +33,16 @@ For two-sided printing, `LongEdge` turns pages like a book, and `ShortEdge` flip
 :::note[Orientation and PDFs on CUPS]
 CUPS may not turn a PDF's pages for `Landscape`: in testing with CUPS 2.4, a portrait PDF stayed portrait. To print landscape through CUPS, make the PDF's pages landscape. On Windows, `Landscape` turns the page and scales the content to fit across it. Network printers are sent the setting as IPP's `orientation-requested`, and what a printer does with it for a PDF is up to the printer. See [CUPS servers and the Windows spooler](/docs/print-systems/cups-and-windows/#pdfs-keep-their-own-orientation).
 :::
+
+`PageRanges` counts pages from 1, in order and without overlapping; `new PageRange(3, int.MaxValue)` prints from page 3 to the end. Where Latiprimere renders the pages, on the Windows spooler or as raster, only those are rendered; a printer or CUPS queue sent the PDF as it is is asked for them. Raw data's pages can't be seen, so a raw job with page ranges is refused with `NotSupportedException`.
+
+For labels and receipts, `MediaSize.Custom(width, height)` makes a size in millimetres, which a printer takes when it is inside one of its `CustomMediaSizes`:
+
+```csharp
+PrintOptions label = new PrintOptions { MediaSize = MediaSize.Custom(102, 152) };
+```
+
+Finishings and output bins aren't applied by the Windows spooler yet: a Windows printer refuses a job that sets them with `NotSupportedException`, rather than printing without them. Its driver's stapling and bins are reached with `windows:feature:` [vendor options](/docs/guides/vendor-options/).
 
 `Scaling` sizes an image on the paper. `Fit` fills the paper within 5 mm margins. `Fill` covers it, cutting off what overhangs. `None` prints the image at its own size, from the resolution it gives, or 96 dpi if it gives none. `PrinterDefault` shrinks an image larger than the paper and leaves a smaller one at its own size. An image is turned as its EXIF orientation says, and printed landscape when it is wider than tall, unless you set `Orientation`. A PNG's transparent parts print as the paper's white.
 
@@ -42,11 +58,19 @@ Text, from `PrintContent.FromText`, is set in Courier at 10 points within half-i
 IPrintJob job = await printer.SubmitAsync(PrintContent.FromText("Order 1042\nTotal\t€42.50"), PrintOptions.Default);
 ```
 
+A password-protected PDF is printed with its password:
+
+```csharp
+IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document, password), PrintOptions.Default);
+```
+
+The password is never logged. Where Latiprimere renders the PDF, on the Windows spooler or as raster, it opens the PDF with it. A network printer that takes PDF is sent the password with the document if it says it takes one, and otherwise the pages as raster. A CUPS queue, which Latiprimere can't send raster, refuses the job with `NotSupportedException` unless it takes passwords. A wrong password fails the job with a `PrintException` before anything prints.
+
 Setting `Copies` below 1 throws `ArgumentOutOfRangeException`. A printer that doesn't support a setting may ignore it or reject the job, depending on the print system: [Reading printer capabilities](/docs/guides/printer-capabilities/) shows how to check first.
 
 ### Vendor options
 
-`VendorOptions` sets what the typed options don't cover, such as print quality, stapling or a driver's own settings, by keys such as `ipp:print-quality` = `5` or `windows:feature:psk:PageOutputQuality` = `psk:High`. Each key starts with the print system that reads it, and each print system ignores the others' keys. A key that sets something a typed option sets for the same job, such as `ipp:copies` with `Copies`, is refused with `ArgumentException`.
+`VendorOptions` sets what the typed options don't cover, such as resolution, pages per sheet or a driver's own settings, by keys such as `ipp:printer-resolution` = `1200dpi` or `windows:parameter:ns0000:JobDarkness` = `2`. Each key starts with the print system that reads it, and each print system ignores the others' keys. A key that sets something a typed option sets for the same job, such as `ipp:copies` with `Copies`, is refused with `ArgumentException`.
 
 The keys, how to list the ones a printer takes, and Windows Print Tickets are in [Vendor options and Windows Print Capabilities](/docs/guides/vendor-options/).
 
@@ -92,6 +116,32 @@ static async Task PrintWithOptionsAsync(IPrinter printer, string pdfPath)
 }
 ```
 
+## Print some of the pages
+
+This prints pages 2 and 3, two copies collated, at draft quality where the printer offers it:
+
+```csharp
+static async Task PrintPagesAsync(IPrinter printer, string pdfPath)
+{
+	PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync();
+
+	PrintOptions options = new PrintOptions
+	{
+		PageRanges = [new PageRange(2, 3)],
+		Copies = 2,
+		Collate = true,
+		Quality = capabilities.PrintQualities.Contains(PrintQuality.Draft) ? PrintQuality.Draft : PrintQuality.PrinterDefault,
+	};
+
+	using FileStream document = File.OpenRead(pdfPath);
+	IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options);
+
+	Console.WriteLine($"Printing pages 2 and 3 as job {job.Id}");
+}
+```
+
+Collated copies come out as whole copies in turn: 2, 3, 2, 3. With `Collate = false`, each page's copies come out together: 2, 2, 3, 3.
+
 ## Job states
 
 `WatchStatusAsync` reports the job's status each time its state, message, reasons or page count changes, never twice the same. It ends after the first final state. The Windows spooler signals each change, so a Windows job is reported as it changes; CUPS and network printers are asked every half second, or at the interval you give.
@@ -135,6 +185,31 @@ static async Task<bool> WaitForJobAsync(IPrintJob job, CancellationToken cancell
 ```
 
 For a single check, call `job.GetStatusAsync()`.
+
+## Follow a printer
+
+`IPrinter.WatchStatusAsync` reports the printer's state each time it changes, such as when it runs out of paper or is paused, until you cancel it. The Windows spooler signals each change; CUPS and network printers are asked every five seconds, or at the interval you give.
+
+```csharp
+static async Task FollowPrinterAsync(IPrinter printer, CancellationToken cancellationToken)
+{
+	try
+	{
+		await foreach (PrinterStatus status in printer.WatchStatusAsync(cancellationToken))
+		{
+			string reasons = status.StateReasons.Count > 0 ? $" ({string.Join(", ", status.StateReasons)})" : string.Empty;
+
+			Console.WriteLine($"{status.State}{reasons} {status.StateMessage}");
+		}
+	}
+	catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+	{
+		Console.WriteLine("Stopped following the printer.");
+	}
+}
+```
+
+Each `PrinterStatus` has the `State` (`Idle`, `Processing`, `Stopped` or `Unknown`), the print system's `StateMessage`, `StateReasons` as IPP `printer-state-reasons` keywords such as `media-empty-error`, and `IsAcceptingJobs`. A printer doesn't finish, so the token is the only way to stop: it's required here, where following a job can do without one. For a single check, call `printer.GetStatusAsync()`.
 
 ## Cancel a job
 

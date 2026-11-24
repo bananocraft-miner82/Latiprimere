@@ -69,4 +69,20 @@ public interface IPrintJob
 	{
 		return StatusPolling.WatchJobAsync(this, pollInterval, cancellationToken);
 	}
+
+	/// <summary>
+	/// Gets what a job of one print system offers beyond <see cref="IPrintJob"/>, or <see langword="null"/> if it
+	/// offers none of that kind.
+	/// </summary>
+	/// <typeparam name="T">The interface asked for.</typeparam>
+	/// <returns>The job as <typeparamref name="T"/>, or <see langword="null"/>.</returns>
+	/// <remarks>
+	/// Use this rather than a cast: jobs from printers the <see cref="IPrinterCatalog"/> gives are Latiprimere's own,
+	/// around the print system's. The default implementation casts this job.
+	/// </remarks>
+	T? GetFeature<T>()
+		where T : class
+	{
+		return this as T;
+	}
 }

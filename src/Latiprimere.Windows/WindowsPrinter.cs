@@ -70,6 +70,33 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 	public PrinterInfo Info { get; }
 
 	/// <inheritdoc/>
+	/// <remarks>
+	/// Every setting but <see cref="PrintOptions.Finishings"/> and <see cref="PrintOptions.OutputBin"/>, which a
+	/// driver reaches only through its Print Capabilities: set them with <c>windows:feature:</c> vendor options
+	/// (ADR 0056).
+	/// </remarks>
+	public PrintOptionKinds AppliedOptions
+	{
+		get
+		{
+			return PrintOptionKinds.JobName
+					| PrintOptionKinds.Copies
+					| PrintOptionKinds.Duplex
+					| PrintOptionKinds.Orientation
+					| PrintOptionKinds.MediaSize
+					| PrintOptionKinds.ColorMode
+					| PrintOptionKinds.Scaling
+					| PrintOptionKinds.InputTray
+					| PrintOptionKinds.VendorOptions
+					| PrintOptionKinds.OutputFile
+					| PrintOptionKinds.PageRanges
+					| PrintOptionKinds.Collate
+					| PrintOptionKinds.Quality
+					| PrintOptionKinds.MediaType;
+		}
+	}
+
+	/// <inheritdoc/>
 	public string QueueName
 	{
 		get
@@ -129,6 +156,7 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 
 		int jobNumber = content.Format switch
 		{
+			DocumentFormat.Raw when options.PageRanges.Count > 0 => throw new NotSupportedException(ExceptionMessages.PageRangesNotForRawData),
 			DocumentFormat.Raw => await this.SubmitRawAsync(content, options.Copies, documentName, outputFile, cancellationToken)
 											.ConfigureAwait(false),
 			DocumentFormat.Pdf => await this.SubmitPdfAsync(content, options, vendorSettings, documentName, outputFile, cancellationToken)
@@ -760,12 +788,15 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 			() =>
 			{
 				// Before the document is opened, so a size or tray the driver lacks fails without rendering anything
-				(short? paperId, short? binId) = this.FindPaperAndBin(options);
+				PaperChoice paper = this.FindPaperAndBin(options);
 
 				// Also before, so a feature or option the printer lacks fails without rendering anything
 				List<byte[]> tickets = this.CreatePrintTickets(options, vendorSettings);
 
-				using IRasterDocument document = rasterizer.Open(content.Content);
+				using IRasterDocument document = rasterizer.Open(content.Content, new PdfOpenOptions { Password = content.Password });
+
+				// Only the pages chosen; ranges that leave none fail before anything is spooled (ADR 0056)
+				IReadOnlyList<int> pages = Latiprimere.Ipp.Documents.PageSelection.Select(options.PageRanges, document.PageCount);
 
 				GdiPrintRequest request = new GdiPrintRequest
 				{
@@ -774,8 +805,11 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 					OutputFile   = outputFile,
 					Document     = document,
 					Options      = options,
-					PaperId      = paperId,
-					BinId        = binId,
+					PaperId      = paper.PaperId,
+					BinId        = paper.BinId,
+					CustomPaper  = paper.CustomPaper,
+					MediaTypeId  = paper.MediaTypeId,
+					Pages        = pages,
 					SavedDevMode = vendorSettings.DevMode,
 					PrintTickets = tickets
 				};
@@ -912,18 +946,20 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 	}
 
 	/// <summary>
-	/// Finds the driver's numbers for the chosen paper size and tray. The driver's lists are only read when one is
-	/// chosen.
+	/// Finds the driver's numbers for the chosen paper size, tray and paper type. The driver's lists are only read
+	/// when one is chosen.
 	/// </summary>
 	/// <param name="options">The print options.</param>
-	/// <returns>The DMPAPER_* and DMBIN_* numbers, each <see langword="null"/> when not chosen.</returns>
-	/// <exception cref="NotSupportedException">The driver doesn't list the chosen size or tray.</exception>
+	/// <returns>The driver's numbers, each <see langword="null"/> when not chosen; a size the driver doesn't list but
+	/// takes as a custom size comes as its dimensions instead.</returns>
+	/// <exception cref="NotSupportedException">The driver doesn't list the chosen size, tray or type, nor take the
+	/// size as a custom one.</exception>
 	/// <exception cref="PrintException">The printer can no longer be found.</exception>
-	private (short? PaperId, short? BinId) FindPaperAndBin(PrintOptions options)
+	private PaperChoice FindPaperAndBin(PrintOptions options)
 	{
-		if (options.MediaSize is null && options.InputTray is null)
+		if (options.MediaSize is null && options.InputTray is null && options.MediaType is null)
 		{
-			return (null, null);
+			return new PaperChoice(null, null, null, null);
 		}
 
 		// Only the papers and trays are needed, so no Print Ticket session
@@ -932,13 +968,33 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 
 		short? paperId = null;
 		short? binId = null;
+		(short Width, short Length)? customPaper = null;
+		uint? mediaTypeId = null;
 
 		if (options.MediaSize is not null)
 		{
-			paperId = WindowsCapabilitiesMapper.FindPaperId(record, options.MediaSize.Name)
-				?? throw new NotSupportedException
+			paperId = WindowsCapabilitiesMapper.FindPaperId(record, options.MediaSize.Name);
+
+			// A size the driver doesn't list may still be one it takes as a custom size (ADR 0056)
+			if (paperId is null && WindowsCapabilitiesMapper.ToCustomRange(record)?.Contains(options.MediaSize) == true)
+			{
+				customPaper = ((short)Math.Round(options.MediaSize.WidthMillimeters * 10), (short)Math.Round(options.MediaSize.HeightMillimeters * 10));
+			}
+			else if (paperId is null)
+			{
+				throw new NotSupportedException
 				(
 					ExceptionMessages.FormatMediaSizeNotListed(this.printerName, options.MediaSize.DisplayName, options.MediaSize.Name)
+				);
+			}
+		}
+
+		if (options.MediaType is not null)
+		{
+			mediaTypeId = WindowsCapabilitiesMapper.FindMediaTypeId(record, options.MediaType.Id)
+				?? throw new NotSupportedException
+				(
+					ExceptionMessages.FormatMediaTypeNotListed(this.printerName, options.MediaType.Name, options.MediaType.Id)
 				);
 		}
 
@@ -951,6 +1007,15 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 				);
 		}
 
-		return (paperId, binId);
+		return new PaperChoice(paperId, binId, customPaper, mediaTypeId);
 	}
+
+	/// <summary>
+	/// The driver's numbers for a job's paper.
+	/// </summary>
+	/// <param name="PaperId">The DMPAPER_* size, or <see langword="null"/>.</param>
+	/// <param name="BinId">The DMBIN_* tray, or <see langword="null"/>.</param>
+	/// <param name="CustomPaper">A custom size in tenths of a millimetre, or <see langword="null"/>.</param>
+	/// <param name="MediaTypeId">The DMMEDIA_* type, or <see langword="null"/>.</param>
+	private readonly record struct PaperChoice(short? PaperId, short? BinId, (short Width, short Length)? CustomPaper, uint? MediaTypeId);
 }

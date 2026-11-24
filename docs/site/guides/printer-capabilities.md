@@ -45,6 +45,12 @@ Most copies:   1
 | `ColorModes`, `DefaultColorMode`     | `Monochrome`, `Color`                                |
 | `Orientations`                       | `Portrait`, `Landscape`                              |
 | `InputTrays`                         | Paper sources, as `InputTray` (an `Id` and a `Name`) |
+| `CustomMediaSizes`                   | Ranges of custom or roll sizes, as `MediaSizeRange`  |
+| `MediaTypes`                         | Kinds of paper, as `MediaType` (an `Id` and a `Name`) |
+| `PrintQualities`, `DefaultPrintQuality` | `Draft`, `Normal`, `High`                         |
+| `Finishings`                         | Staples, holes and folds, as `Finishing`             |
+| `OutputBins`                         | Where printed sheets go, as `OutputBin` (an `Id` and a `Name`) |
+| `SupportsPageRanges`                 | Whether the printer itself prints only some pages    |
 | `MaxCopies`                          | The most copies one job can ask for                  |
 | `VendorOptions`                      | Everything else the printer offers, as `VendorOption`: see below |
 
@@ -106,7 +112,7 @@ How each print system carries them out:
 
 ## Vendor options: everything else the printer offers
 
-Printers offer far more than the typed options cover: print quality, resolution, finishing such as stapling, and settings a driver invents for itself. `VendorOptions` lists them, each with the key and values to pass back through `PrintOptions.VendorOptions`. On Windows, `IWindowsPrinter` also reads the driver's Print Capabilities and default Print Ticket. Both are described in [Vendor options and Windows Print Capabilities](/docs/guides/vendor-options/).
+Printers offer far more than the typed options cover: resolution, pages per sheet, finishings beyond staples, holes and folds, and settings a driver invents for itself. `VendorOptions` lists them, each with the key and values to pass back through `PrintOptions.VendorOptions`. On Windows, `IWindowsPrinter` also reads the driver's Print Capabilities and default Print Ticket. Both are described in [Vendor options and Windows Print Capabilities](/docs/guides/vendor-options/).
 
 ## Comparing capabilities
 

@@ -37,6 +37,9 @@ internal sealed record RasterSettings
 	/// default.</summary>
 	public int PrintQuality { get; init; }
 
+	/// <summary>Gets the pages to render, counted from 1; empty for every page (ADR 0056).</summary>
+	public IReadOnlyList<PageRange> PageRanges { get; init; } = Array.Empty<PageRange>();
+
 	/// <summary>Gets the most memory one rendered band may take; a page is rendered in as many bands as that
 	/// needs.</summary>
 	public long MaxBandBytes { get; init; } = RasterSettings.DefaultMaxBandBytes;

@@ -84,6 +84,46 @@ public sealed class DnsSdServiceMapperTests
 	}
 
 	[Fact]
+	public void GivenRoutableIpv6AddressButNoIpv4WhenMappedThenUsesTheIpv6AddressInBrackets()
+	{
+		// Arrange — as an announcement that reached this machine over IPv6 only carries, from Avahi
+		DnsSdService service = new DnsSdService
+		{
+			Instance    = "Office Laser",
+			ServiceType = "_ipp._tcp",
+			Hostname    = "office-laser.local",
+			Port        = 8631,
+			Addresses   = new[] { IPAddress.Parse("fe80::1"), IPAddress.Parse("2001:db8::20") }
+		};
+
+		// Act
+		DiscoveredIppPrinter? printer = DnsSdServiceMapper.ToDiscoveredPrinter(service);
+
+		// Assert
+		Assert.Equal(new Uri("ipp://[2001:db8::20]:8631/ipp/print"), printer?.PrinterUri);
+	}
+
+	[Fact]
+	public void GivenIpv4AndIpv6AddressesWhenMappedThenPrefersIpv4()
+	{
+		// Arrange
+		DnsSdService service = new DnsSdService
+		{
+			Instance    = "Office Laser",
+			ServiceType = "_ipp._tcp",
+			Hostname    = "office-laser.local",
+			Port        = 631,
+			Addresses   = new[] { IPAddress.Parse("2001:db8::20"), IPAddress.Parse("192.168.1.20") }
+		};
+
+		// Act
+		DiscoveredIppPrinter? printer = DnsSdServiceMapper.ToDiscoveredPrinter(service);
+
+		// Assert
+		Assert.Equal(new Uri("ipp://192.168.1.20:631/ipp/print"), printer?.PrinterUri);
+	}
+
+	[Fact]
 	public void GivenIppsServiceWithoutResourcePathWhenMappedThenUsesIppsSchemeAndDefaultPath()
 	{
 		// Arrange

@@ -17,7 +17,7 @@ internal sealed record RenderedPage(byte[] Pixels, int Stride)
 	/// <returns>Its red, green and blue.</returns>
 	public (int R, int G, int B) GetRgb(int x, int y)
 	{
-		int index = (y * this.Stride) + (x * RasterBand.BytesPerPixel);
+		int index = (y * this.Stride) + (x * RasterBand.GetBytesPerPixel(RasterPixelFormat.Bgra32));
 
 		return (this.Pixels[index + 2], this.Pixels[index + 1], this.Pixels[index]);
 	}

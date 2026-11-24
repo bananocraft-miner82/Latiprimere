@@ -20,6 +20,48 @@ public sealed class PrintContentTests
 	}
 
 	[Fact]
+	public void GivenPdfWithoutPasswordWhenFromPdfThenThereIsNoPassword()
+	{
+		// Arrange
+		using MemoryStream stream = new MemoryStream();
+
+		// Act
+		PrintContent content = PrintContent.FromPdf(stream);
+
+		// Assert
+		Assert.Null(content.Password);
+	}
+
+	[Fact]
+	public void GivenPasswordWhenFromPdfThenFormatIsPdfAndStreamAndPasswordAreKept()
+	{
+		// Arrange
+		using MemoryStream stream = new MemoryStream();
+
+		// Act
+		PrintContent content = PrintContent.FromPdf(stream, "test-password");
+
+		// Assert
+		Assert.Equal((DocumentFormat.Pdf, "test-password"), (content.Format, content.Password));
+		Assert.Same(stream, content.Content);
+	}
+
+	[Fact]
+	public void GivenNullPasswordWhenFromPdfThenThrowsArgumentNullException()
+	{
+		// Arrange
+		using MemoryStream stream = new MemoryStream();
+		string? password = null;
+
+		// Act
+		Func<PrintContent> create = () => PrintContent.FromPdf(stream, password!); // Deliberately null to test the guard
+
+		// Assert
+		ArgumentNullException exception = Assert.Throws<ArgumentNullException>(create);
+		Assert.Equal("password", exception.ParamName);
+	}
+
+	[Fact]
 	public void GivenReadableStreamWhenFromRawThenFormatIsRawAndStreamIsKept()
 	{
 		// Arrange

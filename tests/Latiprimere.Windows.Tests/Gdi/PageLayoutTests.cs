@@ -89,7 +89,7 @@ public sealed class PageLayoutTests
 		int rows = layout.GetRowsPerBand(GdiRenderSettings.MaxBandBytes);
 
 		// Assert
-		Assert.True((long)rows * layout.RenderWidth * RasterBand.BytesPerPixel <= GdiRenderSettings.MaxBandBytes);
+		Assert.True((long)rows * layout.RenderWidth * RasterBand.GetBytesPerPixel(RasterPixelFormat.Bgra32) <= GdiRenderSettings.MaxBandBytes);
 		Assert.InRange(rows, 1, layout.RenderHeight);
 	}
 

@@ -11,6 +11,16 @@ internal sealed record WindowsCapabilitiesRecord
 	/// <summary>Gets the paper sources.</summary>
 	public IReadOnlyList<WindowsBinRecord> Bins { get; init; } = Array.Empty<WindowsBinRecord>();
 
+	/// <summary>Gets the paper types, as DMMEDIA_* numbers and names.</summary>
+	public IReadOnlyList<WindowsMediaTypeRecord> MediaTypes { get; init; } = Array.Empty<WindowsMediaTypeRecord>();
+
+	/// <summary>Gets the smallest custom paper, width and length in tenths of a millimetre, or <see langword="null"/>
+	/// if the driver takes no custom size.</summary>
+	public (short Width, short Length)? MinExtent { get; init; }
+
+	/// <summary>Gets the largest custom paper, as <see cref="MinExtent"/>.</summary>
+	public (short Width, short Length)? MaxExtent { get; init; }
+
 	/// <summary>Gets a value indicating whether the printer can print on both sides.</summary>
 	public bool CanDuplex { get; init; }
 

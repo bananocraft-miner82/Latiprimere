@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
 	<resheader name="resmimetype">
 		<value>text/microsoft-resx</value>
@@ -15,5 +15,9 @@
 	<data name="AllPrintSystemsFailed" xml:space="preserve">
 		<value>Every print system failed. The inner exception lists each failure.</value>
 		<comment>Thrown when several print systems are registered and all of them fail.</comment>
+	</data>
+	<data name="OptionsNotApplied" xml:space="preserve">
+		<value>The printer '{0}' doesn't apply these print options, so the job was refused rather than printed without them: {1}. Leave them at their defaults for this printer.</value>
+		<comment>{0} is the printer ID; {1} lists the PrintOptions settings, such as "Copies, Duplex".</comment>
 	</data>
 </root>

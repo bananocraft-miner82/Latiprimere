@@ -147,7 +147,13 @@ internal static class IppRequestedAttributes
 		IppRequestedAttributes.ColorSupported,
 		IppRequestedAttributes.CopiesSupported,
 		IppRequestedAttributes.OrientationRequestedSupported,
-		IppRequestedAttributes.MediaSourceSupported
+		IppRequestedAttributes.MediaSourceSupported,
+		"media-type-supported",
+		"output-bin-supported",
+		"print-quality-supported",
+		"print-quality-default",
+		"finishings-supported",
+		"page-ranges-supported",
 	};
 
 	/// <summary>

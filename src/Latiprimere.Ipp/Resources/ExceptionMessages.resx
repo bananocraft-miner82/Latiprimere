@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
 	<resheader name="resmimetype">
 		<value>text/microsoft-resx</value>
@@ -260,5 +260,21 @@
 	<data name="PdfTextCharacterUnsupported" xml:space="preserve">
 		<value>The character {0}, at position {1}, can't be printed: text is set in Courier, which shows the Windows-1252 characters of Western European languages.</value>
 		<comment>{0} is the character's code, such as U+0100; {1} its zero-based position in the text.</comment>
+	</data>
+	<data name="PdfPasswordNotSupported" xml:space="preserve">
+		<value>The PDF is password-protected, and the printer at {0} can neither be sent its password nor be sent its pages as raster.</value>
+		<comment>{0} is the printer URI. Never include the password.</comment>
+	</data>
+	<data name="PageRangesSelectNoPages" xml:space="preserve">
+		<value>The page ranges {0} leave no pages of a document of {1} pages.</value>
+		<comment>{0} lists the ranges; {1} is the page count.</comment>
+	</data>
+	<data name="PageRangesNotForRawData" xml:space="preserve">
+		<value>Page ranges can't be applied to raw printer data, whose pages Latiprimere can't see. Leave PrintOptions.PageRanges empty for raw jobs.</value>
+		<comment>Thrown when a raw job sets PrintOptions.PageRanges.</comment>
+	</data>
+	<data name="FinishingNotSupported" xml:space="preserve">
+		<value>The finishing {0} isn't one this version of Latiprimere's IPP support knows.</value>
+		<comment>{0} is the Finishing value.</comment>
 	</data>
 </root>

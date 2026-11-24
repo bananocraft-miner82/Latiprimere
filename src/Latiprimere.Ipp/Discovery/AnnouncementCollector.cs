@@ -113,11 +113,36 @@ internal sealed class AnnouncementCollector
 		{
 			Instance    = announcement.Instance,
 			ServiceType = announcement.Type,
-			Hostname    = announcement.Hostname,
+			Hostname    = AnnouncementCollector.JoinHostname(announcement.Hostname, announcement.Domain),
 			Port        = announcement.Port,
 			Addresses   = announcement.Addresses?.ToList() ?? [],
 			Txt         = announcement.Txt?.ToList() ?? []
 		};
+	}
+
+	/// <summary>
+	/// Puts the SRV record's host name back together: Tmds.MDns gives its first label as the host name and the rest
+	/// as the domain, so <c>printer.local.</c> arrives as <c>printer</c> and <c>local</c>.
+	/// </summary>
+	/// <param name="hostname">The host name's first label.</param>
+	/// <param name="domain">The rest of the name, such as <c>local</c>, with or without a trailing dot.</param>
+	/// <returns>The full host name, such as <c>printer.local</c>; or <see langword="null"/> without a host name.</returns>
+	/// <remarks>
+	/// Without its domain, a name such as <c>printer</c> rarely resolves, and printers that guard against DNS
+	/// rebinding refuse it in the HTTP <c>Host</c> header: ippeveprinter answers 400 for any name not ending in
+	/// <c>.local</c>.
+	/// </remarks>
+	internal static string? JoinHostname(string? hostname, string? domain)
+	{
+		if (string.IsNullOrWhiteSpace(hostname))
+		{
+			return null;
+		}
+
+		string trimmedDomain = domain?.Trim().Trim('.') ?? string.Empty;
+		string trimmedHostname = hostname.Trim().TrimEnd('.');
+
+		return trimmedDomain.Length == 0 ? trimmedHostname : $"{trimmedHostname}.{trimmedDomain}";
 	}
 
 	/// <summary>

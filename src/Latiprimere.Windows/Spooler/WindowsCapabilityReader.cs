@@ -32,6 +32,9 @@ internal static unsafe class WindowsCapabilityReader
 		{
 			Papers            = WindowsCapabilityReader.ReadPapers(printerName, portName),
 			Bins              = WindowsCapabilityReader.ReadBins(printerName, portName),
+			MediaTypes        = WindowsCapabilityReader.ReadMediaTypes(printerName, portName),
+			MinExtent         = WindowsCapabilityReader.ReadExtent(printerName, portName, DeviceCapabilityConstants.MinExtent),
+			MaxExtent         = WindowsCapabilityReader.ReadExtent(printerName, portName, DeviceCapabilityConstants.MaxExtent),
 			CanDuplex         = WindowsCapabilityReader.ReadFlag
 			(
 				printerName,
@@ -143,6 +146,72 @@ internal static unsafe class WindowsCapabilityReader
 		);
 
 		return WindowsCapabilityReader.CombineBins(ids, names);
+	}
+
+	/// <summary>
+	/// Reads the paper types: numbers and names, returned as two parallel lists (ADR 0056).
+	/// </summary>
+	/// <param name="printerName">The printer name.</param>
+	/// <param name="portName">The port, or <see langword="null"/>.</param>
+	/// <returns>The types; empty if the driver doesn't list them.</returns>
+	private static List<WindowsMediaTypeRecord> ReadMediaTypes(string printerName, string? portName)
+	{
+		uint[] ids = WindowsCapabilityReader.ReadArray<uint>(printerName, portName, DeviceCapabilityConstants.MediaTypes, 1);
+
+		string[] names = WindowsCapabilityReader.ReadNames
+		(
+			printerName, portName, DeviceCapabilityConstants.MediaTypeNames, DeviceCapabilityConstants.MediaTypeNameLength
+		);
+
+		return WindowsCapabilityReader.CombineMediaTypes(ids, names);
+	}
+
+	/// <summary>
+	/// Combines the two parallel lists a driver returns for its paper types, using only the entries both agree on.
+	/// </summary>
+	/// <param name="ids">The DMMEDIA_* numbers.</param>
+	/// <param name="names">The names.</param>
+	/// <returns>The types.</returns>
+	internal static List<WindowsMediaTypeRecord> CombineMediaTypes(uint[] ids, string[] names)
+	{
+		int count = Math.Min(ids.Length, names.Length);
+		List<WindowsMediaTypeRecord> types = new List<WindowsMediaTypeRecord>(count);
+
+		for (int index = 0; index < count; index++)
+		{
+			types.Add(new WindowsMediaTypeRecord { Id = ids[index], Name = names[index] });
+		}
+
+		return types;
+	}
+
+	/// <summary>
+	/// Reads a custom paper limit, which DeviceCapabilities returns packed in its result.
+	/// </summary>
+	/// <param name="printerName">The printer name.</param>
+	/// <param name="portName">The port, or <see langword="null"/>.</param>
+	/// <param name="capability">DC_MINEXTENT or DC_MAXEXTENT.</param>
+	/// <returns>The width and length in tenths of a millimetre, or <see langword="null"/> if the driver gives
+	/// none.</returns>
+	private static (short Width, short Length)? ReadExtent(string printerName, string? portName, ushort capability)
+	{
+		int packed = WinSpoolNative.DeviceCapabilities(printerName, portName, capability, null, null);
+
+		return WindowsCapabilityReader.UnpackExtent(packed);
+	}
+
+	/// <summary>
+	/// Unpacks a custom paper limit: the width in the low word, the length in the high.
+	/// </summary>
+	/// <param name="packed">DeviceCapabilities' result.</param>
+	/// <returns>The width and length in tenths of a millimetre, or <see langword="null"/> for a failure (-1) or a
+	/// zero or negative size.</returns>
+	internal static (short Width, short Length)? UnpackExtent(int packed)
+	{
+		short width = unchecked((short)(packed & 0xFFFF));
+		short length = unchecked((short)((packed >> 16) & 0xFFFF));
+
+		return packed != -1 && width > 0 && length > 0 ? (width, length) : null;
 	}
 
 	/// <summary>

@@ -61,7 +61,7 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 	}
 
 	/// <inheritdoc/>
-	public void RenderBand(int pageIndex, RasterBand band, Span<byte> pixels)
+	public void RenderBand(int pageIndex, RasterBand band, Span<byte> pixels, RasterRenderOptions? options = null)
 	{
 		this.ValidatePageIndex(pageIndex);
 		PdfiumDocument.ValidateBand(band);
@@ -83,7 +83,7 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 				// Again under the lock: Dispose on another thread may have closed the document since the first check
 				ObjectDisposedException.ThrowIf(this.isDisposed, this);
 				IntPtr page = this.LoadPage(pageIndex);
-				PdfiumDocument.RenderInto(page, band, firstRow);
+				PdfiumDocument.RenderInto(page, band, firstRow, options ?? RasterRenderOptions.Default);
 			}
 		}
 	}
@@ -102,8 +102,12 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 	/// </summary>
 	/// <param name="band">The band.</param>
 	/// <exception cref="ArgumentOutOfRangeException">The band's geometry is invalid.</exception>
+	/// <exception cref="NotSupportedException">The band's pixel format isn't one this version knows.</exception>
 	private static void ValidateBand(RasterBand band)
 	{
+		// First, as the stride check below needs the format's size
+		int bytesPerPixel = band.BytesPerPixel;
+
 		bool isInsidePage = band.PageWidth > 0
 								&& band.PageHeight > 0
 								&& band.Top >= 0
@@ -118,7 +122,7 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 
 		// In long: a page wider than about 537 million pixels would wrap an int negative and let any stride through, so
 		// PDFium alone would stand between the band and a write past the caller's pixels
-		if (band.Stride < (long)band.PageWidth * RasterBand.BytesPerPixel)
+		if (band.Stride < (long)band.PageWidth * bytesPerPixel)
 		{
 			throw new ArgumentOutOfRangeException(nameof(band), band, ExceptionMessages.StrideTooSmall);
 		}
@@ -130,13 +134,16 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 	/// <param name="page">The loaded page.</param>
 	/// <param name="band">The band.</param>
 	/// <param name="firstRow">The first byte of the pixel buffer.</param>
+	/// <param name="options">How to render.</param>
 	/// <exception cref="PrintException">PDFium could not create the bitmap.</exception>
-	private static void RenderInto(IntPtr page, RasterBand band, byte* firstRow)
+	private static void RenderInto(IntPtr page, RasterBand band, byte* firstRow, RasterRenderOptions options)
 	{
-		IntPtr bitmap = PdfiumNative.CreateBitmap
-		(
-			band.PageWidth, band.Height, PdfiumConstants.BitmapFormatBgrx, firstRow, band.Stride
-		);
+		// PDFium turns colours to grey itself when it draws into a grey bitmap
+		int format = band.PixelFormat == RasterPixelFormat.Gray8
+			? PdfiumConstants.BitmapFormatGray
+			: PdfiumConstants.BitmapFormatBgrx;
+
+		IntPtr bitmap = PdfiumNative.CreateBitmap(band.PageWidth, band.Height, format, firstRow, band.Stride);
 
 		if (bitmap == IntPtr.Zero)
 		{
@@ -153,13 +160,40 @@ internal sealed unsafe class PdfiumDocument : IRasterDocument
 			PdfiumNative.RenderPageBitmap
 			(
 				bitmap, page, 0, -band.Top, band.PageWidth, band.PageHeight, (int)band.Rotation,
-				PdfiumConstants.RenderAnnotations | PdfiumConstants.RenderPrinting
+				PdfiumDocument.GetRenderFlags(options)
 			);
 		}
 		finally
 		{
 			PdfiumNative.DestroyBitmap(bitmap);
 		}
+	}
+
+	/// <summary>
+	/// Gets PDFium's render flags for the options, always with annotations and for printing, as for paper.
+	/// </summary>
+	/// <param name="options">How to render.</param>
+	/// <returns>The FPDF_* flags.</returns>
+	private static int GetRenderFlags(RasterRenderOptions options)
+	{
+		int flags = PdfiumConstants.RenderAnnotations | PdfiumConstants.RenderPrinting;
+
+		if (!options.SmoothText)
+		{
+			flags |= PdfiumConstants.RenderNoSmoothText;
+		}
+
+		if (!options.SmoothLines)
+		{
+			flags |= PdfiumConstants.RenderNoSmoothPath;
+		}
+
+		if (!options.SmoothImages)
+		{
+			flags |= PdfiumConstants.RenderNoSmoothImage;
+		}
+
+		return flags;
 	}
 
 	/// <summary>

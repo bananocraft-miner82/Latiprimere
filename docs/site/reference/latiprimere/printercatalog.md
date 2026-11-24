@@ -16,6 +16,8 @@ Finds printers across every print system supported on the current platform.
 
 Print systems are supplied by Latiprimere platform adapters. Those that report themselves as unsupported on the current platform are ignored. When several print systems are supported, their printers are combined, and a print system that fails while listing printers or finding the default is skipped with a logged warning, so one unreachable print system doesn't hide the printers of the others. The call fails only if every print system fails.
 
+The printers it returns are its own, around the print system's. A job that sets a [PrintOptions](/docs/reference/latiprimere-abstractions/printoptions/) setting the print system's printer doesn't apply ([IPrinter.AppliedOptions](/docs/reference/latiprimere-abstractions/iprinter/#appliedoptions)) is refused with [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) before anything is sent. Reach what a print system's printer offers beyond [IPrinter](/docs/reference/latiprimere-abstractions/iprinter/) with [IPrinter.GetFeature](/docs/reference/latiprimere-abstractions/iprinter/#getfeature), not a cast.
+
 The catalog doesn't own the print systems it is given and never disposes them. A dependency injection container disposes the ones it created; an application that created them with a factory disposes them itself, after it has finished with the catalog.
 
 ## Constructors

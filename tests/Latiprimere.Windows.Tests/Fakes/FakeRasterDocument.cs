@@ -34,7 +34,8 @@ internal sealed class FakeRasterDocument : IRasterDocument
 	/// <param name="pageIndex">Not used.</param>
 	/// <param name="band">The band.</param>
 	/// <param name="pixels">The pixels to fill.</param>
-	public void RenderBand(int pageIndex, RasterBand band, Span<byte> pixels)
+	/// <param name="options">Not used.</param>
+	public void RenderBand(int pageIndex, RasterBand band, Span<byte> pixels, RasterRenderOptions? options = null)
 	{
 		pixels[..(int)band.ByteCount].Fill(byte.MaxValue);
 	}

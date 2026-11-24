@@ -3,7 +3,8 @@ using Latiprimere.Rendering;
 namespace Latiprimere.Ipp.Raster;
 
 /// <summary>
-/// Turns rendered pixels (B, G, R, unused) into a raster colour space's bytes.
+/// Turns rendered pixels into a raster colour space's bytes: colour from B, G, R, unused pixels, and grey and 1-bit
+/// black from 8-bit grey ones, which PDFium renders directly in a quarter of the memory (ADR 0054).
 /// </summary>
 internal static class RasterPixels
 {
@@ -34,6 +35,16 @@ internal static class RasterPixels
 		15, 47, 7, 39, 13, 45, 5, 37,
 		63, 31, 55, 23, 61, 29, 53, 21,
 	];
+
+	/// <summary>
+	/// Gets the pixel format a colour space is rendered in: grey for grey and 1-bit black, colour otherwise.
+	/// </summary>
+	/// <param name="colorSpace">The colour space.</param>
+	/// <returns>The pixel format.</returns>
+	internal static RasterPixelFormat RenderFormat(RasterColorSpace colorSpace)
+	{
+		return colorSpace == RasterColorSpace.Srgb8 ? RasterPixelFormat.Bgra32 : RasterPixelFormat.Gray8;
+	}
 
 	/// <summary>
 	/// Gets the bits a pixel takes.
@@ -90,18 +101,27 @@ internal static class RasterPixels
 	/// <summary>
 	/// Reverses a line of rendered pixels, left to right, for a back side printed mirrored.
 	/// </summary>
-	/// <param name="pixels">The line, four bytes a pixel.</param>
+	/// <param name="pixels">The line.</param>
 	/// <param name="width">The pixels in it.</param>
-	internal static void Mirror(Span<byte> pixels, int width)
+	/// <param name="pixelFormat">How the line's pixels are laid out.</param>
+	internal static void Mirror(Span<byte> pixels, int width, RasterPixelFormat pixelFormat)
 	{
-		Span<uint> words = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(pixels[..(width * RasterBand.BytesPerPixel)]);
+		if (pixelFormat == RasterPixelFormat.Gray8)
+		{
+			pixels[..width].Reverse();
+
+			return;
+		}
+
+		Span<uint> words = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(pixels[..(width * RasterBand.GetBytesPerPixel(pixelFormat))]);
 		words.Reverse();
 	}
 
 	/// <summary>
 	/// Converts a line of rendered pixels.
 	/// </summary>
-	/// <param name="pixels">The line, four bytes a pixel: B, G, R, unused.</param>
+	/// <param name="pixels">The line, in the colour space's <see cref="RenderFormat"/>: four bytes a pixel, B, G, R and
+	/// unused, for colour; a byte of grey a pixel otherwise.</param>
 	/// <param name="width">The pixels in it.</param>
 	/// <param name="colorSpace">The colour space to convert to.</param>
 	/// <param name="row">The line's row on the page, which places the dither pattern for 1-bit black.</param>
@@ -111,7 +131,7 @@ internal static class RasterPixels
 		switch (colorSpace)
 		{
 			case RasterColorSpace.Srgb8:
-				for (int x = 0, source = 0, target = 0; x < width; x++, source += RasterBand.BytesPerPixel, target += 3)
+				for (int x = 0, source = 0, target = 0; x < width; x++, source += RasterBand.GetBytesPerPixel(RasterPixelFormat.Bgra32), target += 3)
 				{
 					output[target] = pixels[source + 2];
 					output[target + 1] = pixels[source + 1];
@@ -121,10 +141,7 @@ internal static class RasterPixels
 				break;
 
 			case RasterColorSpace.Gray8:
-				for (int x = 0, source = 0; x < width; x++, source += RasterBand.BytesPerPixel)
-				{
-					output[x] = RasterPixels.Luma(pixels, source);
-				}
+				pixels[..width].CopyTo(output);
 
 				break;
 
@@ -138,7 +155,7 @@ internal static class RasterPixels
 	/// <summary>
 	/// Converts a line to 1-bit black, dithered, the leftmost pixel in each byte's highest bit.
 	/// </summary>
-	/// <param name="pixels">The line, four bytes a pixel.</param>
+	/// <param name="pixels">The line, a byte of grey a pixel.</param>
 	/// <param name="width">The pixels in it.</param>
 	/// <param name="row">The line's row, which picks the dither matrix's row.</param>
 	/// <param name="output">The converted line.</param>
@@ -147,26 +164,15 @@ internal static class RasterPixels
 		output[..RasterPixels.BytesPerLine(RasterColorSpace.Black1, width)].Clear();
 		int matrixRow = (row % RasterPixels.DitherSize) * RasterPixels.DitherSize;
 
-		for (int x = 0, source = 0; x < width; x++, source += RasterBand.BytesPerPixel)
+		for (int x = 0; x < width; x++)
 		{
 			// Ink where the grey is darker than the cell's threshold: 0 is always ink, 255 never
 			int threshold = (RasterPixels.DitherOrder[matrixRow + (x % RasterPixels.DitherSize)] * 4) + 2;
 
-			if (RasterPixels.Luma(pixels, source) < threshold)
+			if (pixels[x] < threshold)
 			{
 				output[x / RasterPixels.BitsPerByte] |= (byte)(0x80 >> (x % RasterPixels.BitsPerByte));
 			}
 		}
-	}
-
-	/// <summary>
-	/// Gets a pixel's grey, with the weights the Windows path uses (77, 150 and 29 out of 256).
-	/// </summary>
-	/// <param name="pixels">The pixels.</param>
-	/// <param name="offset">The pixel's first byte.</param>
-	/// <returns>The grey, 0 for black to 255 for white.</returns>
-	private static byte Luma(ReadOnlySpan<byte> pixels, int offset)
-	{
-		return (byte)(((77 * pixels[offset + 2]) + (150 * pixels[offset + 1]) + (29 * pixels[offset]) + 128) >> 8);
 	}
 }

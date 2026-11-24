@@ -30,7 +30,14 @@
 #   - ipp.lifecycle.cancel-waiting-job: a job cancelled and followed to its end, its reasons and message read through
 #     the raw Get-Job-Attributes that SharpIppNext maps to its typed response, so on every runner (ADR 0043);
 #   - windows.ipp-route.password-over-ipps: a Windows queue's PDF to an ipps:// printer over TLS, its certificate
-#     pinned and a password sent, on Windows with Microsoft Print to PDF (ADR 0042).
+#     pinned and a password sent, on Windows with Microsoft Print to PDF (ADR 0042);
+#   - windows.jobs.watch-by-notification: a job followed by the spooler's change notifications, which go through
+#     FindFirstPrinterChangeNotification and its buffer of changes, on Windows with the test printers (ADR 0049);
+#   - ipp.submission.typed-options: page ranges, collation, quality, finishings, an output bin, a media type and a
+#     custom size mapped to IPP, against the scripted printer, so on every runner (ADR 0056);
+#   - ipp.raster.pdf-password-rendered: a password-protected PDF opened by PDFium with its password and sent as
+#     raster, against the scripted printer, so on every runner (ADR 0054);
+#   - windows.pdf.password: the same PDF through PDFium and GDI to Microsoft Print to PDF, on Windows (ADR 0054).
 #
 # A scenario whose test printers this machine doesn't have is skipped; one that runs must pass. The first four are
 # the checks this script made with the CLI sample before the harness existed: CI runs only these (ADR 0029). Run every scenario
@@ -61,6 +68,10 @@ scenarios=(
 	ipp.faults.stalled-upload
 	ipp.lifecycle.cancel-waiting-job
 	windows.ipp-route.password-over-ipps
+	windows.jobs.watch-by-notification
+	ipp.submission.typed-options
+	ipp.raster.pdf-password-rendered
+	windows.pdf.password
 )
 
 # The ILCompiler finds the Windows linker through vswhere, which Git Bash may not have on its path

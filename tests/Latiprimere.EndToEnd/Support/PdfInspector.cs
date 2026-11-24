@@ -97,7 +97,7 @@ public static class PdfInspector
 		long inked = 0;
 		long coloured = 0;
 
-		for (int offset = 0; offset < pixels.Length; offset += RasterBand.BytesPerPixel)
+		for (int offset = 0; offset < pixels.Length; offset += RasterBand.GetBytesPerPixel(RasterPixelFormat.Bgra32))
 		{
 			// Blue, green, red, unused
 			int blue = pixels[offset];

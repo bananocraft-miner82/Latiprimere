@@ -18,7 +18,7 @@ public static class CliScenarios
 	{
 		Id = "samples.cli.ipp-printer",
 		Area = ScenarioArea.Samples,
-		Title = "The CLI lists an IPP printer, shows its capabilities, prints with paper, tray, colour and a vendor option that all reach the printer, exits with 1 when the printer refuses a value, and with 64 for a printer address that isn't one",
+		Title = "The CLI lists an IPP printer, shows its capabilities, prints with paper, tray, colour, pages, quality and a vendor option that all reach the printer, exits with 1 when the printer refuses a value, and with 64 for a printer address that isn't one",
 		Needs = TargetNeeds.None,
 		RunAsync = CliScenarios.AgainstFakePrinterAsync
 	};
@@ -66,8 +66,9 @@ public static class CliScenarios
 		SampleRun capabilities = await Samples.RunAsync(context, Samples.Cli, ["caps", printerId], environment);
 		context.CheckEqual("'caps' exits with 0", 0, capabilities.ExitCode);
 		context.Check("'caps' shows the manual tray", capabilities.Output.Contains("(manual)", StringComparison.Ordinal));
+		context.Check("'caps' shows the print qualities", capabilities.Output.Contains("Quality:", StringComparison.Ordinal) && capabilities.Output.Contains("High", StringComparison.Ordinal));
 
-		string[] print = ["print", printerId, document, "--paper", "iso_a4_210x297mm", "--tray", "manual", "--color", "mono", "--option", "ipp:print-quality=5"];
+		string[] print = ["print", printerId, document, "--paper", "iso_a4_210x297mm", "--tray", "manual", "--color", "mono", "--pages", "2-3", "--option", "ipp:print-quality=5"];
 		SampleRun printed = await Samples.RunAsync(context, Samples.Cli, print, environment);
 		context.CheckEqual("'print' exits with 0", 0, printed.ExitCode);
 		context.Check("'print' reports Completed", printed.Output.Contains("Completed", StringComparison.Ordinal));
@@ -77,6 +78,15 @@ public static class CliScenarios
 		context.Check("the printer gets A4 from the manual tray", mediaCol.Contains("media-source=manual", StringComparison.Ordinal) && mediaCol.Contains("x-dimension=21000", StringComparison.Ordinal), mediaCol);
 		context.CheckEqual("the printer gets monochrome", "monochrome", job?.Find("print-color-mode")?.Value);
 		context.CheckEqual("the printer gets print-quality 5", "5", job?.Find("print-quality")?.Value);
+		context.CheckEqual("the printer gets pages 2 to 3", "2-3", job?.Find("page-ranges")?.Value);
+
+		SampleRun draft = await Samples.RunAsync(context, Samples.Cli, ["print", printerId, document, "--quality", "draft"], environment);
+		RecordedRequest? draftJob = fake.GetRequests(IppOperation.PrintJob).LastOrDefault(request => request.StatusCode == IppStatusCode.SuccessfulOk);
+		context.CheckEqual("'print --quality draft' exits with 0", 0, draft.ExitCode);
+		context.CheckEqual("the printer gets print-quality 3", "3", draftJob?.Find("print-quality")?.Value);
+
+		SampleRun badPages = await Samples.RunAsync(context, Samples.Cli, ["print", printerId, document, "--pages", "3-2"], environment);
+		context.CheckEqual("pages out of order exit with 64", CliScenarios.InvalidArguments, badPages.ExitCode);
 
 		SampleRun refused = await Samples.RunAsync(context, Samples.Cli, ["print", printerId, document, "--option", "ipp:print-quality=99"], environment);
 		await FakePrinters.SaveRequestsAsync(context, fake);

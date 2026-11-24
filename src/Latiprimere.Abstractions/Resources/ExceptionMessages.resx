@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
 	<resheader name="resmimetype">
 		<value>text/microsoft-resx</value>
@@ -43,5 +43,17 @@
 	<data name="StreamNotReadable" xml:space="preserve">
 		<value>The document stream must be readable.</value>
 		<comment>Thrown when PrintContent is created from a stream that cannot be read.</comment>
+	</data>
+	<data name="PixelFormatNotSupported" xml:space="preserve">
+		<value>The pixel format {0} isn't one this version of Latiprimere knows.</value>
+		<comment>{0} is the RasterPixelFormat value.</comment>
+	</data>
+	<data name="PageRangesNotInOrder" xml:space="preserve">
+		<value>Page ranges must be in order and must not overlap, such as 1-3, 5, 8-9; these are not: {0}.</value>
+		<comment>{0} lists the ranges given.</comment>
+	</data>
+	<data name="MediaSizeNotPositive" xml:space="preserve">
+		<value>A custom paper size must be wider and taller than 0 mm; {0} x {1} mm is not.</value>
+		<comment>{0} and {1} are the width and height given.</comment>
 	</data>
 </root>

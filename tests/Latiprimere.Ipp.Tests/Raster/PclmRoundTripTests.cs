@@ -186,7 +186,7 @@ public sealed class PclmRoundTripTests
 
 			for (int x = 0; x < page.Width; x++)
 			{
-				int source = (((y + rowOffset) % page.Height) * stride) + (x * RasterBand.BytesPerPixel);
+				int source = (((y + rowOffset) % page.Height) * stride) + (x * RasterBand.GetBytesPerPixel(RasterPixelFormat.Bgra32));
 				(int r, int g, int b) = (pixels[source + 2], pixels[source + 1], pixels[source]);
 
 				// DeviceGray renders as equal red, green and blue

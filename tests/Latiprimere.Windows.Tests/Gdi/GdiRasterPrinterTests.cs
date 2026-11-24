@@ -41,7 +41,8 @@ public sealed class GdiRasterPrinterTests
 			DocumentName = "Latiprimere GDI test",
 			OutputFile   = outputFile,
 			Document     = document,
-			Options      = PrintOptions.Default
+			Options      = PrintOptions.Default,
+			Pages        = Enumerable.Range(0, document.PageCount).ToArray()
 		};
 
 		// Act
@@ -79,7 +80,8 @@ public sealed class GdiRasterPrinterTests
 			DocumentName = "Latiprimere GDI cancel test",
 			OutputFile   = outputFile,
 			Document     = document,
-			Options      = PrintOptions.Default
+			Options      = PrintOptions.Default,
+			Pages        = Enumerable.Range(0, document.PageCount).ToArray()
 		};
 
 		using CancellationTokenSource cancellation = new CancellationTokenSource();

@@ -47,4 +47,44 @@ public sealed class RasterBandTests
 		// Assert
 		Assert.Equal(3_200_000_000L, byteCount);
 	}
+
+	[Fact]
+	public void GivenGreyWhenCreateThenStrideIsOneBytePerPixelAndTheFormatIsKept()
+	{
+		// Arrange
+		const int pageWidth = 4961; // A4 width at 600 DPI
+
+		// Act
+		RasterBand band = RasterBand.Create(pageWidth, 7016, 0, 10, RasterPixelFormat.Gray8);
+
+		// Assert
+		Assert.Equal((pageWidth, RasterPixelFormat.Gray8, 1), (band.Stride, band.PixelFormat, band.BytesPerPixel));
+		Assert.Equal(pageWidth * 10L, band.ByteCount);
+	}
+
+	[Fact]
+	public void GivenBandMadeWithoutFormatWhenReadThenItIsColourAtFourBytesPerPixel()
+	{
+		// Arrange
+		RasterBand band = new RasterBand(PageWidth: 10, PageHeight: 20, Top: 0, Height: 5, Stride: 40);
+
+		// Act
+		(RasterPixelFormat format, int bytesPerPixel) = (band.PixelFormat, band.BytesPerPixel);
+
+		// Assert
+		Assert.Equal((RasterPixelFormat.Bgra32, 4), (format, bytesPerPixel));
+	}
+
+	[Fact]
+	public void GivenFormatThisVersionDoesNotKnowWhenBytesPerPixelReadThenThrowsNotSupportedException()
+	{
+		// Arrange: a value a later version may add
+		RasterBand band = RasterBand.Create(10, 20, 0, 5) with { PixelFormat = (RasterPixelFormat)99 };
+
+		// Act
+		Func<object?> read = () => band.BytesPerPixel;
+
+		// Assert
+		Assert.Throws<NotSupportedException>(read);
+	}
 }

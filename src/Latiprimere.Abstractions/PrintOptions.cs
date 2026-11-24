@@ -37,6 +37,8 @@ public sealed record PrintOptions
 	public static readonly PrintOptions Default = new PrintOptions();
 
 	private int copies = PrintOptions.MinimumCopies;                                          // Number of copies to print
+	private IReadOnlyList<PageRange> pageRanges = Array.Empty<PageRange>();                   // Pages to print; empty for all
+	private IReadOnlyList<Finishing> finishings = Array.Empty<Finishing>();                   // Staples, holes and folds
 	private IReadOnlyDictionary<string, string> vendorOptions = PrintOptions.NoVendorOptions; // Settings for one print system
 
 	/// <summary>
@@ -64,6 +66,98 @@ public sealed record PrintOptions
 	}
 
 	/// <summary>
+	/// Gets the pages to print, counted from 1, in order and without overlapping; empty, the default, for all of them.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Where Latiprimere renders the pages, as on the Windows spooler and for raster, it renders only these. A
+	/// printer or CUPS queue sent a PDF as it is is asked for them, with IPP's <c>page-ranges</c>. Text and images
+	/// count the pages Latiprimere lays out. Pages past the end of the document are left out; ranges that leave no
+	/// pages at all fail the job with <see cref="ArgumentException"/> where Latiprimere renders it.
+	/// </para>
+	/// <para>
+	/// Raw data's pages can't be seen, so a raw job with page ranges is refused with
+	/// <see cref="NotSupportedException"/>. The list is copied when set, and record equality compares it by reference.
+	/// </para>
+	/// </remarks>
+	/// <exception cref="ArgumentNullException">The value is <see langword="null"/>.</exception>
+	/// <exception cref="ArgumentException">The ranges are out of order or overlap, such as 3-5 then 4.</exception>
+	public IReadOnlyList<PageRange> PageRanges
+	{
+		get
+		{
+			return this.pageRanges;
+		}
+
+		init
+		{
+			ArgumentNullException.ThrowIfNull(value, nameof(PrintOptions.PageRanges));
+			PageRange[] copy = value.ToArray();
+			PageRange.Validate(copy, nameof(PrintOptions.PageRanges));
+			this.pageRanges = Array.AsReadOnly(copy);
+		}
+	}
+
+	/// <summary>
+	/// Gets whether copies are collated, each copy whole before the next (1, 2, 3, 1, 2, 3), or not, each page's
+	/// copies together (1, 1, 2, 2, 3, 3); or <see langword="null"/>, the default, for the printer's default.
+	/// </summary>
+	/// <remarks>
+	/// It matters only with more than one <see cref="Copies"/>. The Windows spooler collates unless this is
+	/// <see langword="false"/>.
+	/// </remarks>
+	public bool? Collate { get; init; }
+
+	/// <summary>
+	/// Gets the print quality: draft, normal or high.
+	/// </summary>
+	public PrintQuality Quality { get; init; } = PrintQuality.PrinterDefault;
+
+	/// <summary>
+	/// Gets what to do to the printed sheets, such as staple them; empty, the default, for the printer's default,
+	/// which is usually nothing.
+	/// </summary>
+	/// <remarks>
+	/// Use the printer's <see cref="PrinterCapabilities.Finishings"/>. The Windows spooler doesn't apply them yet:
+	/// a Windows printer refuses a job that sets them with <see cref="NotSupportedException"/>, and its driver's
+	/// stapling is reached with a <c>windows:feature:</c> vendor option. The list is copied when set, without
+	/// repeats, and record equality compares it by reference.
+	/// </remarks>
+	/// <exception cref="ArgumentNullException">The value is <see langword="null"/>.</exception>
+	public IReadOnlyList<Finishing> Finishings
+	{
+		get
+		{
+			return this.finishings;
+		}
+
+		init
+		{
+			ArgumentNullException.ThrowIfNull(value, nameof(PrintOptions.Finishings));
+			this.finishings = Array.AsReadOnly(value.Distinct().ToArray());
+		}
+	}
+
+	/// <summary>
+	/// Gets where to deliver the printed sheets, or <see langword="null"/> for the printer's default.
+	/// </summary>
+	/// <remarks>
+	/// Use one of the printer's <see cref="PrinterCapabilities.OutputBins"/>. The Windows spooler doesn't apply it
+	/// yet: a Windows printer refuses a job that sets it with <see cref="NotSupportedException"/>.
+	/// </remarks>
+	public OutputBin? OutputBin { get; init; }
+
+	/// <summary>
+	/// Gets the kind of paper to print on, such as labels or photo paper, or <see langword="null"/> for the
+	/// printer's default.
+	/// </summary>
+	/// <remarks>
+	/// Use one of the printer's <see cref="PrinterCapabilities.MediaTypes"/>, matched by <see cref="MediaType.Id"/>.
+	/// The Windows spooler refuses a type the printer's driver doesn't list with <see cref="NotSupportedException"/>.
+	/// </remarks>
+	public MediaType? MediaType { get; init; }
+
+	/// <summary>
 	/// Gets whether to print on one or both sides of the paper.
 	/// </summary>
 	public DuplexMode Duplex { get; init; } = DuplexMode.PrinterDefault;
@@ -77,9 +171,11 @@ public sealed record PrintOptions
 	/// Gets the paper size to print on, or <see langword="null"/> to use the printer's default.
 	/// </summary>
 	/// <remarks>
-	/// Use one of the printer's <see cref="PrinterCapabilities.MediaSizes"/>. Sizes are matched by
-	/// <see cref="MediaSize.Name"/> only. The Windows spooler refuses a size the printer's driver doesn't list with
-	/// <see cref="NotSupportedException"/>; IPP printers and CUPS decide for themselves, and may print on another size.
+	/// Use one of the printer's <see cref="PrinterCapabilities.MediaSizes"/>, or a size made with
+	/// <see cref="MediaSize.Custom"/> inside one of its <see cref="PrinterCapabilities.CustomMediaSizes"/>. Listed
+	/// sizes are matched by <see cref="MediaSize.Name"/> only. The Windows spooler refuses a size the printer's driver
+	/// neither lists nor takes as a custom size with <see cref="NotSupportedException"/>; IPP printers and CUPS decide
+	/// for themselves, and may print on another size.
 	/// </remarks>
 	public MediaSize? MediaSize { get; init; }
 

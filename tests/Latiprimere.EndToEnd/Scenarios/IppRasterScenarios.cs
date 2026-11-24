@@ -308,7 +308,7 @@ public static class IppRasterScenarios
 		{
 			for (int x = 0; x < width; x++)
 			{
-				int index = (y * band.Stride) + (x * RasterBand.BytesPerPixel);
+				int index = (y * band.Stride) + (x * RasterBand.GetBytesPerPixel(RasterPixelFormat.Bgra32));
 				inked += pixels[index] < 250 || pixels[index + 1] < 250 || pixels[index + 2] < 250 ? 1 : 0;
 			}
 		}
@@ -406,7 +406,7 @@ public static class IppRasterScenarios
 	/// </summary>
 	/// <param name="gzipped">The upload.</param>
 	/// <returns>The data.</returns>
-	private static byte[] Gunzip(byte[] gzipped)
+	internal static byte[] Gunzip(byte[] gzipped)
 	{
 		using GZipStream gzip = new GZipStream(new MemoryStream(gzipped), CompressionMode.Decompress);
 		using MemoryStream output = new MemoryStream();

@@ -18,7 +18,7 @@ public static class VendorOptionScenarios
 	{
 		Id = "ipp.vendor-options.listed-and-sent",
 		Area = ScenarioArea.Capabilities,
-		Title = "The HP ENVY 5640's and ippeveprinter's captured attributes list print quality and resolution as vendor options, and a value taken from the list reaches the printer with the job",
+		Title = "The HP ENVY 5640's and ippeveprinter's captured attributes list resolution as a vendor option, but not print quality, which has a typed option, and a value taken from the list reaches the printer with the job",
 		Needs = TargetNeeds.None,
 		RunAsync = VendorOptionScenarios.IppListedAndSentAsync
 	};
@@ -48,14 +48,11 @@ public static class VendorOptionScenarios
 		IReadOnlyList<VendorOption> hpOptions = await VendorOptionScenarios.ReadVendorOptionsAsync(context, hp);
 		await VendorOptionScenarios.SaveAsync(context, "hp-envy-5640-vendor-options.txt", hpOptions);
 
-		VendorOption? quality = hpOptions.FirstOrDefault(option => option.Key == "ipp:print-quality");
-		context.Require("the HP lists ipp:print-quality", quality is not null);
-		context.CheckEqual("its choices are Draft, Normal and High", "3=Draft, 4=Normal, 5=High", string.Join(", ", quality!.Choices.Select(choice => $"{choice.Value}={choice.DisplayName}")));
-		context.CheckEqual("its default is Normal", "4", quality.DefaultValue);
-
 		VendorOption? resolution = hpOptions.FirstOrDefault(option => option.Key == "ipp:printer-resolution");
-		context.Check("the HP lists 1200 dpi among its resolutions", resolution?.Choices.Any(choice => choice.Value == "1200dpi") == true, string.Join(", ", resolution?.Choices.Select(choice => choice.Value) ?? []));
-		context.Check("settings the typed options cover aren't listed", !hpOptions.Any(option => option.Key is "ipp:copies" or "ipp:sides" or "ipp:media" or "ipp:print-color-mode"));
+		context.Require("the HP lists ipp:printer-resolution", resolution is not null);
+		context.CheckEqual("its choices are 300, 600 and 1200 dpi", "300dpi, 600dpi, 1200dpi", string.Join(", ", resolution!.Choices.Select(choice => choice.Value)));
+		context.CheckEqual("its default is 600 dpi", "600dpi", resolution.DefaultValue);
+		context.Check("settings the typed options cover aren't listed", !hpOptions.Any(option => option.Key is "ipp:copies" or "ipp:sides" or "ipp:media" or "ipp:print-color-mode" or "ipp:print-quality" or "ipp:output-bin" or "ipp:media-type" or "ipp:multiple-document-handling"));
 
 		// Then one that accepts PDF, given back a value from its own list
 		FakePrinterProfile profile = await FakePrinterProfile.LoadIppeveprinterAsync(context.CancellationToken);
@@ -64,13 +61,13 @@ public static class VendorOptionScenarios
 		IPrinter printer = await fixture.Catalog.GetPrinterAsync(FakePrinters.GetPrinterId(fake), context.CancellationToken);
 		PrinterCapabilities capabilities = await printer.GetCapabilitiesAsync(context.CancellationToken);
 
-		VendorOption? listed = capabilities.VendorOptions.FirstOrDefault(option => option.Key == "ipp:print-quality");
-		VendorOptionChoice? high = listed?.Choices.FirstOrDefault(choice => choice.DisplayName == "High");
-		context.Require("ippeveprinter lists High print quality", high is not null);
+		VendorOption? listed = capabilities.VendorOptions.FirstOrDefault(option => option.Key == "ipp:printer-resolution");
+		VendorOptionChoice? highest = listed?.Choices.Count > 0 ? listed.Choices[^1] : null;
+		context.Require("ippeveprinter lists its resolutions", highest is not null, string.Join(", ", capabilities.VendorOptions.Select(option => option.Key)));
 
 		byte[] pdf = await File.ReadAllBytesAsync(Path.Combine(AppContext.BaseDirectory, "Data", TestDocuments.MixedOnePage), context.CancellationToken);
 		using MemoryStream document = new MemoryStream(pdf);
-		PrintOptions options = new PrintOptions { VendorOptions = new Dictionary<string, string> { [listed!.Key] = high!.Value } };
+		PrintOptions options = new PrintOptions { VendorOptions = new Dictionary<string, string> { [listed!.Key] = highest!.Value } };
 
 		IPrintJob job = await printer.SubmitAsync(PrintContent.FromPdf(document), options, context.CancellationToken);
 		PrintJobStatus status = await JobFollower.WaitUntilFinishedAsync(context, job);
@@ -78,7 +75,10 @@ public static class VendorOptionScenarios
 		context.CheckEqual("the job completes", PrintJobState.Completed, status.State);
 
 		RecordedRequest printJob = fake.GetRequests(IppOperation.PrintJob).Single();
-		context.CheckEqual("print-quality arrives as the listed value", high.Value, printJob.Find("print-quality")?.Value);
+		// A resolution listed as 600dpi is the same in both directions, which IPP writes as 600x600dpi
+		string received = printJob.Find("printer-resolution")?.Value ?? string.Empty;
+		string dpi = highest.Value.Replace("dpi", string.Empty, StringComparison.Ordinal);
+		context.Check("printer-resolution arrives as the listed value", received == highest.Value || received == $"{dpi}x{dpi}dpi", $"sent {highest.Value}, received {received}");
 	}
 
 	/// <summary>
@@ -90,8 +90,8 @@ public static class VendorOptionScenarios
 	{
 		await using CatalogFixture fixture = context.CreateCatalog();
 		IPrinter printer = await fixture.Catalog.GetPrinterAsync(TestPrinters.MicrosoftPrintToPdf, context.CancellationToken);
-		IWindowsPrinter? windowsPrinter = printer as IWindowsPrinter;
-		context.Require("the printer is an IWindowsPrinter", windowsPrinter is not null);
+		IWindowsPrinter? windowsPrinter = printer.GetFeature<IWindowsPrinter>();
+		context.Require("the printer offers IWindowsPrinter", windowsPrinter is not null);
 
 		string printCapabilities = await windowsPrinter!.GetPrintCapabilitiesAsync(cancellationToken: context.CancellationToken);
 		string defaultTicket = await windowsPrinter.GetDefaultPrintTicketAsync(context.CancellationToken);

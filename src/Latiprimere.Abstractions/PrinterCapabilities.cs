@@ -62,6 +62,47 @@ public sealed record PrinterCapabilities
 	public IReadOnlyList<InputTray> InputTrays { get; init; } = Array.Empty<InputTray>();
 
 	/// <summary>
+	/// Gets the ranges of custom paper sizes the printer takes, beyond <see cref="MediaSizes"/>: custom sheets, or
+	/// lengths cut from a roll. Empty if it reports none.
+	/// </summary>
+	public IReadOnlyList<MediaSizeRange> CustomMediaSizes { get; init; } = Array.Empty<MediaSizeRange>();
+
+	/// <summary>
+	/// Gets the kinds of paper the printer takes, such as plain paper, labels or photo paper.
+	/// </summary>
+	public IReadOnlyList<MediaType> MediaTypes { get; init; } = Array.Empty<MediaType>();
+
+	/// <summary>
+	/// Gets the print qualities the printer offers. Never contains <see cref="PrintQuality.PrinterDefault"/>.
+	/// </summary>
+	public IReadOnlyList<PrintQuality> PrintQualities { get; init; } = Array.Empty<PrintQuality>();
+
+	/// <summary>
+	/// Gets the printer's default print quality, or <see langword="null"/> if it doesn't report one.
+	/// </summary>
+	public PrintQuality? DefaultPrintQuality { get; init; }
+
+	/// <summary>
+	/// Gets the finishings the printer offers, such as staples, of those <see cref="Finishing"/> names.
+	/// </summary>
+	public IReadOnlyList<Finishing> Finishings { get; init; } = Array.Empty<Finishing>();
+
+	/// <summary>
+	/// Gets where the printer can deliver the printed sheets.
+	/// </summary>
+	public IReadOnlyList<OutputBin> OutputBins { get; init; } = Array.Empty<OutputBin>();
+
+	/// <summary>
+	/// Gets whether the printer itself prints only some pages of a document it is sent, or <see langword="null"/>
+	/// if it doesn't say.
+	/// </summary>
+	/// <remarks>
+	/// <see cref="PrintOptions.PageRanges"/> works on every printer: where Latiprimere renders the pages, as on the
+	/// Windows spooler or for raster, it renders only those asked for.
+	/// </remarks>
+	public bool? SupportsPageRanges { get; init; }
+
+	/// <summary>
 	/// Gets the document formats the printer can be sent, whether it takes them itself or Latiprimere converts them.
 	/// </summary>
 	/// <remarks>
