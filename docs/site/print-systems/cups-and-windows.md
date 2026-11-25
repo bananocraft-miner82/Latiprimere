@@ -63,9 +63,14 @@ A callback that accepts every certificate gives up what encryption is for: anyon
 
 If a server asks for a password that wasn't given, or refuses the one given, requests throw `PrintAuthenticationException`. To ask the user, catch it, then create the print system again with their credentials.
 
-### PDFs keep their own orientation
+### Turning PDF pages
 
-Latiprimere sends `PrintOptions.Orientation` to CUPS as IPP's `orientation-requested`, but CUPS may not turn a PDF's pages for it. In testing with CUPS 2.4 and its CUPS-PDF printer, a portrait PDF printed with `Landscape` came out portrait: the PDF's own layout won. To print landscape through CUPS, make the PDF's pages landscape when you create it.
+Latiprimere sends `PrintOptions.Orientation` to CUPS as IPP's `orientation-requested`. CUPS versions differ in what they do with it for a PDF:
+
+- In testing with CUPS 2.4 on Linux and its CUPS-PDF printer, a portrait PDF printed with `Landscape` came out portrait: the PDF's own layout won.
+- macOS's CUPS turned the portrait page onto landscape paper at its full size, so its top and bottom were cut off.
+
+So with an orientation, Latiprimere also sends `print-scaling` as `auto-fit`, which asks CUPS to shrink a page only when it doesn't fit the paper, as Latiprimere does itself when it renders the pages. A `cups:fit-to-page`, `cups:scaling` or `ipp:print-scaling` vendor option of your own is sent instead. To be sure of landscape, make the PDF's pages landscape when you create it.
 
 In the same tests, the paper size and monochrome came out as chosen.
 
@@ -134,6 +139,8 @@ A job goes through the queue's driver as before when any of these is so:
 - the pages can't be planned as raster for the printer, such as when it reports no paper size.
 
 Those last two need a document stream that can seek, such as a file, to start again through the queue: from one that can't, the exception is thrown instead.
+
+The same route gives a queue what the spooler can't: the printer's details, from `GetDetailsAsync`, and asking it to identify itself, with `IdentifyAsync`. They need the printer to be found, but not to take PDF (see [Printer details, identifying a printer and test pages](/docs/guides/printer-details-and-test-pages/)).
 
 Jobs sent over IPP bypass the Windows queue: they don't appear in its queue window, and its pause, permissions, pooling and accounting don't apply to them. Their job IDs are the printer's, after `ipp:`, such as `ipp:42`, which `GetJobAsync` uses to ask the printer rather than the queue; `ipp:` vendor options are sent with them, and `MaxRenderDpi` limits the resolution of any raster.
 

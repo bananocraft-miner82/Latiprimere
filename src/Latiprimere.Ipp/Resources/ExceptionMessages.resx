@@ -301,4 +301,12 @@
 		<value>The finishing {0} isn't one this version of Latiprimere's IPP support knows.</value>
 		<comment>{0} is the Finishing value.</comment>
 	</data>
+	<data name="IdentifyMessageTooLong" xml:space="preserve">
+		<value>A message for the printer to show may be at most {0} bytes in UTF-8; this one is {1}.</value>
+		<comment>{0} is the limit, 127, from IPP's text(127). {1} is the message's length in bytes.</comment>
+	</data>
+	<data name="IdentifyNotSupportedByPrinter" xml:space="preserve">
+		<value>The printer at {0} can't be asked to identify itself: it doesn't take IPP's Identify-Printer.</value>
+		<comment>{0} is the printer's URI.</comment>
+	</data>
 </root>

@@ -20,8 +20,19 @@ internal static partial class PdfTextLines
 	/// each byte as the Latin-1 character of the same value.</returns>
 	public static IReadOnlyList<IReadOnlyList<(double X, double Y, string Text)>> Read(byte[] pdf)
 	{
+		return PdfTextLines.ReadContents(pdf).Select(content => (IReadOnlyList<(double X, double Y, string Text)>)PdfTextLines.ReadLines(content)).ToList();
+	}
+
+	/// <summary>
+	/// Reads every page's content stream, inflated.
+	/// </summary>
+	/// <param name="pdf">The PDF.</param>
+	/// <returns>For each page, in order, its content stream's operators, each byte as the Latin-1 character of the
+	/// same value.</returns>
+	public static IReadOnlyList<string> ReadContents(byte[] pdf)
+	{
 		string file = Encoding.Latin1.GetString(pdf);
-		List<IReadOnlyList<(double X, double Y, string Text)>> pages = [];
+		List<string> pages = [];
 
 		// Content streams are the only streams with nothing in their dictionary but their filter and length
 		foreach (Match stream in PdfTextLines.ContentStreamPattern().Matches(file))
@@ -36,7 +47,7 @@ internal static partial class PdfTextLines
 			using MemoryStream content = new MemoryStream();
 			inflater.CopyTo(content);
 
-			pages.Add(PdfTextLines.ReadLines(Encoding.Latin1.GetString(content.ToArray())));
+			pages.Add(Encoding.Latin1.GetString(content.ToArray()));
 		}
 
 		return pages;

@@ -294,6 +294,105 @@ public sealed class PdfDocumentWriterTests
 		Assert.EndsWith("%%EOF\n", file, StringComparison.Ordinal);
 	}
 
+	[Fact]
+	public void GivenRectangleFilledInRedWhenRenderedThenItIsRedAndTheRestWhite()
+	{
+		// Arrange — 100 × 50 points from (50, 100), from the bottom: rows 150 to 200 from the top
+		Action<PdfDocumentWriter> draw = writer => writer.FillRectangle(50, 100, 100, 50, 1, 0, 0);
+
+		// Act
+		RenderedPage page = PdfDocumentWriterTests.RenderOnePage(draw);
+
+		// Assert
+		Assert.Equal((255, 0, 0), page.GetRgb(100, 175));
+		Assert.Equal((255, 255, 255), page.GetRgb(100, 120));
+		Assert.Equal((255, 255, 255), page.GetRgb(200, 175));
+	}
+
+	[Fact]
+	public void GivenRectangleFilledInGreyWhenWrittenThenItIsInDeviceGray()
+	{
+		// Arrange
+		using MemoryStream output = new MemoryStream();
+
+		// Act
+		using (PdfDocumentWriter writer = new PdfDocumentWriter(output))
+		{
+			writer.BeginPage(PdfDocumentWriterTests.Width, PdfDocumentWriterTests.Height);
+			writer.FillRectangle(10, 20, 30, 40, 0.5, 0.5, 0.5);
+			writer.FillRectangle(10, 20, 30, 40, 0, 1, 1);
+			writer.EndPage();
+			writer.Complete();
+		}
+
+		// Assert — a grey with black alone, a colour in RGB
+		string content = Assert.Single(PdfTextLines.ReadContents(output.ToArray()));
+		Assert.Contains("q 0.5 g 10 20 30 40 re f Q", content, StringComparison.Ordinal);
+		Assert.Contains("q 0 1 1 rg 10 20 30 40 re f Q", content, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public void GivenRectangleOutlinedWhenRenderedThenItsEdgeIsDarkAndItsInsideWhite()
+	{
+		// Arrange — a 2-point line, so it covers whole pixels
+		Action<PdfDocumentWriter> draw = writer => writer.StrokeRectangle(50, 50, 200, 100, 2);
+
+		// Act
+		RenderedPage page = PdfDocumentWriterTests.RenderOnePage(draw);
+
+		// Assert — the left edge at x 50, the inside, and outside
+		Assert.True(page.CountDark(49, 160, 2, 80) > 0);
+		Assert.Equal((255, 255, 255), page.GetRgb(150, 200));
+		Assert.Equal(0, page.CountDark(0, 0, 40, (int)PdfDocumentWriterTests.Height));
+	}
+
+	[Fact]
+	public void GivenLineDrawnWhenRenderedThenItIsDarkAlongItsLength()
+	{
+		// Arrange — across the page at 150 points up, row 150 from the top
+		Action<PdfDocumentWriter> draw = writer => writer.DrawLine(20, 150, 380, 150, 2);
+
+		// Act
+		RenderedPage page = PdfDocumentWriterTests.RenderOnePage(draw);
+
+		// Assert
+		Assert.True(page.CountDark(20, 149, 360, 2) > 300);
+		Assert.Equal(0, page.CountDark(0, 0, (int)PdfDocumentWriterTests.Width, 140));
+	}
+
+	[Theory]
+	[InlineData(-0.1)]
+	[InlineData(1.1)]
+	[InlineData(double.NaN)]
+	public void GivenColourComponentOutsideZeroToOneWhenFilledThenThrowsArgumentOutOfRange(double red)
+	{
+		// Arrange
+		using MemoryStream output = new MemoryStream();
+		using PdfDocumentWriter writer = new PdfDocumentWriter(output);
+		writer.BeginPage(PdfDocumentWriterTests.Width, PdfDocumentWriterTests.Height);
+
+		// Act
+		Action fill = () => writer.FillRectangle(0, 0, 10, 10, red, 0, 0);
+
+		// Assert
+		Assert.Throws<ArgumentOutOfRangeException>(fill);
+	}
+
+	[Fact]
+	public void GivenLineOfNoWidthWhenDrawnThenThrowsArgumentOutOfRange()
+	{
+		// Arrange
+		using MemoryStream output = new MemoryStream();
+		using PdfDocumentWriter writer = new PdfDocumentWriter(output);
+		writer.BeginPage(PdfDocumentWriterTests.Width, PdfDocumentWriterTests.Height);
+
+		// Act
+		Action draw = () => writer.DrawLine(0, 0, 10, 10, 0);
+
+		// Assert
+		Assert.Throws<ArgumentOutOfRangeException>(draw);
+	}
+
 	/// <summary>
 	/// Writes a one-page document of the test page's size, drawing on it as the test says, and renders it at 72 dpi,
 	/// a pixel a point.

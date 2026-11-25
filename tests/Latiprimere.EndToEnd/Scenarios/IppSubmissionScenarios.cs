@@ -17,7 +17,7 @@ public static class IppSubmissionScenarios
 	{
 		Id = "ipp.submission.options-arrive",
 		Area = ScenarioArea.Submission,
-		Title = "Copies, two-sided, monochrome, landscape, A4 and ipp:print-quality reach the printer as IPP job attributes, with the PDF unchanged",
+		Title = "Copies, two-sided, monochrome, landscape (with print-scaling auto-fit), A4 and ipp:print-quality reach the printer as IPP job attributes, with the PDF unchanged",
 		Needs = TargetNeeds.None,
 		RunAsync = IppSubmissionScenarios.OptionsArriveAsync
 	};
@@ -111,6 +111,7 @@ public static class IppSubmissionScenarios
 		context.CheckEqual("sides is two-sided-long-edge", "two-sided-long-edge", printJob.Find("sides")?.Value);
 		context.CheckEqual("print-color-mode is monochrome", "monochrome", printJob.Find("print-color-mode")?.Value);
 		context.CheckEqual("orientation-requested is landscape (4)", "4", printJob.Find("orientation-requested")?.Value);
+		context.CheckEqual("print-scaling is auto-fit, so a turned page is shrunk to fit", "auto-fit", printJob.Find("print-scaling")?.Value);
 		context.CheckEqual("media is A4", "iso_a4_210x297mm", printJob.Find("media")?.Value);
 		context.Check("no media-col is sent with media", printJob.Find("media-col") is null);
 		context.CheckEqual("print-quality is high (5), from the vendor option", "5", printJob.Find("print-quality")?.Value);

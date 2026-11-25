@@ -2,7 +2,7 @@
 title: Vendor options and Windows Print Capabilities
 description: Set resolution, pages per sheet, finishing and a driver's own settings with vendor options, list the ones a printer offers, and use Windows Print Capabilities and Print Tickets.
 sidebar:
-  order: 3
+  order: 4
 ---
 
 The typed options in `PrintOptions` cover what most printers have: copies, sides, orientation, paper, colour, trays, pages, collation, quality, the common finishings, output bins and media types. Printers offer far more: resolution, pages per sheet, banner pages, finishings beyond staples, holes and folds, and settings a driver invents for itself. Vendor options reach those, through `PrintOptions.VendorOptions`, and a printer's capabilities list the ones it takes.

@@ -2,7 +2,7 @@
 title: Errors and troubleshooting
 description: What each Latiprimere exception means, how to log what the print systems are doing, and fixes for common problems.
 sidebar:
-  order: 5
+  order: 6
 ---
 
 Every Latiprimere exception derives from `PrintException`, so one `catch` handles them all. Catch the specific ones first when you want to respond differently.

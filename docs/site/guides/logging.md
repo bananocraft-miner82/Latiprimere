@@ -2,7 +2,7 @@
 title: Logging
 description: See what Latiprimere does through Microsoft.Extensions.Logging, choose how much with categories and levels, and know what each message means.
 sidebar:
-  order: 6
+  order: 7
 ---
 
 Latiprimere logs through `Microsoft.Extensions.Logging`, the logging every .NET host uses. It logs what it carries on without: a print system it skipped, a printer whose vendor options couldn't be read, a PDF sent as raster, an address store it couldn't write. Failures it can't get past are thrown as exceptions instead, not logged: see [Errors and troubleshooting](/docs/guides/errors-and-troubleshooting/).

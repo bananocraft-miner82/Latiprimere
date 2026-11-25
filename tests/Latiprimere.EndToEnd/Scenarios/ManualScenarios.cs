@@ -78,7 +78,7 @@ public static class ManualScenarios
 	{
 		Id = "manual.landscape",
 		Area = ScenarioArea.Manual,
-		Title = "With landscape chosen, the page prints across the paper",
+		Title = "With landscape chosen, the page prints across the paper, shrunk to fit, with nothing cut off",
 		Needs = TargetNeeds.Person,
 		Timeout = ManualPrinting.ScenarioTimeout,
 		RunAsync = ManualScenarios.LandscapeAsync
@@ -324,8 +324,10 @@ public static class ManualScenarios
 
 		await ManualPrinting.PrintAsync(context, printer, TestDocuments.MixedOnePage, new PrintOptions { Orientation = PageOrientation.Landscape });
 
-		// CUPS keeps a PDF's own orientation, so this is expected to fail on CUPS queues
+		// CUPS 2.4 on Linux keeps a PDF's own orientation, so the first is expected to fail there; macOS's CUPS turns
+		// the page, and print-scaling auto-fit should keep it from being cut off
 		await context.AskPersonAsync("the page is landscape", "Is the page printed across the paper, so it reads with the paper turned sideways?");
+		await context.AskPersonAsync("the whole page is there", "Are the heading, every line of text and the whole picture there, with nothing cut off at the top or bottom?");
 	}
 
 	/// <summary>

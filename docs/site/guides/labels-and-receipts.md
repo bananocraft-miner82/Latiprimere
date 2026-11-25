@@ -2,7 +2,7 @@
 title: Labels and receipts
 description: Send raw printer data, such as ZPL to a Zebra label printer or ESC/POS to a receipt printer, or print PDF labels on a custom paper size.
 sidebar:
-  order: 4
+  order: 5
 ---
 
 Label and receipt printers usually have their own languages: ZPL for Zebra label printers, ESC/POS for most receipt printers. To use one, build the commands yourself and send them with `PrintContent.FromRaw`. Latiprimere passes the bytes to the printer unchanged. A printer with a driver, or one that takes PDFs over IPP, can also print PDF labels on a size you choose: see [PDF labels on a custom size](#pdf-labels-on-a-custom-size).

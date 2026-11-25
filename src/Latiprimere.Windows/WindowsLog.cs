@@ -103,4 +103,14 @@ internal static partial class WindowsLog
 	/// <param name="exception">Why.</param>
 	[LoggerMessage(Level = LogLevel.Information, Message = "The encrypted connection to the IPP printer of '{PrinterName}' at {SecureUri} couldn't be opened, because its certificate isn't trusted or nothing answered there, so {PrinterUri} is used instead.")]
 	internal static partial void IppSecureAddressUnusable(ILogger logger, string printerName, Uri secureUri, Uri printerUri, Exception exception);
+
+	/// <summary>
+	/// Logs that a queue's IPP printer couldn't be asked for its details, so they are left empty (ADR 0059).
+	/// </summary>
+	/// <param name="logger">The logger.</param>
+	/// <param name="printerName">The queue's name.</param>
+	/// <param name="printerUri">The printer's address.</param>
+	/// <param name="exception">Why.</param>
+	[LoggerMessage(Level = LogLevel.Information, Message = "The IPP printer of '{PrinterName}' at {PrinterUri} couldn't be asked for its details, so they are left empty.")]
+	internal static partial void IppPrinterDetailsUnavailable(ILogger logger, string printerName, Uri printerUri, Exception exception);
 }

@@ -2,3 +2,9 @@
 # breaks them. Keep them LF in every checkout, including Windows ones with core.autocrlf=true.
 *.sh text eol=lf
 *.py text eol=lf
+
+# PDFs give each object's place in bytes, so a carriage return added at checkout breaks them. Some test PDFs are all
+# text, which Git would otherwise convert. Images are binary too.
+*.pdf binary
+*.png binary
+*.jpg binary

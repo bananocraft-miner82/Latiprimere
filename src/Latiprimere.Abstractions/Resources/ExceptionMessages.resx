@@ -56,4 +56,12 @@
 		<value>A custom paper size must be wider and taller than 0 mm; {0} x {1} mm is not.</value>
 		<comment>{0} and {1} are the width and height given.</comment>
 	</data>
+	<data name="IdentifyNotSupported" xml:space="preserve">
+		<value>Printer '{0}' can't be asked to identify itself by this print system.</value>
+		<comment>{0} is the printer's ID. Thrown by IPrinter.IdentifyAsync's default implementation.</comment>
+	</data>
+	<data name="TestPageNotSupported" xml:space="preserve">
+		<value>Printer '{0}' can't print a Latiprimere test page through this print system.</value>
+		<comment>{0} is the printer's ID. Thrown by IPrinter.PrintTestPageAsync's default implementation.</comment>
+	</data>
 </root>
