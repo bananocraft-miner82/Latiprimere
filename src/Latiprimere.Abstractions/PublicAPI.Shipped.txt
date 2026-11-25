@@ -42,16 +42,24 @@ Latiprimere.IPrintSystem.Name.get -> string!
 Latiprimere.IPrinter
 Latiprimere.IPrinter.AppliedOptions.get -> Latiprimere.PrintOptionKinds
 Latiprimere.IPrinter.GetCapabilitiesAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.PrinterCapabilities!>!
+Latiprimere.IPrinter.GetDetailsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.PrinterDetails!>!
 Latiprimere.IPrinter.GetFeature<T>() -> T?
 Latiprimere.IPrinter.GetJobAsync(string! jobId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrintJob?>!
 Latiprimere.IPrinter.GetStatusAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.PrinterStatus!>!
+Latiprimere.IPrinter.IdentifyAsync(string? message = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Latiprimere.IPrinter.Info.get -> Latiprimere.PrinterInfo!
+Latiprimere.IPrinter.PrintTestPageAsync(Latiprimere.PrintOptions! options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrintJob!>!
 Latiprimere.IPrinter.SubmitAsync(Latiprimere.PrintContent! content, Latiprimere.PrintOptions! options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrintJob!>!
 Latiprimere.IPrinter.WatchStatusAsync(System.TimeSpan pollInterval, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Latiprimere.PrinterStatus!>!
 Latiprimere.IPrinterCatalog
 Latiprimere.IPrinterCatalog.GetDefaultPrinterAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrinter?>!
 Latiprimere.IPrinterCatalog.GetPrinterAsync(string! printerId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Latiprimere.IPrinter!>!
 Latiprimere.IPrinterCatalog.GetPrintersAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Latiprimere.PrinterInfo!>!>!
+Latiprimere.IdentifyAction
+Latiprimere.IdentifyAction.Display = 1 -> Latiprimere.IdentifyAction
+Latiprimere.IdentifyAction.Flash = 2 -> Latiprimere.IdentifyAction
+Latiprimere.IdentifyAction.Sound = 3 -> Latiprimere.IdentifyAction
+Latiprimere.IdentifyAction.Speak = 4 -> Latiprimere.IdentifyAction
 Latiprimere.InputTray
 Latiprimere.InputTray.<Clone>$() -> Latiprimere.InputTray!
 Latiprimere.InputTray.Equals(Latiprimere.InputTray? other) -> bool
@@ -265,6 +273,30 @@ Latiprimere.PrinterCapabilities.SupportsPageRanges.get -> bool?
 Latiprimere.PrinterCapabilities.SupportsPageRanges.init -> void
 Latiprimere.PrinterCapabilities.VendorOptions.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.VendorOption!>!
 Latiprimere.PrinterCapabilities.VendorOptions.init -> void
+Latiprimere.PrinterDetails
+Latiprimere.PrinterDetails.<Clone>$() -> Latiprimere.PrinterDetails!
+Latiprimere.PrinterDetails.Equals(Latiprimere.PrinterDetails? other) -> bool
+Latiprimere.PrinterDetails.Firmware.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.PrinterFirmware!>!
+Latiprimere.PrinterDetails.Firmware.init -> void
+Latiprimere.PrinterDetails.Icons.get -> System.Collections.Generic.IReadOnlyList<System.Uri!>!
+Latiprimere.PrinterDetails.Icons.init -> void
+Latiprimere.PrinterDetails.IdentifyActions.get -> System.Collections.Generic.IReadOnlyList<Latiprimere.IdentifyAction>!
+Latiprimere.PrinterDetails.IdentifyActions.init -> void
+Latiprimere.PrinterDetails.PrinterDetails() -> void
+Latiprimere.PrinterDetails.PrinterId.get -> string!
+Latiprimere.PrinterDetails.PrinterId.init -> void
+Latiprimere.PrinterDetails.SuppliesWebPage.get -> System.Uri?
+Latiprimere.PrinterDetails.SuppliesWebPage.init -> void
+Latiprimere.PrinterDetails.WebPage.get -> System.Uri?
+Latiprimere.PrinterDetails.WebPage.init -> void
+Latiprimere.PrinterFirmware
+Latiprimere.PrinterFirmware.<Clone>$() -> Latiprimere.PrinterFirmware!
+Latiprimere.PrinterFirmware.Equals(Latiprimere.PrinterFirmware? other) -> bool
+Latiprimere.PrinterFirmware.Name.get -> string!
+Latiprimere.PrinterFirmware.Name.init -> void
+Latiprimere.PrinterFirmware.PrinterFirmware() -> void
+Latiprimere.PrinterFirmware.Version.get -> string!
+Latiprimere.PrinterFirmware.Version.init -> void
 Latiprimere.PrinterInfo
 Latiprimere.PrinterInfo.<Clone>$() -> Latiprimere.PrinterInfo!
 Latiprimere.PrinterInfo.Description.get -> string?
@@ -434,6 +466,12 @@ override Latiprimere.PrintOptions.ToString() -> string!
 override Latiprimere.PrinterCapabilities.Equals(object? obj) -> bool
 override Latiprimere.PrinterCapabilities.GetHashCode() -> int
 override Latiprimere.PrinterCapabilities.ToString() -> string!
+override Latiprimere.PrinterDetails.Equals(object? obj) -> bool
+override Latiprimere.PrinterDetails.GetHashCode() -> int
+override Latiprimere.PrinterDetails.ToString() -> string!
+override Latiprimere.PrinterFirmware.Equals(object? obj) -> bool
+override Latiprimere.PrinterFirmware.GetHashCode() -> int
+override Latiprimere.PrinterFirmware.ToString() -> string!
 override Latiprimere.PrinterInfo.Equals(object? obj) -> bool
 override Latiprimere.PrinterInfo.GetHashCode() -> int
 override Latiprimere.PrinterInfo.ToString() -> string!
@@ -480,6 +518,10 @@ static Latiprimere.PrintOptions.operator !=(Latiprimere.PrintOptions? left, Lati
 static Latiprimere.PrintOptions.operator ==(Latiprimere.PrintOptions? left, Latiprimere.PrintOptions? right) -> bool
 static Latiprimere.PrinterCapabilities.operator !=(Latiprimere.PrinterCapabilities? left, Latiprimere.PrinterCapabilities? right) -> bool
 static Latiprimere.PrinterCapabilities.operator ==(Latiprimere.PrinterCapabilities? left, Latiprimere.PrinterCapabilities? right) -> bool
+static Latiprimere.PrinterDetails.operator !=(Latiprimere.PrinterDetails? left, Latiprimere.PrinterDetails? right) -> bool
+static Latiprimere.PrinterDetails.operator ==(Latiprimere.PrinterDetails? left, Latiprimere.PrinterDetails? right) -> bool
+static Latiprimere.PrinterFirmware.operator !=(Latiprimere.PrinterFirmware? left, Latiprimere.PrinterFirmware? right) -> bool
+static Latiprimere.PrinterFirmware.operator ==(Latiprimere.PrinterFirmware? left, Latiprimere.PrinterFirmware? right) -> bool
 static Latiprimere.PrinterInfo.operator !=(Latiprimere.PrinterInfo? left, Latiprimere.PrinterInfo? right) -> bool
 static Latiprimere.PrinterInfo.operator ==(Latiprimere.PrinterInfo? left, Latiprimere.PrinterInfo? right) -> bool
 static Latiprimere.PrinterNotFoundException.FromPrinterId(string! printerId) -> Latiprimere.PrinterNotFoundException!
