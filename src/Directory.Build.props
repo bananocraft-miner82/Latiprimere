@@ -45,7 +45,7 @@
 	     sets the baseline; empty means there is no earlier release to compare with. -->
 	<PropertyGroup>
 		<EnablePackageValidation>true</EnablePackageValidation>
-		<PackageValidationBaselineVersion>11.0.11-preview</PackageValidationBaselineVersion>
+		<PackageValidationBaselineVersion>11.0.12-preview</PackageValidationBaselineVersion>
 	</PropertyGroup>
 
 	<!-- A software bill of materials in each package, at sbom/<package>.cdx.json, as the EU Cyber Resilience Act asks of
