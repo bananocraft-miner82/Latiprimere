@@ -54,6 +54,16 @@ internal static partial class IppVendorAttributeMapper
 		"job-media-sheets",
 	};
 
+	/// <summary>Options that size the pages: IPP's, and CUPS's own, which CUPS reads in place of IPP's.</summary>
+	private static readonly HashSet<string> ScalingOptions = new HashSet<string>(StringComparer.Ordinal)
+	{
+		"fit-to-page",
+		"fitplot",
+		"natural-scaling",
+		"print-scaling",
+		"scaling",
+	};
+
 	/// <summary>The end of the names of IPP's resolution attributes, such as <c>printer-resolution</c> and
 	/// <c>pclm-source-resolution</c>, whose values are resolutions.</summary>
 	private const string ResolutionSuffix = "-resolution";
@@ -114,6 +124,23 @@ internal static partial class IppVendorAttributeMapper
 		return operation.Count == 0 && job.Count == 0
 			? IppVendorAttributes.None
 			: new IppVendorAttributes { Operation = operation, Job = job };
+	}
+
+	/// <summary>
+	/// Finds whether the vendor options size the pages themselves, with IPP's <c>print-scaling</c> or one of CUPS's
+	/// own options such as <c>fit-to-page</c>.
+	/// </summary>
+	/// <param name="vendorOptions">The vendor options.</param>
+	/// <param name="prefixes">The key prefixes this print system reads; other keys are ignored.</param>
+	/// <returns>Whether one of them sizes the pages.</returns>
+	internal static bool SetsScaling(IReadOnlyDictionary<string, string> vendorOptions, IReadOnlyList<string> prefixes)
+	{
+		ArgumentNullException.ThrowIfNull(vendorOptions);
+		ArgumentNullException.ThrowIfNull(prefixes);
+
+		return vendorOptions.Keys.Any(key => prefixes.Any(prefix =>
+			key.StartsWith(prefix, StringComparison.Ordinal)
+			&& IppVendorAttributeMapper.ScalingOptions.Contains(key[prefix.Length..])));
 	}
 
 	/// <summary>
@@ -231,6 +258,7 @@ internal static partial class IppVendorAttributeMapper
 		IppVendorAttributeMapper.AddIf(names, job?.PrintQuality is not null, "print-quality");
 		IppVendorAttributeMapper.AddIf(names, job?.Finishings is not null, "finishings");
 		IppVendorAttributeMapper.AddIf(names, job?.OutputBin is not null, "output-bin");
+		IppVendorAttributeMapper.AddIf(names, job?.PrintScaling is not null, "print-scaling");
 
 		return names;
 	}

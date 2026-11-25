@@ -4,7 +4,7 @@ Documents used to exercise Latiprimere's print paths. They are small and safe to
 
 | File | Pages | Content | Made with |
 |---|---|---|---|
-| `three-pages.pdf` | 3 | Plain text (150 numbered lines) | `cupsfilter` in the CUPS test container |
+| `three-pages.pdf` | 3 | A4: plain text, 150 numbered lines, 20 mm from every edge | `make-three-pages.py`, Python's standard library only |
 | `mixed-1-page.pdf` | 1 | A4: heading, text block, filled shapes, a rule and an embedded colour image | Ghostscript from `mixed-content.ps` |
 | `mixed-100-pages.pdf` | 100 | The same page, numbered 1 to 100, for timing and memory measurements | Ghostscript from `mixed-content.ps` |
 | `line-art.pdf` | 1 | A4: black text, a diagonal line and a filled circle, only black on white, for rendering without smoothing | `make-line-art.py`, Python's standard library only |
@@ -25,6 +25,10 @@ docker run --rm -v "$PWD:/work" -w /work debian:bookworm-slim sh -c \
 ```
 
 Run it from this folder. On Windows with Git Bash, set `MSYS_NO_PATHCONV=1` and use `$(cygpath -w "$PWD")` for the volume path.
+
+## Regenerating the three-page text
+
+Run `python make-three-pages.py` from this folder. The text keeps 20 mm from every edge, so nothing is cut off on Letter paper or by a printer with a wide margin on one side of the sheet.
 
 ## Regenerating the line art
 

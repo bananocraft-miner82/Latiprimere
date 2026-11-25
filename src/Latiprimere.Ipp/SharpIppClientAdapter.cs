@@ -350,6 +350,18 @@ internal sealed class SharpIppClientAdapter : IIppClient, IDisposable
 		);
 	}
 
+	/// <inheritdoc/>
+	public Task<IdentifyPrinterResponse> IdentifyPrinterAsync(IdentifyPrinterRequest request, CancellationToken cancellationToken)
+	{
+		return this.SendAsync
+		(
+			request.OperationAttributes?.PrinterUri,
+			token => this.client.IdentifyPrinterAsync(request, token),
+			isUpload: false,
+			cancellationToken
+		);
+	}
+
 	/// <summary>
 	/// Releases the HTTP connection.
 	/// </summary>

@@ -42,6 +42,7 @@ Implementation notes from the spike:
 
 - `ServiceBrowser.StopBrowse()` raises `ServiceRemoved` for every known service. It also marks the announcement objects as removed. So the browser's event handlers are detached before stopping, and each announcement is copied into an immutable `DnsSdService` when its event arrives.
 - Shared IPP helpers (`IppPrinterQueries`) serve both the CUPS and the network print systems.
+- **The browser asks twice in the first second** (added 2026-11-25). Left as it is, Tmds.MDns sends its second query after 5 s, then one every 10 s, so a search of the default 2 s asked only once. On 2026-11-25 the HP ENVY, busy after a long two-sided job, wasn't found in a 2 s search. Each browse now sends its second query after 1 s, the least RFC 6762 (section 5.2) allows, and keeps the browser's spacing after that. Every search gets this: listing, a lookup by name, and finding a WSD queue's printer by UUID (ADR 0036). If a printer is just slow to answer, only a longer `DiscoveryDuration` helps; that's left to the application.
 
 ## Consequences
 

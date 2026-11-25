@@ -218,6 +218,23 @@ public sealed class MdnsIppPrinterDiscoveryTests
 		Assert.Equal(expected, endsSearch);
 	}
 
+	[Fact]
+	public void GivenBrowsersQueryParametersWhenConfiguredThenAsksAgainWithinTheDefaultDiscoveryDuration()
+	{
+		// Arrange — the browser's own: a second query after 5 seconds, then one every 10
+		Tmds.MDns.QueryParameters parameters = new Tmds.MDns.QueryParameters();
+		int queryInterval = parameters.QueryInterval;
+
+		// Act
+		MdnsIppPrinterDiscovery.ConfigureQueries(parameters);
+
+		// Assert — two queries a second apart, as RFC 6762 allows at least, inside a default search; later ones as before
+		Assert.Equal(2, parameters.StartQueryCount);
+		Assert.Equal(1000, parameters.StartQueryInterval);
+		Assert.True(TimeSpan.FromMilliseconds(parameters.StartQueryInterval) < IppNetworkOptions.DefaultDiscoveryDuration);
+		Assert.Equal(queryInterval, parameters.QueryInterval);
+	}
+
 	/// <summary>
 	/// Creates an announcement for a printer at an IPv4 address.
 	/// </summary>

@@ -233,6 +233,28 @@ More gaps in the core, found by a second review the same day (owner: "Add all, t
 12. **Which print systems the catalog skipped,** in its result, not only in the log ([ADR 0008](decisions/0008-print-system-failure-isolation.md), option c)
 13. **IPP notifications** for printers that wait on `notify-wait`, behind the existing watch members ([ADR 0049](decisions/0049-following-printers-and-jobs.md)), and reverse orientations and the `auto` colour mode, in the enums that may grow ([ADR 0011](decisions/0011-capability-model.md), [ADR 0044](decisions/0044-room-to-grow-after-1-0.md))
 
+More printer functions, found by a review of what printers offer that Latiprimere doesn't (2026-11-25; owner: "Do 1, 2 and 3 now and add the remainder to the plan to do later"):
+
+- [x] **Identifying a printer,** a **test page** and the **printer's details** (web page, supplies page, icons, firmware, identify actions). Done 2026-11-25 ([ADR 0059](decisions/0059-identify-test-page-and-printer-details.md)): `IPrinter.IdentifyAsync`, `PrintTestPageAsync` and `GetDetailsAsync`, with `PrinterDetails`, `PrinterFirmware` and `IdentifyAction`. Identifying it and printing the page on the HP are in the sign-off
+
+The rest, each additive by the routes above, and each with its own ADR first. Items 14 to 16 extend what exists; 17 to 19 are new kinds of device or service, so each needs a decision on scope before its ADR:
+
+14. **Settings offices and label printers ask for,** as typed options and capabilities:
+    - **secure release:** a job held at the printer until someone enters a PIN there (IPP's `job-password`, PWG 5100.11);
+    - **accounting:** an account or department code for the job (`job-account-id`, `job-accounting-user-id`);
+    - **banner pages** before or after a job (`job-sheets`);
+    - **what the page holds,** text, photo or graphics, so the printer renders it to suit (`print-content-optimize`);
+    - **booklets,** beyond pages per sheet (`imposition-template`);
+    - **label printers:** darkness, speed, and how the label is found, by gap, mark or continuous (`print-darkness`, `print-speed`, `media-tracking`).
+
+    On Windows several reach the driver only through its Print Capabilities, so their ADR decides how they map there, or whether Windows refuses them through `AppliedOptions`, as it does finishings
+15. **Job accounting:** what a job used, sheets, impressions and colour against monochrome pages, on `PrintJobStatus` beside `PagesCompleted`, from IPP's `job-media-sheets-completed` and `job-impressions-completed` counts, and the spooler's `TotalPages`. Its ADR checks which printers really report them, as many report only what CUPS or the printer counts itself
+16. **A printer's names for its options in a language,** from `printer-strings-uri` and `printer-strings-languages-supported`: a request in each language and a reader for the `.strings` files it points to. Left out of ADR 0059, as only a dialog needs it, so it comes with the UI add-ons
+17. **Scanning,** as separate packages, as it is a second kind of device: **eSCL** (AirScan) first, which most network multifunction printers take, over HTTP, found by mDNS as `_uscan._tcp`, reusing direct IPP's discovery, address rules, TLS and stall guard. IPP Scan (PWG 5100.17) where printers take it. Scanners reached only through local drivers, WIA on Windows and SANE on Linux, later, as legacy print drivers are through the spooler. Its first ADR decides the scope: whether scanning belongs in Latiprimere, its packages, and an API that matches printing's
+18. **Fax,** through IPP FaxOut (PWG 5100.15): a job to a printer's `/ipp/faxout`, with the recipient's number. Cheap on the IPP code, but few need it now. CUPS fax queues already take it as a job
+19. **Cloud printing:** a print system for printers reached through a cloud service, such as Microsoft Universal Print, over its Graph API, or IPP's own infrastructure printers (PWG 5100.18), so a service in the cloud prints to an office's printer without a VPN. A new adapter package implementing `IPrintSystem`
+20. **Maintenance commands,** lowest priority: cleaning the heads, a nozzle check, the printer's own self-test page. No print system has a common way: CUPS has commands only for some PPD drivers (`application/vnd.cups-command`), IPP has none, and on Windows each maker has its own. Until one does, they stay with vendor options and the makers' tools
+
 ### Companion product: documents (after 1.0)
 
 Making documents stays out of the core packages. A companion product beside them was accepted on 2026-11-23 ([ADR 0053](decisions/0053-document-generation-companion.md)):

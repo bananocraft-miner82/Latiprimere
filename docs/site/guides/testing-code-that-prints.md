@@ -2,7 +2,7 @@
 title: Testing code that prints
 description: Unit-test code that prints without a printer, using small fakes of IPrinterCatalog, IPrinter and IPrintJob.
 sidebar:
-  order: 8
+  order: 9
 ---
 
 Tests that print to a real printer are slow, waste paper and fail when the printer is off. You don't need one to test your own code. Latiprimere's types are interfaces, so a test can hand your code fakes instead: a catalog that holds made-up printers, printers that keep what they're sent, and jobs that report whatever states the test chooses.

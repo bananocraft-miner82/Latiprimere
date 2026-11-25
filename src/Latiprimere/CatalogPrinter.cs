@@ -57,19 +57,36 @@ internal sealed class CatalogPrinter : IPrinter
 		ArgumentNullException.ThrowIfNull(content);
 		ArgumentNullException.ThrowIfNull(options);
 
-		// Before anything is sent: a setting the print system doesn't know to apply would be dropped without a word
-		PrintOptionKinds notApplied = CatalogPrinter.GetSetOptions(options) & ~this.printer.AppliedOptions;
-
-		if (notApplied != PrintOptionKinds.None)
-		{
-			string message = ExceptionMessages.FormatOptionsNotApplied(this.printer.Info.Id, notApplied);
-
-			throw new NotSupportedException(message);
-		}
+		this.ThrowIfNotApplied(options);
 
 		IPrintJob job = await this.printer.SubmitAsync(content, options, cancellationToken).ConfigureAwait(false);
 
 		return CatalogPrintJob.Wrap(job);
+	}
+
+	/// <inheritdoc/>
+	public async Task<IPrintJob> PrintTestPageAsync(PrintOptions options, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+
+		// A test page is a job like any other, so its settings are held to the same check (ADR 0059)
+		this.ThrowIfNotApplied(options);
+
+		IPrintJob job = await this.printer.PrintTestPageAsync(options, cancellationToken).ConfigureAwait(false);
+
+		return CatalogPrintJob.Wrap(job);
+	}
+
+	/// <inheritdoc/>
+	public Task<PrinterDetails> GetDetailsAsync(CancellationToken cancellationToken = default)
+	{
+		return this.printer.GetDetailsAsync(cancellationToken);
+	}
+
+	/// <inheritdoc/>
+	public Task IdentifyAsync(string? message = null, CancellationToken cancellationToken = default)
+	{
+		return this.printer.IdentifyAsync(message, cancellationToken);
 	}
 
 	/// <inheritdoc/>
@@ -134,5 +151,23 @@ internal sealed class CatalogPrinter : IPrinter
 		set |= options.MediaType is not null ? PrintOptionKinds.MediaType : PrintOptionKinds.None;
 
 		return set;
+	}
+
+	/// <summary>
+	/// Refuses a job that sets a <see cref="PrintOptions"/> setting the print system's printer doesn't apply, before
+	/// anything is sent: the setting would be dropped without a word.
+	/// </summary>
+	/// <param name="options">The job's options.</param>
+	/// <exception cref="NotSupportedException">It sets one.</exception>
+	private void ThrowIfNotApplied(PrintOptions options)
+	{
+		PrintOptionKinds notApplied = CatalogPrinter.GetSetOptions(options) & ~this.printer.AppliedOptions;
+
+		if (notApplied != PrintOptionKinds.None)
+		{
+			string message = ExceptionMessages.FormatOptionsNotApplied(this.printer.Info.Id, notApplied);
+
+			throw new NotSupportedException(message);
+		}
 	}
 }

@@ -393,6 +393,29 @@ internal sealed class FakeIppClient : IIppClient, IDisposable
 		return Task.FromResult(new CancelJobResponse());
 	}
 
+	/// <summary>Gets the Identify-Printer requests received.</summary>
+	public List<IdentifyPrinterRequest> IdentifyPrinterRequests { get; } = [];
+
+	/// <summary>Gets or sets a failure Identify-Printer alone throws, such as operation-not-supported.</summary>
+	public PrintException? IdentifyFailureToThrow { get; set; }
+
+	/// <summary>Records the request, then fails as set, or answers.</summary>
+	/// <param name="request">The request, which is recorded.</param>
+	/// <param name="cancellationToken">Not used.</param>
+	/// <returns>The response.</returns>
+	public Task<IdentifyPrinterResponse> IdentifyPrinterAsync(IdentifyPrinterRequest request, CancellationToken cancellationToken)
+	{
+		this.ThrowIfFailing();
+		this.IdentifyPrinterRequests.Add(request);
+
+		if (this.IdentifyFailureToThrow is not null)
+		{
+			throw this.IdentifyFailureToThrow;
+		}
+
+		return Task.FromResult(new IdentifyPrinterResponse());
+	}
+
 	/// <summary>Marks the client as disposed.</summary>
 	public void Dispose()
 	{

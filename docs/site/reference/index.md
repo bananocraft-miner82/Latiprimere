@@ -18,6 +18,7 @@ The interfaces, records, enums and exceptions every package shares, in the `Lati
 - [DocumentFormat](/docs/reference/latiprimere-abstractions/documentformat/): Enumerates the document formats that can be submitted to a printer.
 - [DuplexMode](/docs/reference/latiprimere-abstractions/duplexmode/): Enumerates the ways pages can be printed on one or both sides of the paper.
 - [Finishing](/docs/reference/latiprimere-abstractions/finishing/): Something a printer does to the printed sheets: staples, holes or a fold.
+- [IdentifyAction](/docs/reference/latiprimere-abstractions/identifyaction/): Enumerates the ways a printer can make itself known when asked to with [IPrinter.IdentifyAsync](/docs/reference/latiprimere-abstractions/iprinter/#identifyasync), as IPP's `identify-actions` has them.
 - [InputTray](/docs/reference/latiprimere-abstractions/inputtray/): A paper source on a printer, such as a tray or the manual feed.
 - [IPdfRasterizer](/docs/reference/latiprimere-abstractions/ipdfrasterizer/): Turns PDF documents into pixels, for print systems that need images rather than PDF, such as the Windows spooler.
 - [IPrinter](/docs/reference/latiprimere-abstractions/iprinter/): A printer that can accept print jobs.
@@ -37,6 +38,8 @@ The interfaces, records, enums and exceptions every package shares, in the `Lati
 - [PrintCertificateException](/docs/reference/latiprimere-abstractions/printcertificateexception/): The exception thrown when a printer's certificate isn't trusted, so no encrypted connection to it was made.
 - [PrintContent](/docs/reference/latiprimere-abstractions/printcontent/): Represents a document to be printed: its data and its format.
 - [PrinterCapabilities](/docs/reference/latiprimere-abstractions/printercapabilities/): What a printer can do, as reported by its print system.
+- [PrinterDetails](/docs/reference/latiprimere-abstractions/printerdetails/): What a printer reports about itself beyond printing: its web pages, pictures of it, its firmware, and how it can be identified.
+- [PrinterFirmware](/docs/reference/latiprimere-abstractions/printerfirmware/): A part of a printer's firmware and its version, as the printer reports them.
 - [PrinterInfo](/docs/reference/latiprimere-abstractions/printerinfo/): Describes a printer known to a print system.
 - [PrinterNotFoundException](/docs/reference/latiprimere-abstractions/printernotfoundexception/): The exception thrown when a requested printer does not exist.
 - [PrinterState](/docs/reference/latiprimere-abstractions/printerstate/): Enumerates the states a printer can report.

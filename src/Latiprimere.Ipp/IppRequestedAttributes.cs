@@ -77,6 +77,24 @@ internal static class IppRequestedAttributes
 	/// <summary>The job's identifier.</summary>
 	internal const string JobId = "job-id";
 
+	/// <summary>The printer's own web page, usually where it is set up (RFC 8011).</summary>
+	internal const string PrinterMoreInfo = "printer-more-info";
+
+	/// <summary>A web page for the printer's supplies (PWG 5100.13).</summary>
+	internal const string PrinterSupplyInfoUri = "printer-supply-info-uri";
+
+	/// <summary>Pictures of the printer, as PNG, smallest first (PWG 5100.13).</summary>
+	internal const string PrinterIcons = "printer-icons";
+
+	/// <summary>The names of the parts of the printer's firmware (PWG 5100.13).</summary>
+	internal const string PrinterFirmwareName = "printer-firmware-name";
+
+	/// <summary>Their versions, in the same order (PWG 5100.13).</summary>
+	internal const string PrinterFirmwareStringVersion = "printer-firmware-string-version";
+
+	/// <summary>The ways the printer can make itself known to Identify-Printer (PWG 5100.13).</summary>
+	internal const string IdentifyActionsSupported = "identify-actions-supported";
+
 	/// <summary>The job's state.</summary>
 	internal const string JobState = "job-state";
 
@@ -154,6 +172,20 @@ internal static class IppRequestedAttributes
 		"print-quality-default",
 		"finishings-supported",
 		"page-ranges-supported",
+	};
+
+	/// <summary>
+	/// The attributes read for <see cref="IPrinter.GetDetailsAsync"/>, in their raw form, as SharpIppNext models only
+	/// <c>printer-more-info</c> of them (ADR 0059).
+	/// </summary>
+	internal static readonly string[] DetailAttributes = new string[]
+	{
+		IppRequestedAttributes.PrinterMoreInfo,
+		IppRequestedAttributes.PrinterSupplyInfoUri,
+		IppRequestedAttributes.PrinterIcons,
+		IppRequestedAttributes.PrinterFirmwareName,
+		IppRequestedAttributes.PrinterFirmwareStringVersion,
+		IppRequestedAttributes.IdentifyActionsSupported,
 	};
 
 	/// <summary>

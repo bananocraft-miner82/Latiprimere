@@ -64,6 +64,7 @@ Statuses: **Proposed** → **Accepted** / **Rejected**, or later **Superseded by
 | [0056](0056-typed-options-before-1-0.md) | Typed options before 1.0: page ranges, collation, quality, finishings, output bins, media types and custom sizes | Accepted |
 | [0057](0057-api-review-phase-4.md) | Public API review of Phase 4's additions | Accepted |
 | [0058](0058-hardening-after-security-review.md) | Hardening after an outside security review: IPPS without forced fallback, announced addresses, PDFium limits, pinned actions | Accepted |
+| [0059](0059-identify-test-page-and-printer-details.md) | Identifying a printer, a test page, and the printer's details | Accepted |
 
 ## Template
 

@@ -14,6 +14,13 @@ internal sealed class MdnsIppPrinterDiscovery : IIppPrinterDiscovery
 		DnsSdServiceMapper.IppsServiceType,
 	};
 
+	/// <summary>
+	/// How long after the first query the second is sent, in milliseconds: the least RFC 6762 (section 5.2) allows.
+	/// The browser otherwise waits 5 seconds, so a search of the default 2 seconds asks once, and a printer that
+	/// misses that query, as one busy with a job may, isn't heard. Later queries keep the browser's own spacing.
+	/// </summary>
+	internal const int SecondQueryDelayMilliseconds = 1000;
+
 	/// <inheritdoc/>
 	public async Task<IReadOnlyList<DiscoveredIppPrinter>> DiscoverAsync(TimeSpan duration, CancellationToken cancellationToken)
 	{
@@ -71,6 +78,21 @@ internal sealed class MdnsIppPrinterDiscovery : IIppPrinterDiscovery
 	internal static DiscoveredIppPrinter? FindUuid(IEnumerable<DnsSdService> services, string uuid)
 	{
 		return MdnsIppPrinterDiscovery.ToPrinters(services).FirstOrDefault(printer => printer.Uuid == uuid);
+	}
+
+	/// <summary>
+	/// Sets when a browser sends its queries: the second after <see cref="SecondQueryDelayMilliseconds"/> rather
+	/// than the browser's 5 seconds, so even a short search asks twice.
+	/// </summary>
+	/// <param name="parameters">The browser's query parameters, changed in place.</param>
+	internal static void ConfigureQueries(QueryParameters parameters)
+	{
+		ArgumentNullException.ThrowIfNull(parameters);
+
+		// Two queries this close, then the browser's own interval: RFC 6762 wants at least a second between the
+		// first two, and longer gaps after
+		parameters.StartQueryCount = 2;
+		parameters.StartQueryInterval = MdnsIppPrinterDiscovery.SecondQueryDelayMilliseconds;
 	}
 
 	/// <summary>
@@ -146,6 +168,9 @@ internal sealed class MdnsIppPrinterDiscovery : IIppPrinterDiscovery
 		browser.ServiceAdded += collector.Browser_ServiceAdded;
 		browser.ServiceChanged += collector.Browser_ServiceAdded;
 		browser.ServiceRemoved += collector.Browser_ServiceRemoved;
+
+		// Read by the browser each time it queries, so set before it starts
+		MdnsIppPrinterDiscovery.ConfigureQueries(browser.QueryParameters);
 
 		browser.StartBrowse(MdnsIppPrinterDiscovery.ServiceTypes, useSynchronizationContext: false);
 

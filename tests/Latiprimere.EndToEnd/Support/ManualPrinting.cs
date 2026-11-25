@@ -21,9 +21,20 @@ public static class ManualPrinting
 	public static readonly TimeSpan ScenarioTimeout = TimeSpan.FromMinutes(30);
 
 	/// <summary>
+	/// The file, in the run's report folder, where the manual scenarios remember the addresses of printers found by
+	/// mDNS, as an application would with <see cref="Latiprimere.Ipp.IppNetworkOptions.AddressStorePath"/>.
+	/// </summary>
+	public const string AddressStoreFileName = "ipp-addresses.json";
+
+	/// <summary>
 	/// Looks up the printer the person named, through every print system, as an application registers them: CUPS
 	/// (with <c>CUPS_SERVER</c> if set), the Windows spooler, and direct IPP with mDNS discovery.
 	/// </summary>
+	/// <remarks>
+	/// Each scenario has its own catalog, so the IPP print system shares an address store across the run: once one
+	/// scenario has found an <c>ipp:dnssd:</c> printer, the next tries its address before searching again. A printer
+	/// busy after a long job may not answer a two-second mDNS search, though it answers at its address.
+	/// </remarks>
 	/// <param name="context">The scenario; the catalog is kept until it ends.</param>
 	/// <param name="configureWindows">Changes the Windows print system's options, or <see langword="null"/>.</param>
 	/// <returns>The printer.</returns>
@@ -41,6 +52,9 @@ public static class ManualPrinting
 
 		Uri? ippUri = ManualPrinting.FindIppUri(printerId!);
 
+		// The scenario's evidence folder sits in the run's report folder
+		string addressStore = Path.Combine(Path.GetDirectoryName(context.EvidenceDirectory)!, ManualPrinting.AddressStoreFileName);
+
 		CatalogFixture fixture = new CatalogFixture
 		(
 			services =>
@@ -48,6 +62,8 @@ public static class ManualPrinting
 				services.AddLatiprimereCups();
 				services.AddLatiprimereIpp(options =>
 				{
+					options.AddressStorePath = addressStore;
+
 					if (printerId!.StartsWith("ipp:", StringComparison.Ordinal) && ippUri is not null)
 					{
 						options.PrinterUris.Add(ippUri);
