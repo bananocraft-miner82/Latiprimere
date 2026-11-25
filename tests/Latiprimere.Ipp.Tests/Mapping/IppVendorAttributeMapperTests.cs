@@ -125,6 +125,57 @@ public sealed class IppVendorAttributeMapperTests
 		Assert.Equal("print-quality", Assert.Single(attributes.Job).Name);
 	}
 
+	[Theory]
+	[InlineData("ipp:print-scaling", true)]
+	[InlineData("cups:fit-to-page", true)]
+	[InlineData("cups:fitplot", true)]
+	[InlineData("cups:scaling", true)]
+	[InlineData("cups:natural-scaling", true)]
+	[InlineData("cups:print-quality", false)]
+	[InlineData("windows:print-scaling", false)]
+	public void GivenAVendorOptionWhenSetsScalingForCupsThenFindsThoseThatSizeThePages(string key, bool expected)
+	{
+		// Arrange
+		Dictionary<string, string> options = new Dictionary<string, string> { [key] = "true" };
+
+		// Act
+		bool setsScaling = IppVendorAttributeMapper.SetsScaling(options, IppVendorAttributeMapper.CupsPrefixes);
+
+		// Assert
+		Assert.Equal(expected, setsScaling);
+	}
+
+	[Fact]
+	public void GivenACupsScalingOptionWhenSetsScalingForANetworkPrinterThenIgnoresIt()
+	{
+		// Arrange — only CUPS reads cups: keys
+		Dictionary<string, string> options = new Dictionary<string, string> { ["cups:fit-to-page"] = "true" };
+
+		// Act
+		bool setsScaling = IppVendorAttributeMapper.SetsScaling(options, IppVendorAttributeMapper.NetworkPrefixes);
+
+		// Assert
+		Assert.False(setsScaling);
+	}
+
+	[Fact]
+	public void GivenTypedPrintScalingWhenAVendorOptionSetsItTooThenThrowsArgumentException()
+	{
+		// Arrange
+		PrintJobRequest request = new PrintJobRequest
+		{
+			JobTemplateAttributes = new JobTemplateAttributes { PrintScaling = new IppValue<PrintScaling>(PrintScaling.Fit) }
+		};
+		Dictionary<string, string> options = new Dictionary<string, string> { ["ipp:print-scaling"] = "fill" };
+
+		// Act
+		Action toAttributes = () => IppVendorAttributeMapper.ToAttributes(options, IppVendorAttributeMapper.NetworkPrefixes, request);
+
+		// Assert
+		ArgumentException exception = Assert.Throws<ArgumentException>(toAttributes);
+		Assert.Contains("'ipp:print-scaling'", exception.Message, StringComparison.Ordinal);
+	}
+
 	[Fact]
 	public void GivenKeysForOtherPrintSystemsWhenToAttributesForNetworkPrinterThenIgnoresThem()
 	{

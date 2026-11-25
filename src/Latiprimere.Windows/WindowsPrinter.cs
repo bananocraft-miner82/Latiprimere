@@ -37,6 +37,8 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 	/// </summary>
 	internal const string IppJobIdPrefix = "ipp:";
 
+	private const string SpoolerName = "Windows spooler"; // The print system, as the test page names it
+
 	private static readonly MediaSize A4 = PwgMediaNames.ToMediaSize("iso_a4_210x297mm")!;       // Images' paper in metric regions
 	private static readonly MediaSize Letter = PwgMediaNames.ToMediaSize("na_letter_8.5x11in")!; // And elsewhere
 
@@ -283,6 +285,100 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 			DocumentFormats = formats,
 			VendorOptions   = this.ReadVendorOptions(record)
 		};
+	}
+
+	/// <inheritdoc/>
+	/// <remarks>
+	/// The spooler has none of these, so they come from the queue's IPP printer, with
+	/// <see cref="WindowsOptions.PrintPdfOverIpp"/> on. Without it, or when that printer can't be reached, the details
+	/// have only the printer's ID (ADR 0059).
+	/// </remarks>
+	public async Task<PrinterDetails> GetDetailsAsync(CancellationToken cancellationToken = default)
+	{
+		PrinterDetails none = new PrinterDetails { PrinterId = this.Info.Id };
+		IppPrinter? printer = await this.FindIppPrinterToAskAsync(cancellationToken).ConfigureAwait(false);
+
+		if (printer is null)
+		{
+			return none;
+		}
+
+		try
+		{
+			return await printer.GetDetailsAsync(cancellationToken).ConfigureAwait(false);
+		}
+		catch (Exception exception) when (exception is PrintException || IppResponseErrors.IsUnreadableData(exception))
+		{
+			WindowsLog.IppPrinterDetailsUnavailable(this.context.Logger, this.printerName, printer.PrinterUri, exception);
+
+			return none;
+		}
+	}
+
+	/// <inheritdoc/>
+	/// <remarks>
+	/// The spooler has no such call, so the queue's IPP printer is asked, with
+	/// <see cref="WindowsOptions.PrintPdfOverIpp"/> on; otherwise <see cref="NotSupportedException"/> (ADR 0059).
+	/// </remarks>
+	public async Task IdentifyAsync(string? message = null, CancellationToken cancellationToken = default)
+	{
+		IppPrinter printer = await this.FindIppPrinterToAskAsync(cancellationToken).ConfigureAwait(false)
+			?? throw new NotSupportedException(ExceptionMessages.FormatIdentifyNeedsIppPrinter(this.printerName));
+
+		await printer.IdentifyAsync(message, cancellationToken).ConfigureAwait(false);
+	}
+
+	/// <inheritdoc/>
+	/// <remarks>
+	/// The page is laid out on the job's paper, else the driver's default, and printed as any PDF is: over IPP when the
+	/// queue's IPP printer takes it, and otherwise through the driver, which needs a PDF rasteriser (ADR 0059).
+	/// </remarks>
+	public async Task<IPrintJob> PrintTestPageAsync(PrintOptions options, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+
+		PrinterCapabilities capabilities = await this.GetCapabilitiesAsync(cancellationToken).ConfigureAwait(false);
+
+		// Reading the driver's default paper blocks, so run it off the caller's thread
+		MediaSize paper = options.MediaSize
+						  ?? await Task.Run(this.FindDefaultPaper, cancellationToken).ConfigureAwait(false);
+
+		TestPageFacts facts = new TestPageFacts
+		{
+			Printer      = this.Info,
+			PrintSystem  = WindowsPrinter.SpoolerName,
+			Address      = this.DescribeQueue(),
+			Capabilities = capabilities,
+			Paper        = paper,
+			PrintedAt    = this.context.TimeProvider.GetUtcNow()
+		};
+
+		using MemoryStream pdf = TestPageWriter.Write(facts);
+
+		PrintOptions pageOptions = options with { JobName = options.JobName ?? TestPageWriter.JobName };
+
+		return await this.SubmitAsync(PrintContent.FromPdf(pdf), pageOptions, cancellationToken).ConfigureAwait(false);
+	}
+
+	/// <summary>
+	/// Describes the queue for the test page: its name, driver and port, as far as they are known.
+	/// </summary>
+	/// <returns>The description, such as <c>queue Office, driver HP Universal, port WSD-1234</c>.</returns>
+	internal string DescribeQueue()
+	{
+		List<string> parts = ["queue " + this.printerName];
+
+		if (this.driverName is not null)
+		{
+			parts.Add("driver " + this.driverName);
+		}
+
+		if (this.portName is not null)
+		{
+			parts.Add("port " + this.portName);
+		}
+
+		return string.Join(", ", parts);
 	}
 
 	/// <summary>
@@ -547,6 +643,26 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 			return null;
 		}
 
+		return await this.FindIppPrinterToAskAsync(cancellationToken).ConfigureAwait(false)
+			?? throw new PrintException(ExceptionMessages.FormatIppJobPrinterNotFound(jobId, this.printerName));
+	}
+
+	/// <summary>
+	/// Finds the queue's IPP printer to ask something of, whether or not it takes PDF: about a job sent to it, for its
+	/// details, or to identify itself.
+	/// </summary>
+	/// <param name="cancellationToken">A token to cancel the search.</param>
+	/// <returns>The printer, or <see langword="null"/> if the route is off, the queue has no IPP printer to ask, or it
+	/// wasn't found, as when the search for it by UUID failed, which the route logs.</returns>
+	private async Task<IppPrinter?> FindIppPrinterToAskAsync(CancellationToken cancellationToken)
+	{
+		WindowsIppRoute? route = this.context.IppRoute;
+
+		if (route is null || !route.MayHaveTarget(this.printerName, this.portName, this.context.Spool))
+		{
+			return null;
+		}
+
 		WindowsIppMatch? known = this.ippMatch;
 
 		if (known is not null)
@@ -560,10 +676,10 @@ internal sealed class WindowsPrinter : IWindowsPrinter
 
 		if (target is null)
 		{
-			throw new PrintException(ExceptionMessages.FormatIppJobPrinterNotFound(jobId, this.printerName));
+			return null;
 		}
 
-		// Only read from, so it isn't kept for PDF jobs, which check first what the printer takes
+		// Only asked, so it isn't kept for PDF jobs, which check first what the printer takes
 		return new IppPrinter(route.Context, target.PrinterUri, this.Info)
 		{
 			JobIdPrefix = WindowsPrinter.IppJobIdPrefix

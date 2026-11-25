@@ -87,4 +87,54 @@ internal sealed class FakePrinter : IPrinter
 	{
 		return Task.FromResult(new PrinterCapabilities());
 	}
+
+	/// <summary>Gets or sets the details the printer reports, or <see langword="null"/> for the default implementation's.</summary>
+	public PrinterDetails? Details { get; set; }
+
+	/// <summary>Gets the messages the printer was asked to identify itself with, in order.</summary>
+	public List<string?> IdentifyMessages { get; } = [];
+
+	/// <summary>Gets how many test pages were printed.</summary>
+	public int TestPageCount { get; private set; }
+
+	/// <summary>
+	/// Returns the details set, or the default implementation's.
+	/// </summary>
+	/// <param name="cancellationToken">Not used.</param>
+	/// <returns>The details.</returns>
+	public Task<PrinterDetails> GetDetailsAsync(CancellationToken cancellationToken = default)
+	{
+		return Task.FromResult(this.Details ?? new PrinterDetails { PrinterId = this.Info.Id });
+	}
+
+	/// <summary>
+	/// Records the message.
+	/// </summary>
+	/// <param name="message">The message.</param>
+	/// <param name="cancellationToken">Not used.</param>
+	/// <returns>A completed task.</returns>
+	public Task IdentifyAsync(string? message = null, CancellationToken cancellationToken = default)
+	{
+		this.IdentifyMessages.Add(message);
+
+		return Task.CompletedTask;
+	}
+
+	/// <summary>
+	/// Counts the page, and hands back a job that has finished.
+	/// </summary>
+	/// <param name="options">Not used.</param>
+	/// <param name="cancellationToken">Not used.</param>
+	/// <returns>The job.</returns>
+	public Task<IPrintJob> PrintTestPageAsync(PrintOptions options, CancellationToken cancellationToken = default)
+	{
+		this.TestPageCount++;
+
+		IPrintJob job = new FakePrintJob(new PrintJobStatusBuilder().WithState(PrintJobState.Completed).Build())
+		{
+			PrinterId = this.Info.Id
+		};
+
+		return Task.FromResult(job);
+	}
 }

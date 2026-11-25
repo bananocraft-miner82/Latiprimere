@@ -69,6 +69,18 @@ internal static class Program
 				await ReadingCapabilities.ShowAsync(await catalog.GetPrinterAsync(arguments[0]));
 				return 0;
 
+			case "details" when arguments.Length == 1:
+				await PrinterDetailsAndTestPages.ShowDetailsAsync(await catalog.GetPrinterAsync(arguments[0]));
+				return 0;
+
+			case "identify" when arguments.Length == 1:
+				await PrinterDetailsAndTestPages.IdentifyAsync(await catalog.GetPrinterAsync(arguments[0]));
+				return 0;
+
+			case "test-page" when arguments.Length == 1:
+				await PrinterDetailsAndTestPages.PrintTestPageAsync(await catalog.GetPrinterAsync(arguments[0]));
+				return 0;
+
 			case "vendor-options" when arguments.Length == 1:
 				IPrinter printer = await catalog.GetPrinterAsync(arguments[0]);
 				await VendorOptions.ShowVendorOptionsAsync(printer);
@@ -142,6 +154,9 @@ internal static class Program
 		Console.WriteLine("  list                               Finding printers");
 		Console.WriteLine("  options <printer-id> <pdf>         Print options and following jobs");
 		Console.WriteLine("  capabilities <printer-id>          Reading printer capabilities");
+		Console.WriteLine("  details <printer-id>               Printer details: web pages, icons and firmware");
+		Console.WriteLine("  identify <printer-id>              Printer details: asking a printer to identify itself");
+		Console.WriteLine("  test-page <printer-id>             Printer details: printing a test page");
 		Console.WriteLine("  vendor-options <printer-id>        Vendor options and Windows Print Capabilities");
 		Console.WriteLine("  pages <printer-id> <pdf>           Print options: pages 2 and 3, collated, at draft quality");
 		Console.WriteLine("  printer-status <printer-id>        Print options: following a printer for three seconds");

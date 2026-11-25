@@ -125,6 +125,74 @@ public sealed class IppPrinterTests
 		Assert.Null(client.LastPrintJobRequest);
 	}
 
+	[Theory]
+	[InlineData(PageOrientation.Landscape, Orientation.Landscape)]
+	[InlineData(PageOrientation.Portrait, Orientation.Portrait)]
+	public async Task GivenAnOrientationWhenAPdfIsSubmittedThenAsksForAutoFitWithIt(PageOrientation orientation, Orientation expected)
+	{
+		// Arrange — macOS's CUPS turns a portrait page onto landscape paper at full size, cutting off its ends
+		FakeIppClient client = new FakeIppClient();
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), new PrintOptions { Orientation = orientation }, TestContext.Current.CancellationToken);
+
+		// Assert
+		PrintJobRequest request = Assert.IsType<PrintJobRequest>(client.LastPrintJobRequest);
+		Assert.Equal(expected, request.JobTemplateAttributes?.OrientationRequested?.Value);
+		Assert.Equal(PrintScaling.AutoFit, request.JobTemplateAttributes?.PrintScaling?.Value);
+	}
+
+	[Fact]
+	public async Task GivenNoOrientationWhenAPdfIsSubmittedThenSendsNoPrintScaling()
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient();
+		IppPrinter printer = IppPrinterTests.CreatePrinter(client);
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), PrintOptions.Default, TestContext.Current.CancellationToken);
+
+		// Assert — the page is left to the printer, as before
+		PrintJobRequest request = Assert.IsType<PrintJobRequest>(client.LastPrintJobRequest);
+		Assert.Null(request.JobTemplateAttributes?.OrientationRequested);
+		Assert.Null(request.JobTemplateAttributes?.PrintScaling);
+	}
+
+	[Theory]
+	[InlineData("cups:fit-to-page", "true")]
+	[InlineData("ipp:print-scaling", "fill")]
+	public async Task GivenTheCallersOwnScalingWhenALandscapePdfIsSubmittedToCupsThenOnlyTheirsIsSent(string key, string value)
+	{
+		// Arrange
+		FakeIppClient client = new FakeIppClient();
+
+		IppPrintContext context = new IppPrintContextBuilder()
+			.WithClient(client)
+			.WithVendorOptionPrefixes(IppVendorAttributeMapper.CupsPrefixes)
+			.Build();
+
+		IppPrinter printer = new IppPrinter(context, IppPrinterTests.PrinterUri, new PrinterInfo { Id = "cups:Office", Name = "Office" });
+		using MemoryStream document = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+
+		PrintOptions options = new PrintOptions
+		{
+			Orientation   = PageOrientation.Landscape,
+			VendorOptions = new Dictionary<string, string> { [key] = value }
+		};
+
+		// Act
+		await printer.SubmitAsync(PrintContent.FromPdf(document), options, TestContext.Current.CancellationToken);
+
+		// Assert — no auto-fit beside it, so nothing is sent twice
+		PrintJobRequest request = Assert.IsType<PrintJobRequest>(client.LastPrintJobRequest);
+		Assert.Null(request.JobTemplateAttributes?.PrintScaling);
+		IppAttribute attribute = Assert.Single(Assert.IsType<IppVendorAttributes>(client.LastVendorAttributes).Job);
+		Assert.Equal(key[(key.IndexOf(':', StringComparison.Ordinal) + 1)..], attribute.Name);
+	}
+
 	[Fact]
 	public async Task GivenRawContentWhenSubmitThenSendsRawMimeTypeAndNoJobName()
 	{

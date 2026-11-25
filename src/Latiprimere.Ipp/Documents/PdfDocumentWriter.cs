@@ -5,9 +5,9 @@ using Latiprimere.Ipp.Resources;
 namespace Latiprimere.Ipp.Documents;
 
 /// <summary>
-/// Writes a PDF document page by page: images and lines of Courier text placed on each page (ADR 0045). For PCLm,
-/// whose pages are images in strips, and for images and text sent as PDF to printers and the Windows spooler that
-/// can't take them (Phase 4 plan, P4-1).
+/// Writes a PDF document page by page: images, lines of Courier text, rectangles and lines placed on each page
+/// (ADR 0045). For PCLm, whose pages are images in strips; for images and text sent as PDF to printers and the
+/// Windows spooler that can't take them (Phase 4 plan, P4-1); and for the test page (ADR 0059).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -203,6 +203,87 @@ internal sealed class PdfDocumentWriter : IDisposable
 	}
 
 	/// <summary>
+	/// Fills a rectangle on the page in a colour: in DeviceGray when its components are equal, so a printer prints a
+	/// grey with black alone, and in DeviceRGB otherwise.
+	/// </summary>
+	/// <param name="x">Its left, in points.</param>
+	/// <param name="y">Its bottom, in points.</param>
+	/// <param name="width">Its width, in points.</param>
+	/// <param name="height">Its height, in points.</param>
+	/// <param name="red">The colour's red, from 0 to 1.</param>
+	/// <param name="green">Its green, from 0 to 1.</param>
+	/// <param name="blue">Its blue, from 0 to 1.</param>
+	/// <exception cref="ArgumentOutOfRangeException">A size isn't positive and finite, or a component isn't from 0 to
+	/// 1.</exception>
+	/// <exception cref="InvalidOperationException">No page is started.</exception>
+	public void FillRectangle(double x, double y, double width, double height, double red, double green, double blue)
+	{
+		PdfDocumentWriter.ThrowIfNotPositive(width, nameof(width));
+		PdfDocumentWriter.ThrowIfNotPositive(height, nameof(height));
+		PdfDocumentWriter.ThrowIfNotComponent(red, nameof(red));
+		PdfDocumentWriter.ThrowIfNotComponent(green, nameof(green));
+		PdfDocumentWriter.ThrowIfNotComponent(blue, nameof(blue));
+
+		PdfPageContent current = this.RequirePage();
+
+		// The fill colour, then the rectangle filled (8.6.4, 8.5.2)
+		string color = red == green && green == blue
+			? PdfSyntax.FormatNumber(red) + " g"
+			: PdfSyntax.FormatNumber(red) + " " + PdfSyntax.FormatNumber(green) + " " + PdfSyntax.FormatNumber(blue) + " rg";
+
+		current.Content
+			.Append("q ").Append(color)
+			.Append(' ').Append(PdfDocumentWriter.FormatRectangle(x, y, width, height))
+			.Append(" f Q\n");
+	}
+
+	/// <summary>
+	/// Draws a rectangle's outline on the page in black.
+	/// </summary>
+	/// <param name="x">Its left, in points.</param>
+	/// <param name="y">Its bottom, in points.</param>
+	/// <param name="width">Its width, in points.</param>
+	/// <param name="height">Its height, in points.</param>
+	/// <param name="lineWidth">The line's width, in points, centred on the rectangle's edge.</param>
+	/// <exception cref="ArgumentOutOfRangeException">A size or the line's width isn't positive and finite.</exception>
+	/// <exception cref="InvalidOperationException">No page is started.</exception>
+	public void StrokeRectangle(double x, double y, double width, double height, double lineWidth)
+	{
+		PdfDocumentWriter.ThrowIfNotPositive(width, nameof(width));
+		PdfDocumentWriter.ThrowIfNotPositive(height, nameof(height));
+		PdfDocumentWriter.ThrowIfNotPositive(lineWidth, nameof(lineWidth));
+
+		PdfPageContent current = this.RequirePage();
+
+		current.Content
+			.Append("q ").Append(PdfSyntax.FormatNumber(lineWidth)).Append(" w 0 G ")
+			.Append(PdfDocumentWriter.FormatRectangle(x, y, width, height))
+			.Append(" S Q\n");
+	}
+
+	/// <summary>
+	/// Draws a straight line on the page in black.
+	/// </summary>
+	/// <param name="x1">Its start's distance from the left, in points.</param>
+	/// <param name="y1">Its start's distance from the bottom, in points.</param>
+	/// <param name="x2">Its end's distance from the left, in points.</param>
+	/// <param name="y2">Its end's distance from the bottom, in points.</param>
+	/// <param name="lineWidth">The line's width, in points.</param>
+	/// <exception cref="ArgumentOutOfRangeException">The line's width isn't positive and finite.</exception>
+	/// <exception cref="InvalidOperationException">No page is started.</exception>
+	public void DrawLine(double x1, double y1, double x2, double y2, double lineWidth)
+	{
+		PdfDocumentWriter.ThrowIfNotPositive(lineWidth, nameof(lineWidth));
+
+		PdfPageContent current = this.RequirePage();
+
+		current.Content
+			.Append("q ").Append(PdfSyntax.FormatNumber(lineWidth)).Append(" w 0 G ")
+			.Append(PdfSyntax.FormatNumber(x1)).Append(' ').Append(PdfSyntax.FormatNumber(y1)).Append(" m ")
+			.Append(PdfSyntax.FormatNumber(x2)).Append(' ').Append(PdfSyntax.FormatNumber(y2)).Append(" l S Q\n");
+	}
+
+	/// <summary>
 	/// Ends the page: writes its content and the page object.
 	/// </summary>
 	/// <exception cref="InvalidOperationException">No page is started.</exception>
@@ -318,6 +399,34 @@ internal sealed class PdfDocumentWriter : IDisposable
 		{
 			throw new ArgumentOutOfRangeException(name, value, null);
 		}
+	}
+
+	/// <summary>
+	/// Refuses a colour component that isn't from 0 to 1.
+	/// </summary>
+	/// <param name="value">The component.</param>
+	/// <param name="name">The parameter's name.</param>
+	/// <exception cref="ArgumentOutOfRangeException">It isn't.</exception>
+	private static void ThrowIfNotComponent(double value, string name)
+	{
+		if (!double.IsFinite(value) || value < 0 || value > 1)
+		{
+			throw new ArgumentOutOfRangeException(name, value, null);
+		}
+	}
+
+	/// <summary>
+	/// Writes a rectangle's <c>re</c> operator.
+	/// </summary>
+	/// <param name="x">Its left, in points.</param>
+	/// <param name="y">Its bottom, in points.</param>
+	/// <param name="width">Its width, in points.</param>
+	/// <param name="height">Its height, in points.</param>
+	/// <returns>The operator and its operands, such as <c>10 20 30 40 re</c>.</returns>
+	private static string FormatRectangle(double x, double y, double width, double height)
+	{
+		return PdfSyntax.FormatNumber(x) + " " + PdfSyntax.FormatNumber(y) + " "
+			   + PdfSyntax.FormatNumber(width) + " " + PdfSyntax.FormatNumber(height) + " re";
 	}
 
 	/// <summary>

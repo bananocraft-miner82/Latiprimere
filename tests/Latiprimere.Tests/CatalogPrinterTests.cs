@@ -135,6 +135,59 @@ public sealed class CatalogPrinterTests
 	}
 
 	[Fact]
+	public async Task GivenPrinterFromTheCatalogWhenItsDetailsAreReadAndItIsIdentifiedThenThePrintSystemsPrinterIsAsked()
+	{
+		// Arrange
+		PrinterDetails details = new PrinterDetails { PrinterId = "office", WebPage = new Uri("http://office.local/") };
+		FakePrinter adapterPrinter = new FakePrinter(new PrinterInfoBuilder().WithId("office").Build()) { Details = details };
+		IPrinter printer = await CatalogPrinterTests.CreateCatalog(adapterPrinter).GetPrinterAsync("office", TestContext.Current.CancellationToken);
+
+		// Act
+		PrinterDetails read = await printer.GetDetailsAsync(TestContext.Current.CancellationToken);
+		await printer.IdentifyAsync("Here", TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Same(details, read);
+		Assert.Equal(["Here"], adapterPrinter.IdentifyMessages);
+	}
+
+	[Fact]
+	public async Task GivenPrinterFromTheCatalogWhenATestPageIsPrintedThenItsJobIsTheCatalogsToo()
+	{
+		// Arrange
+		FakePrinter adapterPrinter = new FakePrinter(new PrinterInfoBuilder().WithId("office").Build());
+		IPrinter printer = await CatalogPrinterTests.CreateCatalog(adapterPrinter).GetPrinterAsync("office", TestContext.Current.CancellationToken);
+
+		// Act
+		IPrintJob job = await printer.PrintTestPageAsync(new PrintOptions { Copies = 2 }, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(1, adapterPrinter.TestPageCount);
+		Assert.IsNotType<FakePrintJob>(job);
+		Assert.NotNull(job.GetFeature<FakePrintJob>());
+	}
+
+	[Fact]
+	public async Task GivenSettingThePrinterDoesNotApplyWhenATestPageIsPrintedThenRefusedBeforeAnythingIsSent()
+	{
+		// Arrange: a test page is a job, held to the same check (ADR 0059)
+		FakePrinter adapterPrinter = new FakePrinter(new PrinterInfoBuilder().WithId("office").Build())
+		{
+			AppliedOptions = PrintOptionKinds.JobName
+		};
+
+		IPrinter printer = await CatalogPrinterTests.CreateCatalog(adapterPrinter).GetPrinterAsync("office", TestContext.Current.CancellationToken);
+
+		// Act
+		Func<Task> print = () => printer.PrintTestPageAsync(new PrintOptions { Duplex = DuplexMode.LongEdge }, TestContext.Current.CancellationToken);
+
+		// Assert
+		NotSupportedException exception = await Assert.ThrowsAsync<NotSupportedException>(print);
+		Assert.Contains("Duplex", exception.Message, StringComparison.Ordinal);
+		Assert.Equal(0, adapterPrinter.TestPageCount);
+	}
+
+	[Fact]
 	public void GivenPrintOptionsWhenTheirSettingsAreListedThenEachHasAFlagOfItsName()
 	{
 		// Arrange: a setting added to PrintOptions without a flag could never be refused, nor applied

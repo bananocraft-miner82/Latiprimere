@@ -121,6 +121,14 @@ Each check prints only when you say so (decision D9: about ten sheets in all). R
   dotnet run --project tests/Latiprimere.TestHarness -f net11.0 -- manual --printer "windows:HP ENVY 5640 series" manual.windows-queue-over-ipp
   ```
 
+- [ ] **The HP's details, identifying it, and its test page** ([ADR 0059](decisions/0059-identify-test-page-and-printer-details.md)), over IPP and through its Windows queue sent over IPP, with the printer's ID as `list` shows it. The details list its web page and firmware; identifying it makes it flash or beep, or says it can't; the test page prints with all four sides of its edge line, unless the HP can't print that near the edge, and rulers that measure 100 mm and 4 inches:
+
+  ```bash
+  dotnet run --project samples/Latiprimere.Examples -f net11.0 -- details "<the HP's ID>"
+  dotnet run --project samples/Latiprimere.Examples -f net11.0 -- identify "<the HP's ID>"
+  dotnet run --project samples/Latiprimere.Examples -f net11.0 -- test-page "<the HP's ID>"
+  ```
+
 - [ ] **A Mac** (P3-8): the manual checks against a CUPS queue and a printer over direct IPP, and the Phase 0 checklists for [Spike 1](manual-tests/spike-1-macos.md) and [Spike 4](manual-tests/spike-4-network.md). Record them in [manual-tests](manual-tests/README.md).
 - [ ] **CI is green** on all three runners, the CUPS integration tests among them.
 

@@ -62,6 +62,28 @@ The capabilities. Anything the print system doesn't report is left empty.
 
 - [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system or printer couldn't be asked.
 
+### GetDetailsAsync
+
+```csharp
+Task<PrinterDetails> GetDetailsAsync(CancellationToken cancellationToken = default)
+```
+
+Reads what the printer reports about itself beyond printing: its web pages, pictures of it, its firmware, and how it can be identified.
+
+CUPS queues and network printers report them over IPP. A Windows queue reports them only through its IPP printer, with `WindowsOptions.PrintPdfOverIpp` on; otherwise, and when that printer can't be reached, its details are empty. The default implementation gives details with the printer's ID and nothing else.
+
+**Parameters**
+
+- `cancellationToken`: A token to cancel the request.
+
+**Returns**
+
+The details. Anything the print system doesn't report is left empty.
+
+**Exceptions**
+
+- [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system or printer couldn't be asked.
+
 ### GetFeature
 
 ```csharp
@@ -123,6 +145,58 @@ The printer's current status.
 **Exceptions**
 
 - [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system failed to report the printer's state, or no longer has the printer.
+
+### IdentifyAsync
+
+```csharp
+Task IdentifyAsync(string? message = null, CancellationToken cancellationToken = default)
+```
+
+Asks the printer to make itself known, so it can be told from others nearby: it flashes, beeps, shows a message or speaks, as it does by default.
+
+[PrinterDetails.IdentifyActions](/docs/reference/latiprimere-abstractions/printerdetails/#identifyactions) says how the printer can make itself known. CUPS queues and network printers are asked with IPP's Identify-Printer, which IPP Everywhere printers take. A Windows queue can be identified only through its IPP printer, with `WindowsOptions.PrintPdfOverIpp` on. The default implementation throws [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception).
+
+**Parameters**
+
+- `message`: A message to show on the printer's display, if it has one, such as "This is Office Laser"; or `null` for none. At most 127 bytes in UTF-8.
+- `cancellationToken`: A token to cancel the request.
+
+**Returns**
+
+A task that completes once the printer has been asked.
+
+**Exceptions**
+
+- [ArgumentException](https://learn.microsoft.com/dotnet/api/system.argumentexception): `message` is longer than 127 bytes in UTF-8.
+- [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception): The printer, or its print system, can't be identified.
+- [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system or printer couldn't be asked.
+
+### PrintTestPageAsync
+
+```csharp
+Task<IPrintJob> PrintTestPageAsync(PrintOptions options, CancellationToken cancellationToken = default)
+```
+
+Prints a test page Latiprimere draws: the printer's name and address, what its capabilities say, a line a quarter of an inch in from each edge, two rulers, and colour and grey patches.
+
+The page is a PDF, printed as any PDF is. A side of the edge line that doesn't print is outside what the printer can print, and rulers shorter than they say mean the page was scaled. On paper too small for it, such as a label, the page is shrunk to fit and says so.
+
+The default implementation throws [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception).
+
+**Parameters**
+
+- `options`: How to print the page, as for [IPrinter.SubmitAsync](/docs/reference/latiprimere-abstractions/iprinter/#submitasync). Use [PrintOptions.Default](/docs/reference/latiprimere-abstractions/printoptions/#default) for printer defaults. The page goes on the job's paper, else the printer's default.
+- `cancellationToken`: A token to cancel the submission. Cancelling does not cancel the job once it has been accepted.
+
+**Returns**
+
+The page's job, which can be used to follow its progress.
+
+**Exceptions**
+
+- [ArgumentNullException](https://learn.microsoft.com/dotnet/api/system.argumentnullexception): `options` is `null`.
+- [NotSupportedException](https://learn.microsoft.com/dotnet/api/system.notsupportedexception): The printer can't print the page, as for a PDF it can't print, such as a Windows queue without a PDF rasteriser.
+- [PrintException](/docs/reference/latiprimere-abstractions/printexception/): The print system rejected or failed to accept the job, or the printer's capabilities couldn't be read.
 
 ### SubmitAsync
 

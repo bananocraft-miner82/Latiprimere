@@ -21,6 +21,9 @@ internal sealed class IppPrinter : IPrinter
 	private const string DocumentPasswordSupported = "document-password-supported"; // Longest password, in octets
 	private const string DocumentPassword = "document-password";  // The operation attribute carrying it (PWG 5100.13)
 	private static readonly TimeSpan DefaultPaperLifetime = TimeSpan.FromMinutes(5); // How long it is kept
+	private const int MaxIdentifyMessageBytes = 127;              // IPP's message is text(127)
+	private const string CupsName = "CUPS";                       // The print systems, as the test page names them
+	private const string NetworkName = "Network printer over IPP";
 
 	private readonly Lock defaultPaperLock = new Lock();          // Guards the two fields below
 	private MediaSize? defaultPaper;                              // The printer's default paper, once read
@@ -311,6 +314,100 @@ internal sealed class IppPrinter : IPrinter
 		IReadOnlyList<VendorOption> vendorOptions = await this.ReadVendorOptionsAsync(cancellationToken).ConfigureAwait(false);
 
 		return capabilities with { DocumentFormats = this.ListDocumentFormats(), VendorOptions = vendorOptions };
+	}
+
+	/// <inheritdoc/>
+	/// <remarks>
+	/// Read with one Get-Printer-Attributes request, in its raw form (ADR 0059).
+	/// </remarks>
+	public async Task<PrinterDetails> GetDetailsAsync(CancellationToken cancellationToken = default)
+	{
+		IReadOnlyList<IppAttribute> attributes = await IppPrinterQueries
+			.GetAttributeListAsync(this.context, this.printerUri, IppRequestedAttributes.DetailAttributes, cancellationToken)
+			.ConfigureAwait(false)
+			?? throw new PrintException(ExceptionMessages.FormatPrinterNoLongerAvailable(this.printerUri));
+
+		return IppPrinterDetailsMapper.ToDetails(attributes, this.Info.Id);
+	}
+
+	/// <inheritdoc/>
+	/// <remarks>
+	/// Sent as IPP's Identify-Printer, without <c>identify-actions</c>, so the printer does what it does by default. It
+	/// isn't asked first whether it takes the operation: its answer says (ADR 0059).
+	/// </remarks>
+	public async Task IdentifyAsync(string? message = null, CancellationToken cancellationToken = default)
+	{
+		// IPP's message is text(127), so a longer one is refused here rather than cut short by the printer
+		int length = message is null ? 0 : System.Text.Encoding.UTF8.GetByteCount(message);
+
+		if (length > IppPrinter.MaxIdentifyMessageBytes)
+		{
+			string tooLong = ExceptionMessages.FormatIdentifyMessageTooLong(IppPrinter.MaxIdentifyMessageBytes, length);
+
+			throw new ArgumentException(tooLong, nameof(message));
+		}
+
+		// Typed as nullable, or null would become an empty message through SharpIppNext's conversion from string
+		StringWithLanguage? text = length == 0 ? (StringWithLanguage?)null : new StringWithLanguage(message!); // Not null when it has bytes
+
+		IdentifyPrinterRequest request = new IdentifyPrinterRequest
+		{
+			OperationAttributes = new IdentifyPrinterOperationAttributes
+			{
+				PrinterUri         = new IppValue<Uri>(this.printerUri),
+				RequestingUserName = new StringWithLanguage(this.context.RequestingUserName),
+				Message            = text
+			}
+		};
+
+		try
+		{
+			await this.context.Client.IdentifyPrinterAsync(request, cancellationToken).ConfigureAwait(false);
+		}
+		catch (PrintException exception)
+			when (exception.NativeErrorCode == (int)IppStatusCode.ServerErrorOperationNotSupported)
+		{
+			throw new NotSupportedException(ExceptionMessages.FormatIdentifyNotSupportedByPrinter(this.printerUri), exception);
+		}
+	}
+
+	/// <inheritdoc/>
+	/// <remarks>
+	/// The page is laid out on the job's paper, else the printer's <c>media-default</c>, as images and text are, and
+	/// sent as any PDF is: as it is, or as raster (ADR 0059).
+	/// </remarks>
+	public async Task<IPrintJob> PrintTestPageAsync(PrintOptions options, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+
+		MediaSize paper = await this.ChooseConvertedPaperAsync(Latiprimere.DocumentFormat.Pdf, options, cancellationToken).ConfigureAwait(false);
+		PrinterCapabilities capabilities = await this.GetCapabilitiesAsync(cancellationToken).ConfigureAwait(false);
+
+		TestPageFacts facts = new TestPageFacts
+		{
+			Printer      = this.Info,
+			PrintSystem  = this.context.DocumentFormats.ConvertsDocuments ? IppPrinter.CupsName : IppPrinter.NetworkName,
+			Address      = IppPrinter.WithoutCredentials(this.printerUri),
+			Capabilities = capabilities,
+			Paper        = paper,
+			PrintedAt    = this.context.TimeProvider.GetUtcNow()
+		};
+
+		using MemoryStream pdf = TestPageWriter.Write(facts);
+
+		PrintOptions pageOptions = options with { JobName = options.JobName ?? TestPageWriter.JobName };
+
+		return await this.SubmitAsync(PrintContent.FromPdf(pdf), pageOptions, cancellationToken).ConfigureAwait(false);
+	}
+
+	/// <summary>
+	/// Writes a URI without any user name or password it carries, to show it.
+	/// </summary>
+	/// <param name="uri">The URI.</param>
+	/// <returns>Its scheme, host, port and path.</returns>
+	internal static string WithoutCredentials(Uri uri)
+	{
+		return uri.GetComponents(UriComponents.SchemeAndServer | UriComponents.Path, UriFormat.UriEscaped);
 	}
 
 	/// <summary>
@@ -762,8 +859,12 @@ internal sealed class IppPrinter : IPrinter
 			jobAttributes.PageRanges = null;
 		}
 
-		// An image sent as it is is sized by the printer
-		PrintScaling? scaling = ImageDocumentConverter.IsImage(content.Format) ? IppJobTemplateMapper.ToPrintScaling(options.Scaling) : null;
+		// An image sent as it is is sized by the printer. A PDF it is asked to turn is shrunk to fit, as the raster
+		// path does, because macOS's CUPS turns a portrait page onto landscape paper at full size and cuts off its
+		// ends; a caller's own scaling option wins
+		PrintScaling? scaling = ImageDocumentConverter.IsImage(content.Format)
+			? IppJobTemplateMapper.ToPrintScaling(options.Scaling)
+			: IppPrinter.ChooseTurnedPdfScaling(content.Format, jobAttributes, options, this.context.VendorOptionPrefixes);
 
 		if (scaling is not null)
 		{
@@ -786,6 +887,31 @@ internal sealed class IppPrinter : IPrinter
 			},
 			JobTemplateAttributes = jobAttributes
 		};
+	}
+
+	/// <summary>
+	/// Chooses the <c>print-scaling</c> for a PDF the printer is asked to turn.
+	/// </summary>
+	/// <param name="format">The document's format.</param>
+	/// <param name="jobAttributes">The job's attributes, without <c>orientation-requested</c> when the pages are
+	/// turned as they are rendered.</param>
+	/// <param name="options">The print options, whose vendor options may size the pages themselves.</param>
+	/// <param name="prefixes">The vendor option prefixes this print system reads.</param>
+	/// <returns><c>auto-fit</c>, which shrinks a page only when it doesn't fit, or <see langword="null"/> to leave
+	/// the scaling to the printer.</returns>
+	private static PrintScaling? ChooseTurnedPdfScaling
+	(
+		Latiprimere.DocumentFormat format,
+		JobTemplateAttributes      jobAttributes,
+		PrintOptions               options,
+		IReadOnlyList<string>      prefixes
+	)
+	{
+		bool turnsPdf = format == Latiprimere.DocumentFormat.Pdf && jobAttributes.OrientationRequested is not null;
+
+		return turnsPdf && !IppVendorAttributeMapper.SetsScaling(options.VendorOptions, prefixes)
+			? PrintScaling.AutoFit
+			: (PrintScaling?)null;
 	}
 
 	/// <summary>

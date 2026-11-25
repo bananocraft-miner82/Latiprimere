@@ -75,6 +75,12 @@ internal sealed class InvalidServerIppClient : IIppClient
 		return Task.FromException<CancelJobResponse>(this.CreateException());
 	}
 
+	/// <inheritdoc/>
+	public Task<IdentifyPrinterResponse> IdentifyPrinterAsync(IdentifyPrinterRequest request, CancellationToken cancellationToken)
+	{
+		return Task.FromException<IdentifyPrinterResponse>(this.CreateException());
+	}
+
 	/// <summary>
 	/// Creates the failure every request reports.
 	/// </summary>

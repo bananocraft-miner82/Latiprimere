@@ -197,4 +197,8 @@
 		<value>Page ranges can't be applied to raw printer data, whose pages Latiprimere can't see. Leave PrintOptions.PageRanges empty for raw jobs.</value>
 		<comment>Thrown when a raw job sets PrintOptions.PageRanges.</comment>
 	</data>
+	<data name="IdentifyNeedsIppPrinter" xml:space="preserve">
+		<value>The Windows spooler can't ask '{0}' to identify itself. It can be asked over IPP, with WindowsOptions.PrintPdfOverIpp on, when the queue's IPP printer is known: by its URI in WindowsOptions.IppPrinterUris, or found by the UUID of its WSD port.</value>
+		<comment>{0} is the queue's name.</comment>
+	</data>
 </root>

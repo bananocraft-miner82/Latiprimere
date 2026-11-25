@@ -8,6 +8,19 @@ Each release is a heading in the form `## <version> - <yyyy-mm-dd>`, with `###` 
 
 ### Added
 
+- **A test page, on every print system:** `IPrinter.PrintTestPageAsync(options)` prints a page Latiprimere draws, with the printer's name, address and capabilities, a line a quarter of an inch from each edge to show what the printer can't reach, rulers of 100 mm and 4 inches to show scaling, and colour and grey patches. It is a PDF, printed as any PDF is ([ADR 0059](docs/decisions/0059-identify-test-page-and-printer-details.md)).
+- **Identifying a printer:** `IPrinter.IdentifyAsync(message)` asks a printer to flash, beep, show the message or speak, with IPP's Identify-Printer, so it can be told from others nearby. Network printers and CUPS queues; a Windows queue through its IPP printer, with `WindowsOptions.PrintPdfOverIpp` on. Others throw `NotSupportedException`.
+- **A printer's details:** `IPrinter.GetDetailsAsync()` returns `PrinterDetails`: the printer's web page, its supplies page, its icons, its firmware as `PrinterFirmware`, and how it can be identified, as `IdentifyAction`s. Only `http` and `https` addresses are given. A Windows queue has them through its IPP printer, as for identifying.
+- All three are `IPrinter` members with default implementations, so printers of your own keep compiling: they report no details, and throw `NotSupportedException` for the other two. A new guide, [Printer details, identifying a printer and test pages](https://latiprimere.com/docs/guides/printer-details-and-test-pages/), shows them.
+
+### Fixed
+
+- **A printer that misses the first mDNS query is asked again within the search:** each search sends a second query after 1 second, not 5, so a printer busy with a job is still found in the default two seconds of `DiscoveryDuration`. Listing printers, looking one up by `ipp:dnssd:` name, and finding a WSD queue's printer all get this ([ADR 0010](docs/decisions/0010-direct-ipp-adapter-design.md)).
+
+## 11.0.11-preview - 2026-11-24
+
+### Added
+
 - **`IppNetworkOptions.RequireEncryption`** keeps every job to IPPS. A printer found on the network is reached only at its IPPS address, and one that announces none, or whose certificate isn't trusted, is refused with `PrintException` rather than reached over plain IPP. An `ipp://` URI is refused without connecting, and one in `PrinterUris` throws `ArgumentException` when the print system is created ([ADR 0058](docs/decisions/0058-hardening-after-security-review.md)).
 - **Certificates pinned at one printer's address:** `IppNetworkOptions.PrinterCertificateFingerprints` and `WindowsOptions.IppPrinterCertificateFingerprints`, by printer URI. A certificate pinned there is refused at any other host, which matters when printers of one model share a certificate made at the factory ([ADR 0058](docs/decisions/0058-hardening-after-security-review.md)).
 - **Limits on PDFs rendered with PDFium:** `PdfiumOptions.MaxDocumentBytes`, and `RenderTimeout`, by default 2 minutes per band, after which a page built to keep the renderer busy is abandoned with `PrintException`, so it can't hold up every other PDF in the process. Pass them to `new PdfiumRasterizer(options)` or `AddLatiprimerePdfium(options => ...)` ([ADR 0058](docs/decisions/0058-hardening-after-security-review.md)).

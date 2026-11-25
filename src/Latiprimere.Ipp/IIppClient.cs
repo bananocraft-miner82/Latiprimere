@@ -90,4 +90,13 @@ internal interface IIppClient
 	/// <returns>The response.</returns>
 	/// <exception cref="PrintException">The request failed or was rejected.</exception>
 	Task<CancelJobResponse> CancelJobAsync(CancelJobRequest request, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Sends an Identify-Printer request (PWG 5100.13).
+	/// </summary>
+	/// <param name="request">The request.</param>
+	/// <param name="cancellationToken">A token to cancel the operation.</param>
+	/// <returns>The response.</returns>
+	/// <exception cref="PrintException">The request failed or was rejected.</exception>
+	Task<IdentifyPrinterResponse> IdentifyPrinterAsync(IdentifyPrinterRequest request, CancellationToken cancellationToken);
 }

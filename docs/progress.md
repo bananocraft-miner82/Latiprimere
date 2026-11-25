@@ -14,6 +14,36 @@ Newest entries first. Each entry records what was done, what was learned, and wh
 
 ---
 
+## 2026-11-25: Fixes from the macOS manual run
+
+**Found** in the owner's manual run on a Mac through CUPS: with two copies two-sided, the front of each sheet lost the first letter of every line; with landscape, the page's top and bottom were cut off. The rest printed as asked.
+
+**Done** (owner: "Yes, do both"):
+- **`three-pages.pdf` is made again by `make-three-pages.py`:** A4, 150 numbered lines kept 20 mm from every edge. The old file, from `cupsfilter`, was US Letter with its text 0.25 inch from the left edge, so on A4 it came within about 3 mm of it. It still said "CrossPrint", which the rename had missed inside the PDF.
+- **A PDF with an orientation goes with `print-scaling` `auto-fit`** to CUPS and network printers, unless a vendor option sizes the pages (`print-scaling`, `fit-to-page`, `fitplot`, `scaling`, `natural-scaling`). macOS's CUPS had turned the portrait A4 page onto landscape paper at its full size, centred, so about 124 points went from each end. Where Latiprimere renders the pages it already shrinks a turned page to fit, so now all routes ask for the same.
+- **`ipp:print-scaling` beside a typed `Scaling` is refused,** as other repeats of typed options are, rather than sent twice.
+- **The manual landscape scenario** asks too whether anything was cut off; the docs on CUPS and orientation say what macOS does.
+- **`.gitattributes` marks PDFs and images binary.** A PDF written all in text, as `line-art.pdf` and now `three-pages.pdf` are, was checked out on Windows with carriage returns added, which moves every object from the place the PDF's table gives; PDFium had been quietly repairing `line-art.pdf`.
+
+**Not yet checked:** whether macOS's CUPS honours `print-scaling` for a PDF, or only its own `fit-to-page`. The manual landscape scenario on the Mac answers it.
+
+## 2026-11-25: Identifying a printer, a test page, and the printer's details
+
+**Done** (owner: "Do 1, 2 and 3 now and add the remainder to the plan to do later"), recorded in [ADR 0059](decisions/0059-identify-test-page-and-printer-details.md):
+- **`IPrinter.GetDetailsAsync()`** and `PrinterDetails`: web page, supplies page, icons, firmware and identify actions, read over IPP in one raw request. Only `http` and `https` URIs are kept. A Windows queue has them through its IPP printer; without the route, or when that printer can't be reached, only its ID.
+- **`IPrinter.IdentifyAsync(message)`:** IPP's Identify-Printer, the message held to 127 bytes, `server-error-operation-not-supported` as `NotSupportedException`. A Windows queue through its IPP printer, otherwise `NotSupportedException` saying how.
+- **`IPrinter.PrintTestPageAsync(options)`:** a page drawn by `TestPageWriter` in Latiprimere.Ipp, which IPP printers and Windows printers both use, printed as any PDF is. The PDF writer gained filled and outlined rectangles and lines.
+- **The catalog's printer** forwards all three, checking a test page's options as a job's.
+- **The remainder** of the review went into [plan.md](plan.md)'s later items, 14 to 20: office and label settings, job accounting, printers' own option names, scanning, fax, cloud printing and maintenance commands.
+
+**Learned:**
+- **SharpIppNext's `StringWithLanguage` converts from `string`,** so `condition ? null : new StringWithLanguage(...)` is an empty string, not none: the `null` goes through the conversion. The new tests caught it for Identify-Printer's message; nothing else in the code has the pattern.
+- **A test page needs the rulers checked by length, not by eye:** the first draft drew the metric ruler five times too long, which the tests caught.
+
+**Next:** identifying the HP and its test page on paper, added to the sign-off in [releasing.md](releasing.md#1-the-sign-off).
+
+---
+
 ## 2026-11-24: Hardening after an outside security review
 
 **Done** (owner: "Can you analyse the results and identify potential fixes", then "Fix all findings, starting at the top and working down"), recorded in [ADR 0058](decisions/0058-hardening-after-security-review.md), accepted (owner: "Accept ADR 0058"):
